@@ -1,8 +1,4 @@
-interface Env {
-  RESEND_API_KEY?: string
-  RESEND_FROM_EMAIL?: string
-  RESEND_TO_EMAIL?: string
-}
+import { hash, sameOrigin, type Env } from '../lib/store'
 
 const serviceLabels: Record<string, { ar: string; en: string }> = {
   website: { ar: 'موقع إلكتروني', en: 'Website' },
@@ -29,6 +25,7 @@ export const onRequestPost = async (context: {
   env: Env
 }) => {
   const { request, env } = context
+  if (!sameOrigin(request)) return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403 })
 
   // Parse body
   let body: Record<string, string>
@@ -42,6 +39,9 @@ export const onRequestPost = async (context: {
   }
 
   const { name, phone, email, service, description } = body
+  if ([name, phone, email, service, description].some(value => typeof value !== 'string') || Object.values(body).some(value => typeof value !== 'string' || value.length > 5000)) {
+    return new Response(JSON.stringify({ error: 'validation' }), { status: 422 })
+  }
 
   // Validation
   const errors: Record<string, string> = {}
@@ -65,6 +65,15 @@ export const onRequestPost = async (context: {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     })
+  }
+
+  if (env.DB) {
+    const key = 'contact:' + await hash(request.headers.get('CF-Connecting-IP') || 'local') + ':' + Math.floor(Date.now() / 600000)
+    try {
+      await env.DB.prepare('INSERT INTO login_attempts VALUES (?, 1, ?) ON CONFLICT(key) DO UPDATE SET attempts = attempts + 1').bind(key, Date.now() + 600000).run()
+      const row = await env.DB.prepare('SELECT attempts FROM login_attempts WHERE key = ?').bind(key).first<{ attempts: number }>()
+      if ((row?.attempts || 0) > 3) return new Response(JSON.stringify({ error: 'too_many_requests' }), { status: 429 })
+    } catch { return new Response(JSON.stringify({ error: 'server_error' }), { status: 503 }) }
   }
 
   const resendApiKey = env.RESEND_API_KEY
@@ -132,12 +141,19 @@ export const onRequestPost = async (context: {
 </html>
   `.trim()
 
+  const messageId = crypto.randomUUID()
+  if (env.DB) {
+    try {
+      await env.DB.prepare('INSERT INTO messages VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(messageId, name.trim(), email.trim(), phone.trim(), service, description.trim(), Date.now(), 'pending').run()
+    } catch { return new Response(JSON.stringify({ error: 'server_error' }), { status: 503 }) }
+  }
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${resendApiKey}`,
         'Content-Type': 'application/json',
+        'Idempotency-Key': messageId,
       },
       body: JSON.stringify({
         from: fromEmail,
@@ -149,6 +165,7 @@ export const onRequestPost = async (context: {
     })
 
     if (!res.ok) {
+      if (env.DB) await env.DB.prepare("UPDATE messages SET status = 'failed' WHERE id = ?").bind(messageId).run()
       const errData = await res.json().catch(() => ({}))
       return new Response(
         JSON.stringify({ error: 'email_failed', details: errData }),
@@ -159,6 +176,10 @@ export const onRequestPost = async (context: {
       )
     }
 
+    if (env.DB) {
+      try { await env.DB.prepare("UPDATE messages SET status = 'sent', created_at = ? WHERE id = ?").bind(Date.now(), messageId).run() }
+      catch (error) { console.error('Email accepted but recording status failed', messageId, error) }
+    }
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },

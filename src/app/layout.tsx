@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Cairo, Inter } from 'next/font/google'
 import '../styles/globals.css'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
+import { VisitTracker } from '@/components/providers/VisitTracker'
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -106,6 +107,7 @@ export default function RootLayout({
         className={`${cairo.variable} ${inter.variable} font-arabic antialiased bg-[#f8fafc] dark:bg-[#0b1628] text-[#0f2744] dark:text-[#e8f0fb] transition-colors duration-200`}
       >
         <ThemeProvider>
+          <VisitTracker />
           {children}
         </ThemeProvider>
       </body>

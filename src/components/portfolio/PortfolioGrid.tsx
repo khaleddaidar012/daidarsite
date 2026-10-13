@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useProjects } from './useProjects'
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, Globe, Settings2 } from 'lucide-react'
 import { getTranslations } from '@/locales'
@@ -26,7 +27,8 @@ const categoryGradients: Record<string, string> = {
   saas:      'from-emerald-500 to-teal-400',
 }
 
-export function PortfolioGrid({ locale, projects }: PortfolioGridProps) {
+export function PortfolioGrid({ locale, projects: initialProjects }: PortfolioGridProps) {
+  const projects = useProjects(initialProjects)
   const t = getTranslations(locale)
   const isRTL = locale === 'ar'
   const ArrowIcon = isRTL ? ArrowLeft : ArrowRight
@@ -75,14 +77,14 @@ export function PortfolioGrid({ locale, projects }: PortfolioGridProps) {
             return (
               <Link
                 key={project.id}
-                href={`/${locale}/portfolio/${project.slug}`}
+                href={project.managed ? project.link! : `/${locale}/portfolio/${project.slug}`}
                 className="card-base rounded-2xl overflow-hidden group block animate-fade-in-up"
                 style={{ animationDelay: `${i * 0.08}s` }}
                 aria-label={title}
               >
                 {/* Visual header */}
                 <div className={clsx('h-40 bg-gradient-to-br flex items-center justify-center', gradient)}>
-                  <Settings2 size={48} className="text-white/30" />
+                  {project.image ? <img src={project.image} alt={title} className="w-full h-full object-cover" /> : <Settings2 size={48} className="text-white/30" />}
                 </div>
 
                 <div className="p-6">

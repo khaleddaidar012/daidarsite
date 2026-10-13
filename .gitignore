@@ -35,3 +35,5 @@ yarn-error.log*
 # Vercel & Cloudflare
 .vercel
 .wrangler
+.dev.vars
+.dev.vars.*

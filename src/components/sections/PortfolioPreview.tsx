@@ -1,4 +1,6 @@
+'use client'
 import Link from 'next/link'
+import { useProjects } from '@/components/portfolio/useProjects'
 import { ArrowLeft, ArrowRight, Globe, Settings2 } from 'lucide-react'
 import { getTranslations } from '@/locales'
 import { getPublishedProjects } from '@/data/projects'
@@ -43,12 +45,13 @@ function ProjectCard({
 
   return (
     <Link
-      href={`/${locale}/portfolio/${project.slug}`}
+      href={project.managed ? project.link! : `/${locale}/portfolio/${project.slug}`}
       className="group block bg-white dark:bg-[#132038] rounded-2xl border border-[#e2e8f0] dark:border-[#1e3456] p-6 flex flex-col
                  shadow-[0_2px_12px_rgba(15,39,68,0.05)] hover:shadow-[0_8px_28px_rgba(56,189,248,0.12)]
                  hover:-translate-y-0.5 transition-all duration-300"
       aria-label={title}
     >
+      {project.image && <img src={project.image} alt={title} className="w-full h-40 object-cover rounded-xl mb-4" />}
       {/* Category badge */}
       <div className="flex items-center justify-between mb-4">
         <span
@@ -97,7 +100,7 @@ export function PortfolioPreview({ locale }: PortfolioPreviewProps) {
   const t = getTranslations(locale)
   const isRTL = locale === 'ar'
   const ArrowIcon = isRTL ? ArrowLeft : ArrowRight
-  const projects = getPublishedProjects().slice(0, 3)
+  const projects = useProjects(getPublishedProjects()).slice(0, 3)
 
   return (
     <section

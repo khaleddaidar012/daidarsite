@@ -1,4 +1,5 @@
 export interface Project {
+  managed?: boolean
   id: string
   slug: string
   category: 'website' | 'ecommerce' | 'system' | 'saas'

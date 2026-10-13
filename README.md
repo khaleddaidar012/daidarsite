@@ -2,6 +2,8 @@
 
 موقع تعريفي احترافي مبني بـ Next.js 15 + TypeScript + Tailwind CSS.
 
+لوحة الإدارة المحمية متاحة على `/admin` لإحصائيات الزوار والبريد وإضافة المشاريع. إعداد Cloudflare Pages وD1 موضح في [ADMIN_SETUP.md](ADMIN_SETUP.md).
+
 ## 🚀 التشغيل المحلي
 
 ### المتطلبات
