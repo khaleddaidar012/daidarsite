@@ -45,7 +45,7 @@ function ProjectCard({
 
   return (
     <Link
-      href={project.managed ? project.link! : `/${locale}/portfolio/${project.slug}`}
+      href={project.managed ? (project.link || `/${locale}/request`) : `/${locale}/portfolio/${project.slug}`}
       className="group block bg-white dark:bg-[#132038] rounded-2xl border border-[#e2e8f0] dark:border-[#1e3456] p-6 flex flex-col
                  shadow-[0_2px_12px_rgba(15,39,68,0.05)] hover:shadow-[0_8px_28px_rgba(56,189,248,0.12)]
                  hover:-translate-y-0.5 transition-all duration-300"

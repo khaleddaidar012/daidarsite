@@ -8,5 +8,5 @@ export function useProjects(initial: Project[]) {
     fetch('/api/projects', { cache: 'no-store' }).then(r => r.ok ? r.json() : { projects: [] }).then(data => { if (active && Array.isArray(data.projects)) setAdded(data.projects) }).catch(() => {})
     return () => { active = false }
   }, [])
-  return [...added, ...initial]
+  return [...added, ...initial.filter(p => !added.some(a => a.id === p.id))].filter(p => p.status === 'published')
 }

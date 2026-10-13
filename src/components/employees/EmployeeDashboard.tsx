@@ -1,0 +1,47 @@
+'use client'
+import { useEffect, useState, type FormEvent } from 'react'
+import { action, field, callApi, currentMonth, AttendanceTable, time, statusLabel, type Employee, type RecordRow, type EmployeeRequest } from './shared'
+export default function EmployeeDashboard() {
+  const [employee, setEmployee] = useState<Employee | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [month, setMonth] = useState(currentMonth)
+  const [rows, setRows] = useState<RecordRow[]>([])
+  const [requests, setRequests] = useState<EmployeeRequest[]>([])
+  const [open, setOpen] = useState<RecordRow | null>(null)
+  const [today, setToday] = useState<RecordRow | null>(null)
+  const [serverDay, setServerDay] = useState('')
+  const [revision, setRevision] = useState(0)
+  const [requestType, setRequestType] = useState('leave')
+  const [reportLoading, setReportLoading] = useState(false)
+  function fail(e: Error & { status?: number }) { setError(e.message); if (e.status === 401) setEmployee(null) }
+  useEffect(() => { callApi('employee', 'session').then(data => setEmployee(data.employee)).catch(e => { if (e.status !== 401) setError(e.message) }).finally(() => setLoading(false)) }, [])
+  useEffect(() => {
+    if (!employee) return
+    let active = true; setReportLoading(true)
+    Promise.all([callApi('employee', `attendance?month=${month}`), callApi('employee', `requests?month=${month}`)]).then(([a, r]) => { if (active) { setRows(a.records); setOpen(a.open); setToday(a.today); setServerDay(a.serverDay); setRequests(r.requests) } }).catch(e => { if (active) fail(e) }).finally(() => { if (active) setReportLoading(false) })
+    return () => { active = false }
+  }, [employee, month, revision])
+  async function login(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault(); setBusy(true); setError(''); const form = new FormData(e.currentTarget)
+    try { setEmployee((await callApi('employee', 'login', 'POST', { email: form.get('email'), password: form.get('password') })).employee) } catch (e) { fail(e as Error) } finally { setBusy(false) }
+  }
+  async function punch(path: string) {
+    setBusy(true); setError(''); setNotice('')
+    try { await callApi('employee', path, 'POST'); setRevision(n => n + 1); setNotice(path === 'check-in' ? 'تم تسجيل حضورك' : 'تم تسجيل انصرافك') } catch (e) { fail(e as Error) } finally { setBusy(false) }
+  }
+  async function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault(); const target = e.currentTarget; const data = new FormData(target); setBusy(true); setError(''); setNotice('')
+    try { await callApi('employee', 'requests', 'POST', Object.fromEntries(data)); target.reset(); setRequestType('leave'); setRevision(n => n + 1); setNotice('تم إرسال طلبك للإدارة. تابع حالته في شهر تاريخ الطلب.') } catch (e) { fail(e as Error) } finally { setBusy(false) }
+  }
+  if (loading) return <main className="p-10 text-center">جارٍ التحميل…</main>
+  return <main dir="rtl" className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-8"><div className="max-w-5xl mx-auto"><header className="flex flex-wrap justify-between items-center gap-4 mb-8"><div><p className="text-sky-600 font-bold">دعيدر للحلول البرمجية</p><h1 className="text-3xl font-bold mt-2">{employee ? `أهلًا ${employee.name}` : 'دخول الموظفين'}</h1>{employee && <p className="text-slate-500 mt-2">{employee.job_title}</p>}</div>{employee && <button className={action} disabled={busy} onClick={async () => { setBusy(true); try { await callApi('employee', 'logout', 'POST'); setEmployee(null); setRows([]); setRequests([]); setNotice('') } catch (e) { fail(e as Error) } finally { setBusy(false) } }}>تسجيل الخروج</button>}</header>{error && <p role="alert" className="bg-red-50 text-red-700 p-4 rounded-xl mb-5">{error}</p>}{notice && <p role="status" className="text-green-700 p-4 mb-5">{notice}</p>}
+    {!employee ? <form onSubmit={login} className="max-w-md mx-auto bg-white border rounded-2xl p-6 space-y-4"><label className="block">البريد الإلكتروني<input className={field} name="email" type="email" autoComplete="username" required /></label><label className="block">كلمة المرور<input className={field} name="password" type="password" autoComplete="current-password" maxLength={256} required /></label><button className={`${action} w-full`} disabled={busy}>دخول</button><p className="text-sm text-slate-500">حسابك يتم إنشاؤه بواسطة الإدارة.</p></form> : <>
+    <section className="bg-white border rounded-2xl p-6 mb-6"><h2 className="text-xl font-bold mb-3">حضور وانصراف اليوم</h2><p className="mb-4">{open ? `حضور مفتوح منذ ${open.day} — ${time(open.check_in)}` : today?.check_out ? `تم تسجيل انصرافك ${time(today.check_out)}` : 'لم تسجل حضورًا اليوم'}</p><div className="flex flex-wrap gap-3"><button className={action} disabled={busy || reportLoading || !!open || !!today} onClick={() => punch('check-in')}>تسجيل حضور</button><button className="rounded-xl bg-slate-800 text-white px-5 py-3 font-bold disabled:opacity-50" disabled={busy || reportLoading || !open} onClick={() => punch('check-out')}>تسجيل انصراف</button><button disabled={busy || reportLoading} className="text-sky-700 px-3" onClick={() => setRevision(n => n + 1)}>تحديث</button></div><p className="mt-4 text-sm text-slate-500">التوقيت من الخادم بتوقيت القاهرة. حضور وانصراف واحد لكل يوم.</p></section>
+    <section className="bg-white border rounded-2xl p-6 mb-6"><h2 className="text-xl font-bold mb-4">طلب إجازة أو استئذان</h2><form onSubmit={submit} className="grid sm:grid-cols-2 gap-4"><label>نوع الطلب<select className={field} name="type" value={requestType} onChange={e => setRequestType(e.target.value)}><option value="leave">إجازة يوم</option><option value="early">استئذان انصراف مبكر</option></select></label><label>التاريخ<input className={field} type="date" name="day" min={serverDay} required /></label>{requestType === 'early' && <label>وقت الانصراف المطلوب (القاهرة)<input className={field} type="time" name="requested_time" required /></label>}<label className="sm:col-span-2">السبب<textarea className={field} name="reason" required maxLength={1000} rows={3} /></label><button className={action} disabled={busy}>إرسال الطلب للإدارة</button></form></section>
+    <section className="bg-white border rounded-2xl p-6"><div className="flex flex-wrap justify-between items-center gap-4"><h2 className="text-xl font-bold">سجلي الشهري</h2><label>الشهر<input className={field} type="month" value={month} onChange={e => { if (e.target.value) setMonth(e.target.value) }} /></label></div>{reportLoading ? <p className="py-6">جارٍ تحميل الشهر…</p> : <><AttendanceTable month={month} records={rows} requests={requests} /><h3 className="font-bold mt-6 mb-3">طلبات الشهر</h3>{requests.map(r => <article key={r.id} className="border rounded-xl p-4 mb-3"><h4 className="font-bold">{r.type === 'leave' ? 'إجازة' : 'انصراف مبكر'} — {r.day} {r.requested_time || ''} · {statusLabel[r.status]}</h4><p className="whitespace-pre-wrap break-words mt-2">{r.reason}</p>{r.admin_note && <p className="text-slate-500 mt-2">ملاحظة الإدارة: {r.admin_note}</p>}</article>)}{!requests.length && <p className="text-slate-500">لا توجد طلبات في هذا الشهر.</p>}</>}</section>
+    </>}
+  </div></main>
+}

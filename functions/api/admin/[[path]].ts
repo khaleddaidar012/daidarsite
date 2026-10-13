@@ -1,4 +1,6 @@
 import { authenticated, hash, json, sameOrigin, verifyPassword, type Env } from '../../lib/store'
+import { adminEmployees } from '../../lib/employees'
+import { allProjects, originals } from '../../lib/projects'
 
 export async function onRequest({ request, env }: { request: Request; env: Env }) {
   try {
@@ -34,6 +36,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       return json({ success: true }, 200, { 'Set-Cookie': `daidar_session=${token}; Path=/api/admin; HttpOnly; SameSite=Strict; Max-Age=28800${secure}` })
     }
     if (!await authenticated(request, env)) return json({ error: 'سجل دخولك أولاً' }, 401)
+    if (['employees', 'attendance', 'employee-requests'].includes(path)) return await adminEmployees(request, env, path)
     if (path === 'session' && request.method === 'GET') return json({ email: env.ADMIN_EMAIL })
     if (path === 'logout' && request.method === 'POST') {
       const token = request.headers.get('Cookie')?.split(';').map(x => x.trim()).find(x => x.startsWith('daidar_session='))?.slice(15)
@@ -62,8 +65,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       return json({ messages: rows.results, limited: rows.results.length === 500 })
     }
     if (path === 'projects' && request.method === 'GET') {
-      const rows = await env.DB.prepare('SELECT data FROM managed_projects ORDER BY created_at DESC').all<{ data: string }>()
-      return json({ projects: rows.results.map(x => JSON.parse(x.data)) })
+      return json({ projects: await allProjects(env) })
     }
     if (path === 'projects' && request.method === 'POST') {
       if (Number(request.headers.get('Content-Length') || 0) > 1500000) return json({ error: 'الصورة كبيرة جدًا' }, 413)
@@ -72,14 +74,19 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       const body = JSON.parse(raw)
       if ((body.titleEn !== undefined && typeof body.titleEn !== 'string') || (body.descriptionEn !== undefined && typeof body.descriptionEn !== 'string')) return json({ error: 'بيانات غير صحيحة' }, 422)
       if (typeof body.title !== 'string' || !body.title.trim() || body.title.length > 200 || typeof body.description !== 'string' || !body.description.trim() || body.description.length > 5000 || !['website', 'system', 'ecommerce', 'saas'].includes(body.category)) return json({ error: 'راجع عنوان المشروع والوصف والتصنيف' }, 422)
-      if (!validUrl(body.link) || !(validUrl(body.image) || (typeof body.image === 'string' && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(body.image)))) return json({ error: 'أضف رابط HTTPS وصورة PNG أو JPEG أو WebP' }, 422)
-      const id = typeof body.id === 'string' && /^[a-f0-9-]{36}$/.test(body.id) ? body.id : crypto.randomUUID()
-      const project = { id, slug: id, category: body.category, status: 'published', titleAr: body.title.trim(), titleEn: body.titleEn?.trim().slice(0, 200) || body.title.trim(), descriptionAr: body.description.trim(), descriptionEn: body.descriptionEn?.trim().slice(0, 5000) || body.description.trim(), longDescriptionAr: body.description.trim(), longDescriptionEn: body.description.trim(), technologiesAr: [], technologiesEn: [], featuresAr: [], featuresEn: [], image: body.image, link: body.link, order: -now, managed: true }
+      if ((body.link && !validUrl(body.link)) || (body.image && !(validUrl(body.image) || (typeof body.image === 'string' && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(body.image))))) return json({ error: 'استخدم روابط HTTPS وصورة PNG أو JPEG أو WebP' }, 422)
+      const existing = body.id ? (await allProjects(env)).find(p => p.id === body.id) : undefined
+      if (body.id && !existing) return json({ error: 'المشروع غير موجود' }, 404)
+      if (body.status !== undefined && !['published', 'draft'].includes(body.status)) return json({ error: 'حالة غير صحيحة' }, 422)
+      const id = existing?.id || crypto.randomUUID()
+      const original = originals.find(p => p.id === id)
+      const project = { ...existing, id, slug: existing?.slug || id, category: body.category, status: body.status || 'published', titleAr: body.title.trim(), titleEn: body.titleEn?.trim().slice(0, 200) || body.title.trim(), descriptionAr: body.description.trim(), descriptionEn: body.descriptionEn?.trim().slice(0, 5000) || body.description.trim(), longDescriptionAr: body.description.trim(), longDescriptionEn: body.descriptionEn?.trim().slice(0, 5000) || body.description.trim(), technologiesAr: existing?.technologiesAr || [], technologiesEn: existing?.technologiesEn || [], featuresAr: existing?.featuresAr || [], featuresEn: existing?.featuresEn || [], image: body.image || null, link: body.link || null, order: existing?.order ?? -now, managed: !original }
       await env.DB.prepare('INSERT INTO managed_projects VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data').bind(id, JSON.stringify(project), now).run()
       return json({ project })
     }
     if (path === 'projects' && request.method === 'DELETE') {
       const { id } = await request.json() as { id: string }
+      if (originals.some(p => p.id === id)) return json({ error: 'لإخفاء مشروع أصلي، غيّر حالته إلى مخفي من التعديل' }, 409)
       await env.DB.prepare('DELETE FROM managed_projects WHERE id = ?').bind(id).run()
       return json({ success: true })
     }

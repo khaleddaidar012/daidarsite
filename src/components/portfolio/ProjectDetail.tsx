@@ -1,3 +1,5 @@
+'use client'
+import { useProjects } from './useProjects'
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, CheckCircle2, Code2 } from 'lucide-react'
 import { getTranslations } from '@/locales'
@@ -16,7 +18,9 @@ const categoryGradients: Record<string, string> = {
   saas:      'from-emerald-500 to-teal-400',
 }
 
-export function ProjectDetail({ locale, project }: ProjectDetailProps) {
+export function ProjectDetail({ locale, project: initial }: ProjectDetailProps) {
+  const project = useProjects([initial]).find(p => p.id === initial.id)
+  if (!project) return <div className="pt-32 text-center pb-20">{locale === 'ar' ? 'هذا المشروع غير متاح حاليًا' : 'This project is currently unavailable'}<p><Link href={`/${locale}/portfolio`}>{locale === 'ar' ? 'العودة للأعمال' : 'Back to portfolio'}</Link></p></div>
   const t = getTranslations(locale)
   const isRTL = locale === 'ar'
   const ArrowIcon = isRTL ? ArrowLeft : ArrowRight
@@ -33,6 +37,7 @@ export function ProjectDetail({ locale, project }: ProjectDetailProps) {
     <div className="pt-24 pb-20">
       {/* Hero Banner */}
       <div className={clsx('h-64 sm:h-80 bg-gradient-to-br flex items-center justify-center', gradient)}>
+        {project.image && <img src={project.image} alt={locale === 'ar' ? project.titleAr : project.titleEn} className="h-full max-w-[50%] object-contain" />}
         <div className="text-center text-white">
           <Code2 size={56} className="mx-auto mb-4 opacity-40" />
           <h1 className="text-3xl sm:text-4xl font-bold">{title}</h1>

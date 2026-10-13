@@ -10,6 +10,7 @@ export function middleware(request: NextRequest) {
   if (
     pathname.startsWith('/api') ||
     pathname === '/admin' || pathname.startsWith('/admin/') ||
+    pathname === '/employee' || pathname.startsWith('/employee/') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/sitemap') ||
     pathname.includes('.') // static files

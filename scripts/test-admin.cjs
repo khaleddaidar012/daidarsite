@@ -19,7 +19,11 @@ const DB = {
   async batch(statements) { return Promise.all(statements.map(s => s.run())) },
 }
 const store = load('functions/lib/store.ts')
-const admin = load('functions/api/admin/[[path]].ts', { '../../lib/store': store }).onRequest
+const employeeLib = load('functions/lib/employees.ts', { './store': store })
+const originalProjects = load('src/data/projects.ts')
+const projectLib = load('functions/lib/projects.ts', { '../../src/data/projects': originalProjects })
+const admin = load('functions/api/admin/[[path]].ts', { '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib }).onRequest
+const employeeApi = load('functions/api/employee/[[path]].ts', { '../../lib/store': store, '../../lib/employees': employeeLib }).onRequest
 const visit = load('functions/api/visit.ts', { '../lib/store': store }).onRequestPost
 const publicProjects = load('functions/api/projects.ts', { '../lib/store': store }).onRequestGet
 const contact = load('functions/api/contact.ts', { '../lib/store': store }).onRequestPost
@@ -55,6 +59,16 @@ async function test() {
   assert.equal((await (await publicProjects({ env })).json()).projects.length, 1)
   await call('projects', 'POST', { ...project, id: saved.id, title: 'تعديل' }, cookie)
   assert.equal((await (await call('projects', 'GET', undefined, cookie)).json()).projects[0].titleAr, 'تعديل')
+  const original = originalProjects.projects[0]
+  response = await call('projects', 'POST', { id: original.id, title: 'عنوان المشروع الأصلي الجديد', description: 'وصف محدث', category: original.category, status: 'draft', image: '', link: '' }, cookie)
+  assert.equal(response.status, 200)
+  const updatedOriginal = (await response.json()).project
+  assert.equal(updatedOriginal.slug, original.slug)
+  assert.equal(updatedOriginal.managed, false)
+  assert.deepEqual(updatedOriginal.featuresAr, original.featuresAr)
+  assert.equal(updatedOriginal.status, 'draft')
+  assert.equal((await (await call('projects', 'GET', undefined, cookie)).json()).projects.length, 4)
+  await DB.prepare('DELETE FROM managed_projects WHERE id = ?').bind(original.id).run()
   const visitor = crypto.randomUUID()
   const visitorRequest = () => new Request('https://test.example/api/visit', { method: 'POST', headers: { Origin: 'https://test.example' }, body: JSON.stringify({ visitor }) })
   assert.equal((await visit({ env, request: visitorRequest() })).status, 200)
@@ -70,6 +84,79 @@ async function test() {
   assert.equal((await (await call('messages?days=7', 'GET', undefined, cookie)).json()).messages.length, 2)
   await call('projects', 'DELETE', { id: saved.id }, cookie)
   assert.equal((await (await publicProjects({ env })).json()).projects.length, 0)
+  sqlite.exec(fs.readFileSync('migrations/0002_employees.sql', 'utf8'))
+  for (const path of ['employees', 'attendance', 'employee-requests']) assert.equal((await call(path)).status, 401)
+  const employeePassword = 'employee-test-password'
+  assert.equal(employeeLib.cairoDay(Date.parse('2026-10-12T21:30:00Z')), '2026-10-13')
+  const employeeForm = { name: 'خالد', job_title: 'مطور', email: 'khaled@example.com', password: employeePassword, active: 1 }
+  assert.equal((await call('employees', 'POST', employeeForm, cookie)).status, 200)
+  assert.equal((await call('employees', 'POST', employeeForm, cookie)).status, 409)
+  await call('employees', 'POST', { ...employeeForm, name: 'أحمد', email: 'ahmed@example.com' }, cookie)
+  const employeeList = (await (await call('employees', 'GET', undefined, cookie)).json()).employees
+  assert.equal(employeeList.length, 2)
+  assert.equal(employeeList[0].password_hash, undefined)
+  const employeeCall = (path, method = 'GET', body, employeeCookie, origin) => employeeApi({ env, request: new Request(request(path, method, body, employeeCookie, origin).url.replace('/api/admin/', '/api/employee/'), request(path, method, body, employeeCookie, origin)) })
+  assert.equal((await employeeCall('check-in', 'POST')).status, 401)
+  assert.equal((await employeeCall('login', 'POST', { email: employeeForm.email, password: 'wrong' })).status, 401)
+  response = await employeeCall('login', 'POST', { email: employeeForm.email, password: employeePassword })
+  assert.equal(response.status, 200)
+  const employeeCookie = response.headers.get('set-cookie').split(';')[0]
+  assert.equal((await call('employees', 'GET', undefined, employeeCookie)).status, 401)
+  assert.equal((await employeeCall('check-in', 'POST', {}, employeeCookie, 'https://evil.example')).status, 403)
+  assert.equal((await employeeCall('check-out', 'POST', {}, employeeCookie)).status, 409)
+  const punch = () => employeeCall('check-in', 'POST', { employee_id: employeeList[1].id, check_in: 0 }, employeeCookie)
+  await Promise.all([punch(), punch()])
+  const attendance = sqlite.prepare('SELECT * FROM attendance').all()
+  assert.equal(attendance.length, 1)
+  assert.equal(attendance[0].employee_id, employeeList[0].id)
+  assert.ok(attendance[0].check_in > now - 10000)
+  assert.equal(attendance[0].day, employeeLib.cairoDay())
+  sqlite.prepare('UPDATE attendance SET check_in = ? WHERE id = ?').run(Date.now() - 4.5 * 3600000, attendance[0].id)
+  assert.equal((await employeeCall('check-out', 'POST', {}, employeeCookie)).status, 200)
+  const month = employeeLib.cairoDay().slice(0, 7)
+  const report = (await (await employeeCall('attendance?month=' + month, 'GET', undefined, employeeCookie)).json()).records
+  assert.equal(report.length, 1)
+  assert.ok(Math.abs(report[0].hours - 4.5) < 0.01)
+  assert.equal((await punch()).status, 409)
+  sqlite.prepare('INSERT INTO attendance VALUES (?, ?, ?, ?, ?)').run('other', employeeList[1].id, employeeLib.cairoDay(), Date.now() - 3600000, Date.now())
+  assert.equal((await (await employeeCall('attendance?month=' + month, 'GET', undefined, employeeCookie)).json()).records.length, 1)
+  assert.equal((await (await call('attendance?month=' + month, 'GET', undefined, cookie)).json()).records.length, 2)
+  assert.equal((await employeeCall('attendance?month=invalid', 'GET', undefined, employeeCookie)).status, 400)
+  const leave = { day: employeeLib.cairoDay(), type: 'leave', reason: 'ظرف شخصي', employee_id: employeeList[1].id, status: 'approved' }
+  assert.equal((await employeeCall('requests', 'POST', leave, employeeCookie)).status, 200)
+  assert.equal((await employeeCall('requests', 'POST', leave, employeeCookie)).status, 409)
+  const leaveRow = sqlite.prepare('SELECT * FROM employee_requests').get()
+  assert.equal(leaveRow.employee_id, employeeList[0].id)
+  assert.equal(leaveRow.status, 'pending')
+  assert.equal((await employeeCall('requests', 'POST', { ...leave, type: 'early', requested_time: '99:99' }, employeeCookie)).status, 422)
+  assert.equal((await employeeCall('requests', 'POST', { ...leave, type: 'early', requested_time: '15:30' }, employeeCookie)).status, 200)
+  assert.equal((await call('employee-requests', 'POST', { id: leaveRow.id, status: 'approved', admin_note: 'موافق' }, employeeCookie)).status, 401)
+  assert.equal((await call('employee-requests', 'POST', { id: leaveRow.id, status: 'approved', admin_note: 'موافق' }, cookie)).status, 200)
+  const employeeRequests = (await (await employeeCall('requests?month=' + month, 'GET', undefined, employeeCookie)).json()).requests
+  assert.equal(employeeRequests.find(r => r.id === leaveRow.id).status, 'approved')
+  assert.equal(employeeRequests.find(r => r.id === leaveRow.id).admin_note, 'موافق')
+  assert.equal((await employeeCall('requests', 'POST', { ...leave, day: '2020-02-30' }, employeeCookie)).status, 422)
+  assert.equal((await call('employees', 'POST', { ...employeeForm, id: employeeList[0].id, password: '', active: 0 }, cookie)).status, 200)
+  assert.equal((await employeeCall('session', 'GET', undefined, employeeCookie)).status, 401)
+  assert.equal((await employeeCall('login', 'POST', { email: employeeForm.email, password: employeePassword })).status, 401)
+  await call('employees', 'POST', { ...employeeForm, id: employeeList[0].id, password: '', active: 1 }, cookie)
+  response = await employeeCall('login', 'POST', { email: employeeForm.email, password: employeePassword })
+  const resetCookie = response.headers.get('set-cookie').split(';')[0]
+  await call('employees', 'POST', { ...employeeForm, id: employeeList[0].id, password: 'changed-test-password' }, cookie)
+  assert.equal((await employeeCall('session', 'GET', undefined, resetCookie)).status, 401)
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM attendance').get().n, 2)
+  sqlite.prepare('INSERT INTO attendance VALUES (?, ?, ?, ?, NULL)').run('overnight', employeeList[1].id, '2026-09-30', Date.parse('2026-09-30T20:00:00Z'))
+  const oldNow = Date.now
+  Date.now = () => Date.parse('2026-10-01T04:00:00Z')
+  try {
+    const overnightToken = 'overnight-test-token'
+    const secondEmployee = sqlite.prepare('SELECT * FROM employees WHERE id = ?').get(employeeList[1].id)
+    sqlite.prepare('INSERT INTO employee_sessions VALUES (?, ?, ?, ?)').run(await store.hash(overnightToken), secondEmployee.id, Date.now() + 100000, secondEmployee.password_hash)
+    await employeeCall('check-out', 'POST', {}, 'daidar_employee=' + overnightToken)
+    const previousMonth = await employeeLib.monthlyAttendance(env, '2026-09', secondEmployee.id)
+    assert.equal(previousMonth.find(r => r.id === 'overnight').hours, 8)
+    assert.equal((await employeeLib.monthlyAttendance(env, '2026-10', secondEmployee.id)).some(r => r.id === 'overnight'), false)
+  } finally { Date.now = oldNow }
   await call('logout', 'POST', undefined, cookie)
   assert.equal((await call('session', 'GET', undefined, cookie)).status, 401)
   for (let i = 0; i < 5; i++) response = await call('login', 'POST', { email: env.ADMIN_EMAIL, password: 'wrong' })
@@ -89,6 +176,6 @@ async function test() {
     assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM messages WHERE email = 'customer@example.com' AND status = 'failed'").get().n, 1)
   } finally { global.fetch = oldFetch }
   sqlite.close()
-  console.log('Passed: authentication, CSRF, session revocation, login throttling, project CRUD, visitor deduplication, email periods, full message recording and provider success/failure.')
+  console.log('Passed: admin security, original project editing, employee accounts and isolation, attendance deduplication and hours, leave/early requests and approval, account suspension and password reset, contact and analytics.')
 }
 test().catch(error => { console.error(error); process.exitCode = 1 })

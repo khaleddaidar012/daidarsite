@@ -2,5 +2,7 @@ User-agent: *
 Allow: /
 Disallow: /admin
 Disallow: /api/admin/
+Disallow: /employee
+Disallow: /api/employee/
 
 Sitemap: https://daidarsolutions.com/sitemap.xml

@@ -77,7 +77,7 @@ export function PortfolioGrid({ locale, projects: initialProjects }: PortfolioGr
             return (
               <Link
                 key={project.id}
-                href={project.managed ? project.link! : `/${locale}/portfolio/${project.slug}`}
+                href={project.managed ? (project.link || `/${locale}/request`) : `/${locale}/portfolio/${project.slug}`}
                 className="card-base rounded-2xl overflow-hidden group block animate-fade-in-up"
                 style={{ animationDelay: `${i * 0.08}s` }}
                 aria-label={title}
