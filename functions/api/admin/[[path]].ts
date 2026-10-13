@@ -7,6 +7,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
     const now = Date.now()
     if (request.method !== 'GET' && !sameOrigin(request)) return json({ error: 'طلب غير مسموح' }, 403)
     if (path === 'login' && request.method === 'POST') {
+      if (!/^[a-f0-9]{48}:[a-f0-9]{64}$/.test(env.ADMIN_PASSWORD_HASH.trim())) return json({ error: 'إعداد كلمة المرور في Cloudflare غير سليم. حدّث ADMIN_PASSWORD_HASH بالقيمة الناتجة بعد علامة = فقط، ثم أعد النشر.' }, 503)
       const key = await hash(request.headers.get('CF-Connecting-IP') || 'local')
       const bucket = Math.floor(now / 900000)
       const keys = [key + ':' + bucket, 'global:' + bucket]
@@ -18,7 +19,11 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       const body = JSON.parse(raw) as Record<string, unknown>
       if (typeof body.email !== 'string' || typeof body.password !== 'string' || body.password.length > 256) return json({ error: 'بيانات الدخول غير صحيحة' }, 401)
       const valid = await verifyPassword(body.password, env.ADMIN_PASSWORD_HASH)
-      if (!valid || body.email.trim().toLowerCase() !== env.ADMIN_EMAIL.toLowerCase()) return json({ error: 'بيانات الدخول غير صحيحة' }, 401)
+      const emailMatches = body.email.trim().toLowerCase() === env.ADMIN_EMAIL.trim().toLowerCase()
+      if (!valid || !emailMatches) {
+        console.warn(`[admin-login] Rejected: ${!valid && !emailMatches ? 'email_and_password_mismatch' : !valid ? 'password_mismatch' : 'email_mismatch'}`)
+        return json({ error: 'بيانات الدخول غير صحيحة' }, 401)
+      }
       const token = crypto.randomUUID() + crypto.randomUUID()
       await env.DB.batch([
         env.DB.prepare('DELETE FROM sessions WHERE expires_at <= ?').bind(now),

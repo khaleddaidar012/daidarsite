@@ -23,7 +23,7 @@ const admin = load('functions/api/admin/[[path]].ts', { '../../lib/store': store
 const visit = load('functions/api/visit.ts', { '../lib/store': store }).onRequestPost
 const publicProjects = load('functions/api/projects.ts', { '../lib/store': store }).onRequestGet
 const contact = load('functions/api/contact.ts', { '../lib/store': store }).onRequestPost
-const salt = 'test-salt'
+const salt = 'ab'.repeat(24)
 const password = 'test-password-long'
 const env = { DB, ADMIN_EMAIL: 'admin@example.com', ADMIN_PASSWORD_HASH: salt + ':' + pbkdf2Sync(password, salt, 100000, 32, 'sha256').toString('hex') }
 function request(path, method = 'GET', body, cookie, origin = 'https://test.example') {
@@ -41,6 +41,11 @@ async function test() {
   assert.match(response.headers.get('set-cookie'), /HttpOnly; SameSite=Strict/)
   assert.match(response.headers.get('set-cookie'), /Secure/)
   assert.equal((await call('session', 'GET', undefined, cookie)).status, 200)
+  assert.equal(await store.verifyPassword(password, `\n ${env.ADMIN_PASSWORD_HASH} \r\n`), true)
+  const normalizedLogin = await admin({ request: request('login', 'POST', { email: env.ADMIN_EMAIL, password }), env: { ...env, ADMIN_EMAIL: ` ${env.ADMIN_EMAIL} `, ADMIN_PASSWORD_HASH: `\n${env.ADMIN_PASSWORD_HASH}\n` } })
+  assert.equal(normalizedLogin.status, 200)
+  const malformedLogin = await admin({ request: request('login', 'POST', { email: env.ADMIN_EMAIL, password }), env: { ...env, ADMIN_PASSWORD_HASH: `ADMIN_PASSWORD_HASH=${env.ADMIN_PASSWORD_HASH}` } })
+  assert.equal(malformedLogin.status, 503)
   assert.equal((await call('session', 'GET', undefined, 'daidar_session=forged')).status, 401)
   const project = { title: 'مشروع', description: 'تفاصيل المشروع', image: 'https://example.com/image.png', link: 'https://example.com', category: 'website' }
   assert.equal((await call('projects', 'POST', { ...project, link: 'javascript:alert(1)' }, cookie)).status, 422)
