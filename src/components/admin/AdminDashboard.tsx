@@ -2,6 +2,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import type { Project } from '@/types'
 import EmployeesManager from './EmployeesManager'
+import AdminClock from './AdminClock'
 import { LayoutDashboard, FolderKanban, Users, Mail, ArrowUpLeft, LogOut, ExternalLink, ShieldCheck, Sparkles } from 'lucide-react'
 import './admin.css'
 
@@ -69,7 +70,7 @@ export default function AdminDashboard() {
       {error && <p role="alert" className="p-4 rounded-xl bg-red-50 text-red-700 mb-5">{error}</p>}
       {notice && <p role="status" className="p-4 rounded-xl bg-green-50 text-green-700 mb-5">{notice}</p>}
       {!session ? <form onSubmit={login} className="max-w-md mx-auto rounded-2xl bg-white border p-6 space-y-5"><h2 className="text-xl font-bold">تسجيل دخول الإدارة</h2><label className="block">البريد الإلكتروني<input className={input} name="email" type="email" dir="ltr" autoComplete="username" required /></label><label className="block">كلمة المرور<input className={input} name="password" type="password" autoComplete="current-password" required maxLength={256} /></label><button className={`${button} w-full`} disabled={busy}>{busy ? 'جارٍ تسجيل الدخول…' : 'دخول'}</button></form> : <>
-        <section className="admin-welcome"><div><span className="admin-eyebrow"><Sparkles size={15} /> مساحة لكل تفاصيل شغلك</span><h1>{activeSection === 'overview' ? 'أهلًا بيك في دعيدر' : sections.find(s => s.id === activeSection)?.label}<span className="text-sky-300">.</span></h1><p>{activeSection === 'overview' ? 'نظرة على أداء موقعك، ومشاريعك، وفريقك. كل حاجة قدامك بوضوح.' : sections.find(s => s.id === activeSection)?.detail}</p><span className="admin-account"><ShieldCheck size={14} /><bdi>{session}</bdi></span></div><div className="admin-welcome-mark"><LayoutDashboard size={62} strokeWidth={1.2} /><span>DAIDAR / ADMIN</span></div></section>
+        <section className="admin-welcome"><div><span className="admin-eyebrow"><Sparkles size={15} /> مساحة لكل تفاصيل شغلك</span><h1>{activeSection === 'overview' ? 'أهلًا بيك في دعيدر' : sections.find(s => s.id === activeSection)?.label}<span className="text-sky-300">.</span></h1><p>{activeSection === 'overview' ? 'نظرة على أداء موقعك، ومشاريعك، وفريقك. كل حاجة قدامك بوضوح.' : sections.find(s => s.id === activeSection)?.detail}</p><span className="admin-account"><ShieldCheck size={14} /><bdi>{session}</bdi></span></div><AdminClock /></section>
         <div hidden={activeSection !== 'overview'}>
         <div className="admin-section-heading"><div><span className="admin-eyebrow">الموقع بالأرقام</span><h2>إحصائيات الزيارات والبريد</h2></div><span className="admin-timezone">بتوقيت القاهرة</span></div>
         <section aria-label="الإحصائيات" className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">{stats.map(s => <div key={s.days} className="bg-white border rounded-2xl p-5"><h2 className="text-slate-500 font-bold">{s.days === 0 ? 'اليوم بتوقيت القاهرة' : `آخر ${s.days} يوم`}</h2><p className="text-3xl font-extrabold text-sky-600 mt-4">{s.visitors.toLocaleString('ar-EG')}</p><p className="text-sm text-slate-500">زائر فريد</p><p className="text-xl font-bold mt-4">{s.emails.toLocaleString('ar-EG')} <span className="text-sm font-normal">إيميل مُرسل</span></p></div>)}</section>
