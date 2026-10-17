@@ -1,4 +1,4 @@
-export type Employee = { id: string; name: string; job_title: string; email: string; active: number }
+export type Employee = { id: string; name: string; job_title: string; email: string; active: number; manage_projects: number; manage_hub_subscriptions: number }
 export type RecordRow = { id: string; employee_id: string; day: string; check_in: number; check_out: number | null; hours: number | null }
 export type EmployeeRequest = { id: string; employee_id: string; name?: string; type: 'leave' | 'early'; day: string; requested_time: string | null; reason: string; status: 'pending' | 'approved' | 'rejected'; admin_note: string }
 export const field = 'w-full rounded-xl border border-slate-300 bg-white text-slate-900 p-3 focus:outline-none focus:ring-2 focus:ring-sky-500'

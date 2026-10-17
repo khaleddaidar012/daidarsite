@@ -21,9 +21,11 @@ const DB = {
 const store = load('functions/lib/store.ts')
 const employeeLib = load('functions/lib/employees.ts', { './store': store })
 const originalProjects = load('src/data/projects.ts')
-const projectLib = load('functions/lib/projects.ts', { '../../src/data/projects': originalProjects })
-const admin = load('functions/api/admin/[[path]].ts', { '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib }).onRequest
-const employeeApi = load('functions/api/employee/[[path]].ts', { '../../lib/store': store, '../../lib/employees': employeeLib }).onRequest
+const projectLib = load('functions/lib/projects.ts', { './store': store, '../../src/data/projects': originalProjects })
+const hubApi = load('functions/api/hub/[[path]].ts', { '../../lib/store': store })
+const hubAdmin = load('functions/lib/hub-admin.ts', { './store': store, '../api/hub/[[path]]': hubApi })
+const admin = load('functions/api/admin/[[path]].ts', { '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin }).onRequest
+const employeeApi = load('functions/api/employee/[[path]].ts', { '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin }).onRequest
 const visit = load('functions/api/visit.ts', { '../lib/store': store }).onRequestPost
 const publicProjects = load('functions/api/projects.ts', { '../lib/store': store }).onRequestGet
 const contact = load('functions/api/contact.ts', { '../lib/store': store }).onRequestPost
@@ -85,10 +87,12 @@ async function test() {
   await call('projects', 'DELETE', { id: saved.id }, cookie)
   assert.equal((await (await publicProjects({ env })).json()).projects.length, 0)
   sqlite.exec(fs.readFileSync('migrations/0002_employees.sql', 'utf8'))
+  sqlite.exec(fs.readFileSync('migrations/0003_hub.sql', 'utf8'))
+  sqlite.exec(fs.readFileSync('migrations/0004_employee_work_permissions.sql', 'utf8'))
   for (const path of ['employees', 'attendance', 'employee-requests']) assert.equal((await call(path)).status, 401)
   const employeePassword = 'employee-test-password'
   assert.equal(employeeLib.cairoDay(Date.parse('2026-10-12T21:30:00Z')), '2026-10-13')
-  const employeeForm = { name: 'خالد', job_title: 'مطور', email: 'khaled@example.com', password: employeePassword, active: 1 }
+  const employeeForm = { name: 'خالد', job_title: 'مطور', email: 'khaled@example.com', password: employeePassword, active: 1, manage_projects: 0, manage_hub_subscriptions: 0 }
   assert.equal((await call('employees', 'POST', employeeForm, cookie)).status, 200)
   assert.equal((await call('employees', 'POST', employeeForm, cookie)).status, 409)
   await call('employees', 'POST', { ...employeeForm, name: 'أحمد', email: 'ahmed@example.com' }, cookie)
@@ -101,7 +105,50 @@ async function test() {
   response = await employeeCall('login', 'POST', { email: employeeForm.email, password: employeePassword })
   assert.equal(response.status, 200)
   const employeeCookie = response.headers.get('set-cookie').split(';')[0]
+  assert.equal((await response.json()).employee.manage_projects, 0)
   assert.equal((await call('employees', 'GET', undefined, employeeCookie)).status, 401)
+  assert.equal((await employeeCall('projects', 'GET', undefined, employeeCookie)).status, 403)
+  assert.equal((await employeeCall('hub-customers', 'GET', undefined, employeeCookie)).status, 403)
+  assert.equal((await call('employees', 'POST', { ...employeeForm, id: employeeList[0].id, password: '', manage_projects: 1, manage_hub_subscriptions: 1 }, cookie)).status, 200)
+  assert.equal((await employeeCall('projects', 'GET', undefined, employeeCookie)).status, 200)
+  const staffProject = { title: 'مشروع الموظف', description: 'وصف تجريبي لمشروع أضافه الموظف.', category: 'website', status: 'draft' }
+  assert.equal((await employeeCall('projects', 'POST', staffProject, employeeCookie)).status, 200)
+  const projectRows = (await (await employeeCall('projects', 'GET', undefined, employeeCookie)).json()).projects
+  const savedStaffProject = projectRows.find(p => p.titleAr === staffProject.title)
+  assert.ok(savedStaffProject)
+  assert.equal(savedStaffProject.status, 'draft')
+  assert.equal((await employeeCall('projects', 'DELETE', { id: savedStaffProject.id }, employeeCookie)).status, 403)
+  sqlite.prepare('INSERT INTO hub_users(id,email,name,created_at) VALUES(?,?,?,?)').run('customer-a', 'customer@example.com', 'عميل تجربة', Date.now())
+  const hubCustomers = await employeeCall('hub-customers?q=customer', 'GET', undefined, employeeCookie)
+  assert.equal(hubCustomers.status, 200)
+  assert.equal((await hubCustomers.json()).customers[0].email, 'customer@example.com')
+  assert.equal((await employeeCall('hub-catalog', 'GET', undefined, employeeCookie)).status, 200)
+  const manualPayload = { userId: 'customer-a', productId: 'daidar-flow', activityId: 'general', period: 'monthly', addons: [], renewalSubscriptionId: null }
+  const operationKey = 'b32b38f3-2168-46ec-966b-bc2a690b482c'
+  assert.equal((await employeeCall('hub-manual-subscriptions', 'POST', { ...manualPayload, operationKey, amountReceived: 34999 }, employeeCookie)).status, 409)
+  const grant = await employeeCall('hub-manual-subscriptions', 'POST', { ...manualPayload, operationKey, amountReceived: 35000 }, employeeCookie)
+  assert.equal(grant.status, 200)
+  const grantData = await grant.json()
+  assert.equal(sqlite.prepare('SELECT status FROM hub_orders WHERE id=?').get(grantData.orderId).status, 'approved')
+  const manualSub = sqlite.prepare('SELECT * FROM hub_subscriptions WHERE id=?').get(grantData.subscriptionId)
+  assert.equal(manualSub.status, 'awaiting_activation')
+  assert.equal(JSON.parse(manualSub.snapshot).paymentMode, 'manual')
+  assert.equal(sqlite.prepare("SELECT actor FROM hub_audit WHERE action='manual_subscription' AND entity_id=?").get(grantData.orderId).actor, 'khaled@example.com')
+  const grantAgain = await employeeCall('hub-manual-subscriptions', 'POST', { ...manualPayload, operationKey, amountReceived: 35000 }, employeeCookie)
+  assert.equal(grantAgain.status, 200)
+  assert.equal((await grantAgain.json()).subscriptionId, grantData.subscriptionId)
+  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM hub_subscriptions WHERE user_id=?').get('customer-a').n, 1)
+  sqlite.prepare("UPDATE hub_subscriptions SET status='active',starts_at=?,expires_at=? WHERE id=?").run(Date.now()-30*86400000, Date.now()+10*86400000, grantData.subscriptionId)
+  const beforeRenewal = sqlite.prepare('SELECT expires_at FROM hub_subscriptions WHERE id=?').get(grantData.subscriptionId).expires_at
+  const renewalPayload = { ...manualPayload, period: 'yearly', renewalSubscriptionId: grantData.subscriptionId }
+  const renewalKey = '934f39fc-a9cd-4321-8b47-16b2463ef5b0'
+  const renewalGrant = await employeeCall('hub-manual-subscriptions', 'POST', { ...renewalPayload, operationKey: renewalKey, amountReceived: 350000 }, employeeCookie)
+  assert.equal(renewalGrant.status, 200)
+  assert.equal((await renewalGrant.json()).subscriptionId, grantData.subscriptionId)
+  assert.ok(sqlite.prepare('SELECT expires_at FROM hub_subscriptions WHERE id=?').get(grantData.subscriptionId).expires_at > beforeRenewal)
+  assert.equal((await call('employees', 'POST', { ...employeeForm, id: employeeList[0].id, password: '', manage_projects: 0, manage_hub_subscriptions: 0 }, cookie)).status, 200)
+  assert.equal((await employeeCall('projects', 'GET', undefined, employeeCookie)).status, 403)
+  assert.equal((await employeeCall('hub-customers', 'GET', undefined, employeeCookie)).status, 403)
   assert.equal((await employeeCall('check-in', 'POST', {}, employeeCookie, 'https://evil.example')).status, 403)
   assert.equal((await employeeCall('check-out', 'POST', {}, employeeCookie)).status, 409)
   const punch = () => employeeCall('check-in', 'POST', { employee_id: employeeList[1].id, check_in: 0 }, employeeCookie)

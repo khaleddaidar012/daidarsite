@@ -358,3 +358,10 @@ main {
 .flip-card-back { transform: rotateY(180deg); }
 [dir="rtl"] .flip-card-back { transform: rotateY(-180deg); }
 
+@keyframes hub-swap {
+  0% { opacity: 0; transform: translateX(18px); }
+  18%, 78% { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(-12px); }
+}
+.animate-hub-swap { animation: hub-swap 4.2s ease-in-out both; }
+@media (prefers-reduced-motion: reduce) { .animate-hub-swap { animation: none; } }

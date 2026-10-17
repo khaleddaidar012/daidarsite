@@ -1,5 +1,7 @@
 import { hash, json, sameOrigin, verifyPassword, type Env } from '../../lib/store'
 import { cairoDay, employeeSession, monthlyAttendance, safeEmployee, type Employee, type Attendance } from '../../lib/employees'
+import { manageProjects } from '../../lib/projects'
+import { adminHub } from '../../lib/hub-admin'
 export async function onRequest({ request, env }: { request: Request; env: Env }) {
   try {
     if (!env.DB) return json({ error: 'الخدمة غير جاهزة' }, 503)
@@ -29,6 +31,16 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
     }
     const employee = await employeeSession(request, env)
     if (!employee) return json({ error: 'سجل دخولك أولاً' }, 401)
+    if (path === 'projects') {
+      if (!employee.manage_projects) return json({ error: 'حسابك لا يملك صلاحية إدارة معرض الأعمال.' }, 403)
+      if (request.method === 'DELETE') return json({ error: 'صلاحية الموظف تسمح بإضافة المشروع وتعديله أو إخفائه، والحذف النهائي للإدارة فقط.' }, 403)
+      return await manageProjects(request, env)
+    }
+    if (['hub-catalog', 'hub-customers', 'hub-manual-subscriptions'].includes(path)) {
+      if (!employee.manage_hub_subscriptions) return json({ error: 'حسابك لا يملك صلاحية تسجيل اشتراكات دعيدر هب.' }, 403)
+      if (path === 'hub-catalog' && request.method !== 'GET') return json({ error: 'طريقة الطلب غير مسموحة' }, 405)
+      return await adminHub(request, env, path, employee.email)
+    }
     if (path === 'requests' && request.method === 'GET') {
       const month = new URL(request.url).searchParams.get('month') || cairoDay().slice(0, 7)
       if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return json({ error: 'شهر غير صحيح' }, 400)

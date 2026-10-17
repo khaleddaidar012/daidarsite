@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { Menu, X, Globe, Sun, Moon } from 'lucide-react'
+import { Menu, X, Globe, Sun, Moon, Blocks } from 'lucide-react'
 import { getTranslations } from '@/locales'
 import { useTheme } from '@/components/providers/ThemeProvider'
 import type { Locale } from '@/types'
@@ -43,6 +43,7 @@ export function Navbar({ locale }: NavbarProps) {
     { href: `/${locale}`, label: t.nav.home },
     { href: `/${locale}#services`, label: t.nav.services },
     { href: `/${locale}/portfolio`, label: t.nav.portfolio },
+    { href: `/${locale}/hub`, label: locale === 'ar' ? 'دعيدر هب' : 'Daidar Hub' },
   ]
 
   const isActive = (href: string) => {
@@ -146,6 +147,7 @@ export function Navbar({ locale }: NavbarProps) {
           >
             {t.nav.requestService}
           </Link>
+          <Link href={`/${locale}/hub`} className="hidden sm:flex items-center gap-2 rounded-full border border-sky-500 px-4 py-2 text-sm font-bold text-[#0c3156] transition hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-slate-900"><Blocks size={17}/>{locale === 'ar' ? 'دعيدر هب' : 'Daidar Hub'}</Link>
 
           {/* Mobile Menu Toggle */}
           <button
@@ -220,6 +222,7 @@ export function Navbar({ locale }: NavbarProps) {
             >
               {t.nav.requestService}
             </Link>
+            <Link href={`/${locale}/hub`} onClick={() => setIsMenuOpen(false)} className="btn-secondary text-center"><Blocks size={17}/>{locale === 'ar' ? 'دعيدر هب' : 'Daidar Hub'}</Link>
             <Link
               href={localePath}
               onClick={() => setIsMenuOpen(false)}

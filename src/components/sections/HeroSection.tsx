@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Blocks } from 'lucide-react'
 import { getTranslations } from '@/locales'
 import type { Locale } from '@/types'
 
@@ -75,11 +75,12 @@ export function HeroSection({ locale }: HeroSectionProps) {
                 <ArrowIcon size={16} />
               </Link>
               <Link
-                href={`/${locale}/portfolio`}
-                className="btn-secondary"
-                id="hero-portfolio-btn"
+                href={`/${locale}/hub`}
+                className="inline-flex items-center gap-2 rounded-xl bg-[#0c3156] px-5 py-3 font-bold text-white shadow-lg shadow-blue-950/15 transition hover:bg-[#164776]"
+                id="hero-hub-btn"
               >
-                {locale === 'ar' ? 'شاهد أعمالنا' : 'View Our Work'}
+                <Blocks size={18} />
+                {locale === 'ar' ? 'استكشف دعيدر هب' : 'Explore Daidar Hub'}
               </Link>
             </div>
 

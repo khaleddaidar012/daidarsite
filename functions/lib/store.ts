@@ -12,6 +12,11 @@ export interface Env {
   RESEND_API_KEY?: string
   RESEND_FROM_EMAIL?: string
   RESEND_TO_EMAIL?: string
+  HUB_GOOGLE_CLIENT_ID?: string
+  HUB_GOOGLE_CLIENT_SECRET?: string
+  HUB_LICENSE_SIGNING_PRIVATE_JWK?: string
+  HUB_LICENSE_VERIFY_PUBLIC_JWK?: string
+  HUB_FILES?: { get(key: string): Promise<{ body: ReadableStream; httpMetadata?: { contentType?: string }; size?: number } | null>; put(key: string, value: ReadableStream | ArrayBuffer | string, options?: Record<string, unknown>): Promise<unknown> }
 }
 export const json = (data: unknown, status = 200, extra: Record<string, string> = {}) => new Response(JSON.stringify(data), {
   status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...extra },
