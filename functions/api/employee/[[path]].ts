@@ -1,5 +1,5 @@
 import { hash, json, sameOrigin, verifyPassword, type Env } from '../../lib/store'
-import { cairoDay, employeeSession, monthlyAttendance, safeEmployee, type Employee, type Attendance } from '../../lib/employees'
+import { cairoDay, calculatePayroll, employeeSession, monthlyAttendance, safeEmployee, type Employee, type Attendance } from '../../lib/employees'
 import { manageProjects } from '../../lib/projects'
 import { adminHub } from '../../lib/hub-admin'
 import { d1UsageResponse } from '../../lib/d1-usage'
@@ -89,11 +89,26 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       return json({ success: true }, 200, { 'Set-Cookie': 'daidar_employee=; Path=/api/employee; HttpOnly; SameSite=Strict; Max-Age=0; Secure' })
     }
     if (path === 'attendance' && request.method === 'GET') {
-      const rows = await monthlyAttendance(env, new URL(request.url).searchParams.get('month') || cairoDay().slice(0, 7), employee.id)
+      const month = new URL(request.url).searchParams.get('month') || cairoDay().slice(0, 7)
+      const rows = await monthlyAttendance(env, month, employee.id)
       if (!rows) return json({ error: 'شهر غير صحيح' }, 400)
       const open = await env.DB.prepare('SELECT * FROM attendance WHERE employee_id = ? AND check_out IS NULL').bind(employee.id).first<Attendance>()
       const today = await env.DB.prepare('SELECT * FROM attendance WHERE employee_id = ? AND day = ?').bind(employee.id, cairoDay()).first<Attendance>()
-      return json({ records: rows, open, today, serverDay: cairoDay() })
+      let payrollView: { absent_days?: number; absent_dates?: string[]; due_piasters?: number } | null = null
+      if (employee.view_absences || employee.view_due) {
+        const approvedLeaves = await env.DB.prepare("SELECT employee_id,day,type,status FROM employee_requests WHERE employee_id=? AND type='leave' AND status='approved' AND day>=? AND day<=?").bind(employee.id, month + '-01', month + '-31').all<{ employee_id: string; day: string; type: string; status: string }>()
+        const calculated = calculatePayroll([employee], rows, approvedLeaves.results, month)
+        const ownPayroll = calculated?.[0]
+        if (ownPayroll) {
+          payrollView = {}
+          if (employee.view_absences) { payrollView.absent_days = ownPayroll.absent_days; payrollView.absent_dates = ownPayroll.absent_dates }
+          if (employee.view_due) {
+            const adjustment = await env.DB.prepare('SELECT due_piasters FROM employee_payroll_adjustments WHERE employee_id=? AND month=?').bind(employee.id, month).first<{ due_piasters: number }>()
+            payrollView.due_piasters = adjustment?.due_piasters ?? ownPayroll.due_piasters
+          }
+        }
+      }
+      return json({ records: rows, open, today, serverDay: cairoDay(), payroll: payrollView })
     }
     if (path === 'check-in' && request.method === 'POST') {
       const inserted = await env.DB.prepare('INSERT OR IGNORE INTO attendance VALUES (?, ?, ?, ?, NULL)').bind(crypto.randomUUID(), employee.id, cairoDay(now), now).run() as { meta?: { changes?: number }; changes?: number }

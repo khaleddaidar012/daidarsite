@@ -95,6 +95,7 @@ async function test() {
   sqlite.exec(fs.readFileSync('migrations/0004_employee_work_permissions.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0005_d1_usage_permission.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0007_employee_payroll.sql', 'utf8'))
+  sqlite.exec(fs.readFileSync('migrations/0008_employee_payroll_visibility.sql', 'utf8'))
   for (const path of ['employees', 'attendance', 'employee-requests']) assert.equal((await call(path)).status, 401)
   const employeePassword = 'employee-test-password'
   const schedule = []
@@ -120,6 +121,8 @@ async function test() {
   assert.equal(employeeList.length, 2)
   assert.equal(employeeList[0].password_hash, undefined)
   assert.deepEqual(employeeList[0].weekly_days_off, [5])
+  assert.equal(employeeList[0].view_absences, 1)
+  assert.equal(employeeList[0].view_due, 0)
   assert.equal((await call('employees', 'POST', { ...employeeForm, id: employeeList[0].id, password: '', monthly_salary_piasters: -1 }, cookie)).status, 422)
   const payrollMonth = employeeLib.cairoDay().slice(0, 7)
   assert.equal((await call('payroll', 'POST', { employee_id: employeeList[0].id, month: payrollMonth, due_piasters: 288550 }, cookie)).status, 422)
@@ -134,12 +137,23 @@ async function test() {
   response = await employeeCall('login', 'POST', { email: employeeForm.email, password: employeePassword })
   assert.equal(response.status, 200)
   const employeeCookie = response.headers.get('set-cookie').split(';')[0]
-  assert.equal((await response.json()).employee.manage_projects, 0)
+  const employeeIdentity = (await response.json()).employee
+  assert.equal(employeeIdentity.manage_projects, 0)
+  assert.equal(employeeIdentity.view_absences, 1)
+  assert.equal(employeeIdentity.view_due, 0)
+  assert.equal(employeeIdentity.monthly_salary_piasters, undefined)
+  const visibleAttendance = await employeeCall('attendance?month=' + employeeLib.cairoDay().slice(0, 7), 'GET', undefined, employeeCookie)
+  assert.equal(visibleAttendance.status, 200)
+  assert.equal(typeof (await visibleAttendance.json()).payroll.absent_days, 'number')
   assert.equal((await call('employees', 'GET', undefined, employeeCookie)).status, 401)
   assert.equal((await employeeCall('projects', 'GET', undefined, employeeCookie)).status, 403)
   assert.equal((await employeeCall('hub-customers', 'GET', undefined, employeeCookie)).status, 403)
   assert.equal((await employeeCall('d1-usage', 'GET', undefined, employeeCookie)).status, 403)
   assert.equal((await call('employees', 'POST', { ...employeeForm, id: employeeList[0].id, password: '', manage_projects: 1, manage_hub_subscriptions: 1, view_d1_usage: 1 }, cookie)).status, 200)
+  await call('employees', 'POST', { ...employeeForm, id: employeeList[0].id, password: '', manage_projects: 1, manage_hub_subscriptions: 1, view_d1_usage: 1, view_absences: 0, view_due: 1, monthly_salary_piasters: 300000 }, cookie)
+  const hiddenAbsencesVisibleDue = await (await employeeCall('attendance?month=' + employeeLib.cairoDay().slice(0, 7), 'GET', undefined, employeeCookie)).json()
+  assert.equal(hiddenAbsencesVisibleDue.payroll.absent_days, undefined)
+  assert.equal(typeof hiddenAbsencesVisibleDue.payroll.due_piasters, 'number')
   assert.equal((await employeeCall('d1-usage', 'GET', undefined, employeeCookie)).status, 503)
   const originalUsageFetch = global.fetch
   env.CLOUDFLARE_ACCOUNT_ID = 'test-account'
