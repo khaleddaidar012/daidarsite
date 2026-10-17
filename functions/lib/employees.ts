@@ -126,6 +126,18 @@ export async function adminEmployees(request: Request, env: Env, path: string) {
     const rows = await env.DB!.prepare('SELECT id, name, job_title, email, active, manage_projects, manage_hub_subscriptions, view_d1_usage, monthly_salary_piasters, weekly_days_off, view_absences, view_due FROM employees ORDER BY created_at').all<Employee>()
     return json({ employees: rows.results.map(row => ({ ...row, weekly_days_off: parseDaysOff(row.weekly_days_off) })) })
   }
+  if (request.method === 'DELETE') {
+    const raw = await request.text()
+    if (raw.length > 1024) return json({ error: 'طلب كبير جدًا' }, 413)
+    const body = JSON.parse(raw) as { id?: unknown }
+    if (typeof body.id !== 'string' || body.id.length > 64) return json({ error: 'حساب الموظف غير صحيح' }, 422)
+    const employee = await env.DB!.prepare('SELECT id FROM employees WHERE id = ?').bind(body.id).first()
+    if (!employee) return json({ error: 'الموظف غير موجود' }, 404)
+    // Keep attendance, requests, and payroll history; revoke login access immediately.
+    await env.DB!.prepare('UPDATE employees SET active = 0 WHERE id = ?').bind(body.id).run()
+    await env.DB!.prepare('DELETE FROM employee_sessions WHERE employee_id = ?').bind(body.id).run()
+    return json({ success: true, deactivated: true })
+  }
   if (request.method === 'POST') {
     const raw = await request.text()
     if (raw.length > 4096) return json({ error: 'طلب كبير جدًا' }, 413)

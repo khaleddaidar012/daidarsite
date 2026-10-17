@@ -267,6 +267,12 @@ async function test() {
   const resetCookie = response.headers.get('set-cookie').split(';')[0]
   await call('employees', 'POST', { ...employeeForm, id: employeeList[0].id, password: 'changed-test-password' }, cookie)
   assert.equal((await employeeCall('session', 'GET', undefined, resetCookie)).status, 401)
+  response = await employeeCall('login', 'POST', { email: employeeForm.email, password: 'changed-test-password' })
+  const deleteCookie = response.headers.get('set-cookie').split(';')[0]
+  assert.equal((await call('employees', 'DELETE', { id: employeeList[0].id })).status, 401)
+  assert.equal((await call('employees', 'DELETE', { id: employeeList[0].id }, cookie)).status, 200)
+  assert.equal((await employeeCall('session', 'GET', undefined, deleteCookie)).status, 401)
+  assert.equal(sqlite.prepare('SELECT active FROM employees WHERE id=?').get(employeeList[0].id).active, 0)
   assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM attendance').get().n, 2)
   sqlite.prepare('INSERT INTO attendance VALUES (?, ?, ?, ?, NULL)').run('overnight', employeeList[1].id, '2026-09-30', Date.parse('2026-09-30T20:00:00Z'))
   const oldNow = Date.now
