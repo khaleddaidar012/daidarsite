@@ -7,6 +7,7 @@ import { LayoutDashboard, FolderKanban, Users, Mail, ArrowUpLeft, LogOut, Extern
 import './admin.css'
 import HubAdminManager from './HubAdminManager'
 import D1UsageDashboard from './D1UsageDashboard'
+import AdminNotifications from './AdminNotifications'
 
 const sections = [
   { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard, detail: 'متابعة أداء الموقع' },
@@ -69,7 +70,7 @@ export default function AdminDashboard() {
   const button = 'rounded-xl bg-sky-600 text-white px-5 py-3 font-bold disabled:opacity-50 hover:bg-sky-700'
   if (loading) return <main dir="rtl" className="min-h-screen grid place-items-center">جارٍ تحميل لوحة الإدارة…</main>
   return <main dir="rtl" className="admin-workspace min-h-screen text-slate-900">
-    <header className="admin-topbar"><div className="admin-topbar-inner"><a href="/admin" className="admin-brand"><img src="/logo.png" alt="دعيدر" /><span>دعيدر<span className="admin-brand-caption">مساحة الإدارة</span></span></a>{session && <nav aria-label="أقسام لوحة الإدارة" className="admin-nav">{sections.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={activeSection === id ? 'page' : undefined} onClick={() => navigate(id)} className={activeSection === id ? 'active' : ''}><Icon size={17} /><span>{label}</span></button>)}</nav>}<div className="admin-header-actions"><a href="/ar" target="_blank" rel="noreferrer" title="عرض الموقع" aria-label="عرض الموقع"><ExternalLink size={18} /></a>{session && <button title="تسجيل الخروج" aria-label="تسجيل الخروج" disabled={busy} onClick={async () => { setBusy(true); try { await api('logout', 'POST'); setSession(null); setActiveSection('overview'); setStats([]); setMessages([]); setProjects([]); setForm(empty) } catch (e) { handleError(e as Error) } finally { setBusy(false) } }}><LogOut size={18} /></button>}</div></div></header>
+    <header className="admin-topbar"><div className="admin-topbar-inner"><a href="/admin" className="admin-brand"><img src="/logo.png" alt="دعيدر" /><span>دعيدر<span className="admin-brand-caption">مساحة الإدارة</span></span></a>{session && <nav aria-label="أقسام لوحة الإدارة" className="admin-nav">{sections.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={activeSection === id ? 'page' : undefined} onClick={() => navigate(id)} className={activeSection === id ? 'active' : ''}><Icon size={17} /><span>{label}</span></button>)}</nav>}<div className="admin-header-actions"><a href="/ar" target="_blank" rel="noreferrer" title="عرض الموقع" aria-label="عرض الموقع"><ExternalLink size={18} /></a>{session && <AdminNotifications onNavigate={navigate} />}{session && <button title="تسجيل الخروج" aria-label="تسجيل الخروج" disabled={busy} onClick={async () => { setBusy(true); try { await api('logout', 'POST'); setSession(null); setActiveSection('overview'); setStats([]); setMessages([]); setProjects([]); setForm(empty) } catch (e) { handleError(e as Error) } finally { setBusy(false) } }}><LogOut size={18} /></button>}</div></div></header>
     <div className="admin-content max-w-6xl mx-auto">
       {error && <p role="alert" className="p-4 rounded-xl bg-red-50 text-red-700 mb-5">{error}</p>}
       {notice && <p role="status" className="p-4 rounded-xl bg-green-50 text-green-700 mb-5">{notice}</p>}

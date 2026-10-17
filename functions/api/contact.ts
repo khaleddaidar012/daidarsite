@@ -1,4 +1,5 @@
 import { hash, sameOrigin, type Env } from '../lib/store'
+import { recordAdminNotification } from '../lib/notifications'
 
 const serviceLabels: Record<string, { ar: string; en: string }> = {
   website: { ar: 'موقع إلكتروني', en: 'Website' },
@@ -180,6 +181,7 @@ export const onRequestPost = async (context: {
       try { await env.DB.prepare("UPDATE messages SET status = 'sent', created_at = ? WHERE id = ?").bind(Date.now(), messageId).run() }
       catch (error) { console.error('Email accepted but recording status failed', messageId, error) }
     }
+    if (env.DB) await recordAdminNotification(env, { actor: sanitize(name), eventType: 'customer_message', title: 'رسالة عميل جديدة', detail: `${sanitize(name)} أرسل طلبًا بخصوص ${serviceLabel}`, target: 'messages' })
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },

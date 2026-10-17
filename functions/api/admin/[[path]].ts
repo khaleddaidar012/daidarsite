@@ -3,6 +3,7 @@ import { adminEmployees } from '../../lib/employees'
 import { manageProjects } from '../../lib/projects'
 import { adminHub } from '../../lib/hub-admin'
 import { d1UsageResponse } from '../../lib/d1-usage'
+import { adminNotifications } from '../../lib/notifications'
 
 export async function onRequest({ request, env }: { request: Request; env: Env }) {
   try {
@@ -38,6 +39,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       return json({ success: true }, 200, { 'Set-Cookie': `daidar_session=${token}; Path=/api/admin; HttpOnly; SameSite=Strict; Max-Age=28800${secure}` })
     }
     if (!await authenticated(request, env)) return json({ error: 'سجل دخولك أولاً' }, 401)
+    if (path === 'notifications') return await adminNotifications(request, env)
     if (['employees', 'attendance', 'employee-requests'].includes(path)) return await adminEmployees(request, env, path)
     if (path === 'd1-usage' && request.method === 'GET') return await d1UsageResponse(env)
     if (path.startsWith('hub-')) return await adminHub(request, env, path, env.ADMIN_EMAIL.trim())

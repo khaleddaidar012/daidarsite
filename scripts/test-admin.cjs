@@ -11,6 +11,7 @@ function load(file, dependencies = {}) {
 }
 const sqlite = new DatabaseSync(':memory:')
 sqlite.exec(fs.readFileSync('migrations/0001_admin.sql', 'utf8'))
+sqlite.exec(fs.readFileSync('migrations/0006_admin_notifications.sql', 'utf8'))
 const DB = {
   prepare(sql) {
     let args = []
@@ -20,16 +21,17 @@ const DB = {
 }
 const store = load('functions/lib/store.ts')
 const d1Usage = load('functions/lib/d1-usage.ts', { './store': store })
+const notifications = load('functions/lib/notifications.ts', { './store': store })
 const employeeLib = load('functions/lib/employees.ts', { './store': store })
 const originalProjects = load('src/data/projects.ts')
 const projectLib = load('functions/lib/projects.ts', { './store': store, '../../src/data/projects': originalProjects })
 const hubApi = load('functions/api/hub/[[path]].ts', { '../../lib/store': store })
 const hubAdmin = load('functions/lib/hub-admin.ts', { './store': store, '../api/hub/[[path]]': hubApi })
-const admin = load('functions/api/admin/[[path]].ts', { '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage }).onRequest
-const employeeApi = load('functions/api/employee/[[path]].ts', { '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage }).onRequest
+const admin = load('functions/api/admin/[[path]].ts', { '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
+const employeeApi = load('functions/api/employee/[[path]].ts', { '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
 const visit = load('functions/api/visit.ts', { '../lib/store': store }).onRequestPost
 const publicProjects = load('functions/api/projects.ts', { '../lib/store': store }).onRequestGet
-const contact = load('functions/api/contact.ts', { '../lib/store': store }).onRequestPost
+const contact = load('functions/api/contact.ts', { '../lib/store': store, '../lib/notifications': notifications }).onRequestPost
 const salt = 'ab'.repeat(24)
 const password = 'test-password-long'
 const env = { DB, ADMIN_EMAIL: 'admin@example.com', ADMIN_PASSWORD_HASH: salt + ':' + pbkdf2Sync(password, salt, 100000, 32, 'sha256').toString('hex') }
@@ -48,6 +50,7 @@ async function test() {
   assert.match(response.headers.get('set-cookie'), /HttpOnly; SameSite=Strict/)
   assert.match(response.headers.get('set-cookie'), /Secure/)
   assert.equal((await call('session', 'GET', undefined, cookie)).status, 200)
+  assert.equal((await call('notifications', 'GET', undefined, cookie)).status, 200)
   assert.equal(await store.verifyPassword(password, `\n ${env.ADMIN_PASSWORD_HASH} \r\n`), true)
   const normalizedLogin = await admin({ request: request('login', 'POST', { email: env.ADMIN_EMAIL, password }), env: { ...env, ADMIN_EMAIL: ` ${env.ADMIN_EMAIL} `, ADMIN_PASSWORD_HASH: `\n${env.ADMIN_PASSWORD_HASH}\n` } })
   assert.equal(normalizedLogin.status, 200)
@@ -134,6 +137,7 @@ async function test() {
   assert.equal((await employeeCall('projects', 'GET', undefined, employeeCookie)).status, 200)
   const staffProject = { title: 'مشروع الموظف', description: 'وصف تجريبي لمشروع أضافه الموظف.', category: 'website', status: 'draft' }
   assert.equal((await employeeCall('projects', 'POST', staffProject, employeeCookie)).status, 200)
+  assert.equal(sqlite.prepare("SELECT count(*) AS n FROM admin_notifications WHERE event_type='project_added'").get().n, 1)
   const projectRows = (await (await employeeCall('projects', 'GET', undefined, employeeCookie)).json()).projects
   const savedStaffProject = projectRows.find(p => p.titleAr === staffProject.title)
   assert.ok(savedStaffProject)
@@ -155,9 +159,11 @@ async function test() {
   assert.equal(manualSub.status, 'awaiting_activation')
   assert.equal(JSON.parse(manualSub.snapshot).paymentMode, 'manual')
   assert.equal(sqlite.prepare("SELECT actor FROM hub_audit WHERE action='manual_subscription' AND entity_id=?").get(grantData.orderId).actor, 'khaled@example.com')
+  assert.equal(sqlite.prepare("SELECT count(*) AS n FROM admin_notifications WHERE event_type='hub_subscription_created'").get().n, 1)
   const grantAgain = await employeeCall('hub-manual-subscriptions', 'POST', { ...manualPayload, operationKey, amountReceived: 35000 }, employeeCookie)
   assert.equal(grantAgain.status, 200)
   assert.equal((await grantAgain.json()).subscriptionId, grantData.subscriptionId)
+  assert.equal(sqlite.prepare("SELECT count(*) AS n FROM admin_notifications WHERE event_type='hub_subscription_created'").get().n, 1)
   assert.equal(sqlite.prepare('SELECT count(*) AS n FROM hub_subscriptions WHERE user_id=?').get('customer-a').n, 1)
   sqlite.prepare("UPDATE hub_subscriptions SET status='active',starts_at=?,expires_at=? WHERE id=?").run(Date.now()-30*86400000, Date.now()+10*86400000, grantData.subscriptionId)
   const beforeRenewal = sqlite.prepare('SELECT expires_at FROM hub_subscriptions WHERE id=?').get(grantData.subscriptionId).expires_at
@@ -178,10 +184,12 @@ async function test() {
   const attendance = sqlite.prepare('SELECT * FROM attendance').all()
   assert.equal(attendance.length, 1)
   assert.equal(attendance[0].employee_id, employeeList[0].id)
+  assert.equal(sqlite.prepare("SELECT count(*) AS n FROM admin_notifications WHERE event_type='attendance_checkin'").get().n, 1)
   assert.ok(attendance[0].check_in > now - 10000)
   assert.equal(attendance[0].day, employeeLib.cairoDay())
   sqlite.prepare('UPDATE attendance SET check_in = ? WHERE id = ?').run(Date.now() - 4.5 * 3600000, attendance[0].id)
   assert.equal((await employeeCall('check-out', 'POST', {}, employeeCookie)).status, 200)
+  assert.equal(sqlite.prepare("SELECT count(*) AS n FROM admin_notifications WHERE event_type='attendance_checkout'").get().n, 1)
   const month = employeeLib.cairoDay().slice(0, 7)
   const report = (await (await employeeCall('attendance?month=' + month, 'GET', undefined, employeeCookie)).json()).records
   assert.equal(report.length, 1)
@@ -197,10 +205,18 @@ async function test() {
   const leaveRow = sqlite.prepare('SELECT * FROM employee_requests').get()
   assert.equal(leaveRow.employee_id, employeeList[0].id)
   assert.equal(leaveRow.status, 'pending')
+  assert.equal(sqlite.prepare("SELECT count(*) AS n FROM admin_notifications WHERE event_type='employee_request'").get().n, 1)
   assert.equal((await employeeCall('requests', 'POST', { ...leave, type: 'early', requested_time: '99:99' }, employeeCookie)).status, 422)
   assert.equal((await employeeCall('requests', 'POST', { ...leave, type: 'early', requested_time: '15:30' }, employeeCookie)).status, 200)
   assert.equal((await call('employee-requests', 'POST', { id: leaveRow.id, status: 'approved', admin_note: 'موافق' }, employeeCookie)).status, 401)
   assert.equal((await call('employee-requests', 'POST', { id: leaveRow.id, status: 'approved', admin_note: 'موافق' }, cookie)).status, 200)
+  let notificationList = await (await call('notifications', 'GET', undefined, cookie)).json()
+  assert.ok(notificationList.unread >= 4)
+  const notificationId = notificationList.notifications[0].id
+  assert.equal((await call('notifications', 'POST', { id: notificationId }, cookie)).status, 200)
+  assert.equal((await call('notifications', 'POST', { all: true }, cookie)).status, 200)
+  notificationList = await (await call('notifications', 'GET', undefined, cookie)).json()
+  assert.equal(notificationList.unread, 0)
   const employeeRequests = (await (await employeeCall('requests?month=' + month, 'GET', undefined, employeeCookie)).json()).requests
   assert.equal(employeeRequests.find(r => r.id === leaveRow.id).status, 'approved')
   assert.equal(employeeRequests.find(r => r.id === leaveRow.id).admin_note, 'موافق')
@@ -240,6 +256,7 @@ async function test() {
     const recorded = sqlite.prepare("SELECT * FROM messages WHERE email = 'customer@example.com'").get()
     assert.equal(recorded.description, message.description)
     assert.equal(recorded.status, 'sent')
+    assert.equal(sqlite.prepare("SELECT count(*) AS n FROM admin_notifications WHERE event_type='customer_message'").get().n, 1)
     global.fetch = async () => new Response(JSON.stringify({ message: 'Rejected' }), { status: 422 })
     assert.equal((await contact({ env, request: contactRequest() })).status, 500)
     assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM messages WHERE email = 'customer@example.com' AND status = 'failed'").get().n, 1)

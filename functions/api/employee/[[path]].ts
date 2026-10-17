@@ -3,6 +3,7 @@ import { cairoDay, employeeSession, monthlyAttendance, safeEmployee, type Employ
 import { manageProjects } from '../../lib/projects'
 import { adminHub } from '../../lib/hub-admin'
 import { d1UsageResponse } from '../../lib/d1-usage'
+import { recordAdminNotification } from '../../lib/notifications'
 export async function onRequest({ request, env }: { request: Request; env: Env }) {
   try {
     if (!env.DB) return json({ error: 'الخدمة غير جاهزة' }, 503)
@@ -39,12 +40,30 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
     if (path === 'projects') {
       if (!employee.manage_projects) return json({ error: 'حسابك لا يملك صلاحية إدارة معرض الأعمال.' }, 403)
       if (request.method === 'DELETE') return json({ error: 'صلاحية الموظف تسمح بإضافة المشروع وتعديله أو إخفائه، والحذف النهائي للإدارة فقط.' }, 403)
-      return await manageProjects(request, env)
+      const body = request.method === 'POST' ? await request.clone().json().catch(() => ({})) as Record<string, unknown> : {}
+      const response = await manageProjects(request, env)
+      if (request.method === 'POST' && response.ok) {
+        const title = typeof body.title === 'string' && body.title.trim() ? body.title.trim().slice(0, 160) : 'مشروع جديد'
+        const action = body.id ? 'عدّل مشروعًا' : 'أضاف مشروعًا'
+        await recordAdminNotification(env, { actor: employee.name, eventType: body.id ? 'project_updated' : 'project_added', title: 'نشاط في معرض الأعمال', detail: `${employee.name} ${action}: «${title}»`, target: 'projects' })
+      }
+      return response
     }
     if (['hub-catalog', 'hub-customers', 'hub-manual-subscriptions'].includes(path)) {
       if (!employee.manage_hub_subscriptions) return json({ error: 'حسابك لا يملك صلاحية تسجيل اشتراكات دعيدر هب.' }, 403)
       if (path === 'hub-catalog' && request.method !== 'GET') return json({ error: 'طريقة الطلب غير مسموحة' }, 405)
-      return await adminHub(request, env, path, employee.email)
+      if (path !== 'hub-manual-subscriptions' || request.method !== 'POST') return await adminHub(request, env, path, employee.email)
+      const body = await request.clone().json().catch(() => ({})) as Record<string, unknown>
+      const response = await adminHub(request, env, path, employee.email)
+      if (response.ok) {
+        const data = await response.clone().json().catch(() => ({})) as Record<string, unknown>
+        if (!data.idempotent) {
+          const customer = typeof body.userId === 'string' ? await env.DB.prepare('SELECT name FROM hub_users WHERE id=?').bind(body.userId).first<{ name: string }>() : null
+          const renewal = !!body.renewalSubscriptionId
+          await recordAdminNotification(env, { actor: employee.name, eventType: renewal ? 'hub_subscription_renewed' : 'hub_subscription_created', title: renewal ? 'تجديد اشتراك عميل' : 'تسجيل اشتراك عميل', detail: `${employee.name} ${renewal ? 'جدّد اشتراك' : 'سجّل اشتراك'} ${customer?.name || 'عميل'}`, target: 'hub' })
+        }
+      }
+      return response
     }
     if (path === 'requests' && request.method === 'GET') {
       const month = new URL(request.url).searchParams.get('month') || cairoDay().slice(0, 7)
@@ -60,6 +79,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       const duplicate = await env.DB.prepare("SELECT id FROM employee_requests WHERE employee_id = ? AND day = ? AND type = ? AND status IN ('pending','approved')").bind(employee.id, body.day, body.type).first()
       if (duplicate) return json({ error: 'يوجد طلب لنفس اليوم بالفعل' }, 409)
       await env.DB.prepare('INSERT OR IGNORE INTO employee_requests VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)').bind(crypto.randomUUID(), employee.id, body.type, body.day, body.type === 'early' ? body.requested_time : null, body.reason.trim(), 'pending', '', now).run()
+      await recordAdminNotification(env, { actor: employee.name, eventType: 'employee_request', title: body.type === 'leave' ? 'طلب إجازة جديد' : 'طلب انصراف مبكر', detail: `${employee.name} أرسل طلبًا ليوم ${body.day}${body.type === 'early' ? ` الساعة ${body.requested_time}` : ''}`, target: 'employees' })
       return json({ success: true })
     }
     if (path === 'session' && request.method === 'GET') return json({ employee: safeEmployee(employee) })
@@ -76,14 +96,16 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       return json({ records: rows, open, today, serverDay: cairoDay() })
     }
     if (path === 'check-in' && request.method === 'POST') {
-      await env.DB.prepare('INSERT OR IGNORE INTO attendance VALUES (?, ?, ?, ?, NULL)').bind(crypto.randomUUID(), employee.id, cairoDay(now), now).run()
+      const inserted = await env.DB.prepare('INSERT OR IGNORE INTO attendance VALUES (?, ?, ?, ?, NULL)').bind(crypto.randomUUID(), employee.id, cairoDay(now), now).run() as { meta?: { changes?: number }; changes?: number }
       const row = await env.DB.prepare('SELECT * FROM attendance WHERE employee_id = ? AND check_out IS NULL').bind(employee.id).first<Attendance>()
+      if ((inserted.meta?.changes ?? inserted.changes ?? 0) > 0) await recordAdminNotification(env, { actor: employee.name, eventType: 'attendance_checkin', title: 'تسجيل حضور', detail: `${employee.name} سجّل حضوره`, target: 'employees' })
       return row ? json({ record: row }) : json({ error: 'تم تسجيل حضور وانصراف اليوم بالفعل' }, 409)
     }
     if (path === 'check-out' && request.method === 'POST') {
       const row = await env.DB.prepare('SELECT * FROM attendance WHERE employee_id = ? AND check_out IS NULL').bind(employee.id).first<Attendance>()
       if (!row) return json({ error: 'لا يوجد حضور مفتوح لتسجيل الانصراف' }, 409)
       await env.DB.prepare('UPDATE attendance SET check_out = ? WHERE id = ? AND check_out IS NULL').bind(now, row.id).run()
+      await recordAdminNotification(env, { actor: employee.name, eventType: 'attendance_checkout', title: 'تسجيل انصراف', detail: `${employee.name} سجّل انصرافه`, target: 'employees' })
       return json({ success: true })
     }
     return json({ error: 'غير موجود' }, 404)
