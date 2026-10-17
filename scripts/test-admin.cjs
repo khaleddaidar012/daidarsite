@@ -94,8 +94,23 @@ async function test() {
   sqlite.exec(fs.readFileSync('migrations/0003_hub.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0004_employee_work_permissions.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0005_d1_usage_permission.sql', 'utf8'))
+  sqlite.exec(fs.readFileSync('migrations/0007_employee_payroll.sql', 'utf8'))
   for (const path of ['employees', 'attendance', 'employee-requests']) assert.equal((await call(path)).status, 401)
   const employeePassword = 'employee-test-password'
+  const schedule = []
+  const attendanceForPayroll = []
+  for (let day = 1; day <= 30; day++) {
+    const date = `2026-06-${String(day).padStart(2, '0')}`
+    const weekday = new Date(date + 'T00:00:00Z').getUTCDay()
+    if ([5, 6].includes(weekday)) continue
+    schedule.push(date)
+    if (date !== '2026-06-11' && date !== '2026-06-10') attendanceForPayroll.push({ id: date, employee_id: 'payroll-test', day: date, check_in: Date.parse(date + 'T08:00:00Z'), check_out: Date.parse(date + 'T16:00:00Z') })
+  }
+  const payroll = employeeLib.calculatePayroll([{ id: 'payroll-test', name: 'خالد', job_title: 'مطور', email: 'payroll@example.com', active: 1, password_hash: '', created_at: Date.parse('2026-01-01T00:00:00Z'), manage_projects: 0, manage_hub_subscriptions: 0, view_d1_usage: 0, monthly_salary_piasters: 300000, weekly_days_off: '[5,6]' }], attendanceForPayroll, [{ employee_id: 'payroll-test', day: '2026-06-10', type: 'leave', status: 'approved' }], '2026-06', Date.parse('2026-06-30T12:00:00Z'))
+  assert.equal(payroll[0].absent_days, 1)
+  assert.equal(payroll[0].approved_leave_days, 1)
+  assert.equal(payroll[0].due_piasters, 288500)
+  assert.equal(payroll[0].deduction_piasters, 11500)
   assert.equal(employeeLib.cairoDay(Date.parse('2026-10-12T21:30:00Z')), '2026-10-13')
   const employeeForm = { name: 'خالد', job_title: 'مطور', email: 'khaled@example.com', password: employeePassword, active: 1, manage_projects: 0, manage_hub_subscriptions: 0, view_d1_usage: 0 }
   assert.equal((await call('employees', 'POST', employeeForm, cookie)).status, 200)
@@ -104,6 +119,15 @@ async function test() {
   const employeeList = (await (await call('employees', 'GET', undefined, cookie)).json()).employees
   assert.equal(employeeList.length, 2)
   assert.equal(employeeList[0].password_hash, undefined)
+  assert.deepEqual(employeeList[0].weekly_days_off, [5])
+  assert.equal((await call('employees', 'POST', { ...employeeForm, id: employeeList[0].id, password: '', monthly_salary_piasters: -1 }, cookie)).status, 422)
+  const payrollMonth = employeeLib.cairoDay().slice(0, 7)
+  assert.equal((await call('payroll', 'POST', { employee_id: employeeList[0].id, month: payrollMonth, due_piasters: 288550 }, cookie)).status, 422)
+  assert.equal((await call('payroll', 'POST', { employee_id: employeeList[0].id, month: payrollMonth, due_piasters: 288500, note: 'مكافأة اختبار' }, cookie)).status, 200)
+  const savedPayroll = (await (await call('payroll', 'GET', undefined, cookie)).json()).payroll.find(row => row.employee_id === employeeList[0].id)
+  assert.equal(savedPayroll.due_piasters, 288500)
+  assert.equal(savedPayroll.adjustment_note, 'مكافأة اختبار')
+  assert.equal((await call('payroll', 'POST', { employee_id: employeeList[0].id, month: payrollMonth, clear: true }, cookie)).status, 200)
   const employeeCall = (path, method = 'GET', body, employeeCookie, origin) => employeeApi({ env, request: new Request(request(path, method, body, employeeCookie, origin).url.replace('/api/admin/', '/api/employee/'), request(path, method, body, employeeCookie, origin)) })
   assert.equal((await employeeCall('check-in', 'POST')).status, 401)
   assert.equal((await employeeCall('login', 'POST', { email: employeeForm.email, password: 'wrong' })).status, 401)
