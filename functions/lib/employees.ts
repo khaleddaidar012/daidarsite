@@ -23,7 +23,13 @@ export async function monthlyAttendance(env: Env, month: string, employeeId?: st
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return null
   const rows = await env.DB!.prepare(`SELECT * FROM attendance WHERE day >= ? AND day <= ?${employeeId ? ' AND employee_id = ?' : ''} ORDER BY day, check_in`)
     .bind(`${month}-01`, `${month}-31`, ...(employeeId ? [employeeId] : [])).all<Attendance>()
-  return rows.results.map(row => ({ ...row, hours: row.check_out === null ? null : (row.check_out - row.check_in) / 3600000 }))
+  const now = Date.now()
+  const today = cairoDay(now)
+  return rows.results.map(row => {
+    const open = row.check_out === null
+    const end = row.check_out ?? (row.day === today ? now : null)
+    return { ...row, open, hours: end === null ? null : Math.max(0, (end - row.check_in) / 3600000) }
+  })
 }
 export function calculatePayroll(employees: Employee[], attendance: Attendance[], requests: Array<{ employee_id: string; day: string; type: string; status: string }>, month: string, now = Date.now()): PayrollRow[] | null {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return null
