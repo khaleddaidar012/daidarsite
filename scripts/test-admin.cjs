@@ -19,13 +19,14 @@ const DB = {
   async batch(statements) { return Promise.all(statements.map(s => s.run())) },
 }
 const store = load('functions/lib/store.ts')
+const d1Usage = load('functions/lib/d1-usage.ts', { './store': store })
 const employeeLib = load('functions/lib/employees.ts', { './store': store })
 const originalProjects = load('src/data/projects.ts')
 const projectLib = load('functions/lib/projects.ts', { './store': store, '../../src/data/projects': originalProjects })
 const hubApi = load('functions/api/hub/[[path]].ts', { '../../lib/store': store })
 const hubAdmin = load('functions/lib/hub-admin.ts', { './store': store, '../api/hub/[[path]]': hubApi })
-const admin = load('functions/api/admin/[[path]].ts', { '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin }).onRequest
-const employeeApi = load('functions/api/employee/[[path]].ts', { '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin }).onRequest
+const admin = load('functions/api/admin/[[path]].ts', { '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage }).onRequest
+const employeeApi = load('functions/api/employee/[[path]].ts', { '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage }).onRequest
 const visit = load('functions/api/visit.ts', { '../lib/store': store }).onRequestPost
 const publicProjects = load('functions/api/projects.ts', { '../lib/store': store }).onRequestGet
 const contact = load('functions/api/contact.ts', { '../lib/store': store }).onRequestPost
@@ -37,7 +38,7 @@ function request(path, method = 'GET', body, cookie, origin = 'https://test.exam
 }
 async function call(path, method, body, cookie, origin) { return admin({ request: request(path, method, body, cookie, origin), env }) }
 async function test() {
-  for (const path of ['session', 'stats', 'messages', 'projects']) assert.equal((await call(path)).status, 401)
+  for (const path of ['session', 'stats', 'messages', 'projects', 'd1-usage']) assert.equal((await call(path)).status, 401)
   assert.equal((await call('projects', 'POST', {})).status, 401)
   assert.equal((await call('login', 'POST', { email: env.ADMIN_EMAIL, password }, undefined, 'https://evil.example')).status, 403)
   assert.equal((await call('login', 'POST', { email: env.ADMIN_EMAIL, password: 'wrong' })).status, 401)
@@ -89,10 +90,11 @@ async function test() {
   sqlite.exec(fs.readFileSync('migrations/0002_employees.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0003_hub.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0004_employee_work_permissions.sql', 'utf8'))
+  sqlite.exec(fs.readFileSync('migrations/0005_d1_usage_permission.sql', 'utf8'))
   for (const path of ['employees', 'attendance', 'employee-requests']) assert.equal((await call(path)).status, 401)
   const employeePassword = 'employee-test-password'
   assert.equal(employeeLib.cairoDay(Date.parse('2026-10-12T21:30:00Z')), '2026-10-13')
-  const employeeForm = { name: 'خالد', job_title: 'مطور', email: 'khaled@example.com', password: employeePassword, active: 1, manage_projects: 0, manage_hub_subscriptions: 0 }
+  const employeeForm = { name: 'خالد', job_title: 'مطور', email: 'khaled@example.com', password: employeePassword, active: 1, manage_projects: 0, manage_hub_subscriptions: 0, view_d1_usage: 0 }
   assert.equal((await call('employees', 'POST', employeeForm, cookie)).status, 200)
   assert.equal((await call('employees', 'POST', employeeForm, cookie)).status, 409)
   await call('employees', 'POST', { ...employeeForm, name: 'أحمد', email: 'ahmed@example.com' }, cookie)
@@ -109,7 +111,26 @@ async function test() {
   assert.equal((await call('employees', 'GET', undefined, employeeCookie)).status, 401)
   assert.equal((await employeeCall('projects', 'GET', undefined, employeeCookie)).status, 403)
   assert.equal((await employeeCall('hub-customers', 'GET', undefined, employeeCookie)).status, 403)
-  assert.equal((await call('employees', 'POST', { ...employeeForm, id: employeeList[0].id, password: '', manage_projects: 1, manage_hub_subscriptions: 1 }, cookie)).status, 200)
+  assert.equal((await employeeCall('d1-usage', 'GET', undefined, employeeCookie)).status, 403)
+  assert.equal((await call('employees', 'POST', { ...employeeForm, id: employeeList[0].id, password: '', manage_projects: 1, manage_hub_subscriptions: 1, view_d1_usage: 1 }, cookie)).status, 200)
+  assert.equal((await employeeCall('d1-usage', 'GET', undefined, employeeCookie)).status, 503)
+  const originalUsageFetch = global.fetch
+  env.CLOUDFLARE_ACCOUNT_ID = 'test-account'
+  env.CLOUDFLARE_D1_READ_TOKEN = 'test-token'
+  env.D1_PLAN = 'free'
+  global.fetch = async url => {
+    if (String(url).endsWith('/d1/database?page=1&per_page=1000')) return new Response(JSON.stringify({ success: true, result: [{ uuid: 'db-usage-test', name: 'مشروع' }] }), { status: 200 })
+    if (String(url).includes('/d1/database/db-usage-test?fields=')) return new Response(JSON.stringify({ success: true, result: { uuid: 'db-usage-test', name: 'مشروع', file_size: 300000000 } }), { status: 200 })
+    throw new Error('Unexpected Cloudflare API URL: ' + url)
+  }
+  try {
+    const usageResponse = await employeeCall('d1-usage', 'GET', undefined, employeeCookie)
+    assert.equal(usageResponse.status, 200)
+    const usage = await usageResponse.json()
+    assert.equal(usage.databases[0].usedPercent, 60)
+    assert.equal(usage.databases[0].freeBytes, 200000000)
+    assert.equal(usage.databases[0].status, 'healthy')
+  } finally { global.fetch = originalUsageFetch }
   assert.equal((await employeeCall('projects', 'GET', undefined, employeeCookie)).status, 200)
   const staffProject = { title: 'مشروع الموظف', description: 'وصف تجريبي لمشروع أضافه الموظف.', category: 'website', status: 'draft' }
   assert.equal((await employeeCall('projects', 'POST', staffProject, employeeCookie)).status, 200)
@@ -146,9 +167,10 @@ async function test() {
   assert.equal(renewalGrant.status, 200)
   assert.equal((await renewalGrant.json()).subscriptionId, grantData.subscriptionId)
   assert.ok(sqlite.prepare('SELECT expires_at FROM hub_subscriptions WHERE id=?').get(grantData.subscriptionId).expires_at > beforeRenewal)
-  assert.equal((await call('employees', 'POST', { ...employeeForm, id: employeeList[0].id, password: '', manage_projects: 0, manage_hub_subscriptions: 0 }, cookie)).status, 200)
+  assert.equal((await call('employees', 'POST', { ...employeeForm, id: employeeList[0].id, password: '', manage_projects: 0, manage_hub_subscriptions: 0, view_d1_usage: 0 }, cookie)).status, 200)
   assert.equal((await employeeCall('projects', 'GET', undefined, employeeCookie)).status, 403)
   assert.equal((await employeeCall('hub-customers', 'GET', undefined, employeeCookie)).status, 403)
+  assert.equal((await employeeCall('d1-usage', 'GET', undefined, employeeCookie)).status, 403)
   assert.equal((await employeeCall('check-in', 'POST', {}, employeeCookie, 'https://evil.example')).status, 403)
   assert.equal((await employeeCall('check-out', 'POST', {}, employeeCookie)).status, 409)
   const punch = () => employeeCall('check-in', 'POST', { employee_id: employeeList[1].id, check_in: 0 }, employeeCookie)

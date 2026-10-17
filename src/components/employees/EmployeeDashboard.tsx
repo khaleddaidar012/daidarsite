@@ -1,9 +1,10 @@
 'use client'
 import { useEffect, useState, type FormEvent } from 'react'
-import { Clock3, FolderKanban, CreditCard } from 'lucide-react'
+import { Clock3, FolderKanban, CreditCard, Database } from 'lucide-react'
 import { action, field, callApi, currentMonth, AttendanceTable, time, statusLabel, type Employee, type RecordRow, type EmployeeRequest } from './shared'
 import EmployeeProjectManager from './EmployeeProjectManager'
 import HubManualSubscriptionManager from '@/components/shared/HubManualSubscriptionManager'
+import D1UsageDashboard from '@/components/admin/D1UsageDashboard'
 export default function EmployeeDashboard() {
   const [employee, setEmployee] = useState<Employee | null>(null)
   const [loading, setLoading] = useState(true)
@@ -19,7 +20,7 @@ export default function EmployeeDashboard() {
   const [revision, setRevision] = useState(0)
   const [requestType, setRequestType] = useState('leave')
   const [reportLoading, setReportLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'attendance' | 'projects' | 'hub'>('attendance')
+  const [activeTab, setActiveTab] = useState<'attendance' | 'projects' | 'hub' | 'databases'>('attendance')
   function fail(e: Error & { status?: number }) { setError(e.message); if (e.status === 401) setEmployee(null) }
   useEffect(() => { callApi('employee', 'session').then(data => setEmployee(data.employee)).catch(e => { if (e.status !== 401) setError(e.message) }).finally(() => setLoading(false)) }, [])
   useEffect(() => {
@@ -45,6 +46,7 @@ export default function EmployeeDashboard() {
     { id: 'attendance' as const, label: 'الحضور والانصراف', description: 'سجل يومك وتقاريرك', icon: Clock3 },
     ...(employee?.manage_projects === 1 ? [{ id: 'projects' as const, label: 'إدارة المشاريع', description: 'معرض أعمال دعيدر', icon: FolderKanban }] : []),
     ...(employee?.manage_hub_subscriptions === 1 ? [{ id: 'hub' as const, label: 'اشتراكات هب', description: 'تسجيل دفعة أو تجديد', icon: CreditCard }] : []),
+    ...(employee?.view_d1_usage === 1 ? [{ id: 'databases' as const, label: 'سعة قواعد البيانات', description: 'المساحة المستخدمة والمتاحة', icon: Database }] : []),
   ]
   return <main dir="rtl" className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-8"><div className="max-w-5xl mx-auto"><header className="flex flex-wrap justify-between items-center gap-4 mb-8"><div><p className="text-sky-600 font-bold">دعيدر للحلول البرمجية</p><h1 className="text-3xl font-bold mt-2">{employee ? `أهلًا ${employee.name}` : 'دخول الموظفين'}</h1>{employee && <p className="text-slate-500 mt-2">{employee.job_title}</p>}</div>{employee && <button className={action} disabled={busy} onClick={async () => { setBusy(true); try { await callApi('employee', 'logout', 'POST'); setEmployee(null); setRows([]); setRequests([]); setNotice('') } catch (e) { fail(e as Error) } finally { setBusy(false) } }}>تسجيل الخروج</button>}</header>{error && <p role="alert" className="bg-red-50 text-red-700 p-4 rounded-xl mb-5">{error}</p>}{notice && <p role="status" className="text-green-700 p-4 mb-5">{notice}</p>}
     {!employee ? <form onSubmit={login} className="max-w-md mx-auto bg-white border rounded-2xl p-6 space-y-4"><label className="block">البريد الإلكتروني<input className={field} name="email" type="email" autoComplete="username" required /></label><label className="block">كلمة المرور<input className={field} name="password" type="password" autoComplete="current-password" maxLength={256} required /></label><button className={`${action} w-full`} disabled={busy}>دخول</button><p className="text-sm text-slate-500">حسابك يتم إنشاؤه بواسطة الإدارة.</p></form> : <>
@@ -58,6 +60,7 @@ export default function EmployeeDashboard() {
     </div>}
     {activeTab === 'projects' && employee.manage_projects === 1 && <EmployeeProjectManager />}
     {activeTab === 'hub' && employee.manage_hub_subscriptions === 1 && <HubManualSubscriptionManager scope="employee" />}
+    {activeTab === 'databases' && employee.view_d1_usage === 1 && <D1UsageDashboard scope="employee" />}
     </>}
   </div></main>
 }

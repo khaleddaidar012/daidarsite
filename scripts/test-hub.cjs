@@ -20,11 +20,12 @@ const DB = {
   async batch(statements) { const out=[]; for (const statement of statements) out.push(await statement.run()); return out },
 }
 const store = load('functions/lib/store.ts')
+const d1Usage = load('functions/lib/d1-usage.ts', { './store': store })
 const hub = load('functions/api/hub/[[path]].ts', { '../../lib/store': store })
 const hubAdmin = load('functions/lib/hub-admin.ts', { './store': store, '../api/hub/[[path]]': hub })
 const projects = load('functions/lib/projects.ts', { './store': store, '../../src/data/projects': load('src/data/projects.ts') })
 const employees = load('functions/lib/employees.ts', { './store': store })
-const admin = load('functions/api/admin/[[path]].ts', { '../../lib/store': store, '../../lib/employees': employees, '../../lib/projects': projects, '../../lib/hub-admin': hubAdmin }).onRequest
+const admin = load('functions/api/admin/[[path]].ts', { '../../lib/store': store, '../../lib/employees': employees, '../../lib/projects': projects, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage }).onRequest
 const env = { DB, ADMIN_EMAIL: 'owner@example.com', ADMIN_PASSWORD_HASH: 'ab'.repeat(24) + ':' + 'cd'.repeat(32) }
 function req(base, path, method='GET', body, cookie, origin='https://hub.example') {
   return new Request(`${origin}/api/${base}/${path}`, { method, headers: { Origin: origin, ...(body instanceof FormData ? {} : {'Content-Type':'application/json'}), ...(cookie?{Cookie:cookie}:{}) }, body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body) })

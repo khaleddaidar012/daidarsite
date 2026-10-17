@@ -2,6 +2,7 @@ import { hash, json, sameOrigin, verifyPassword, type Env } from '../../lib/stor
 import { cairoDay, employeeSession, monthlyAttendance, safeEmployee, type Employee, type Attendance } from '../../lib/employees'
 import { manageProjects } from '../../lib/projects'
 import { adminHub } from '../../lib/hub-admin'
+import { d1UsageResponse } from '../../lib/d1-usage'
 export async function onRequest({ request, env }: { request: Request; env: Env }) {
   try {
     if (!env.DB) return json({ error: 'الخدمة غير جاهزة' }, 503)
@@ -31,6 +32,10 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
     }
     const employee = await employeeSession(request, env)
     if (!employee) return json({ error: 'سجل دخولك أولاً' }, 401)
+    if (path === 'd1-usage' && request.method === 'GET') {
+      if (!employee.view_d1_usage) return json({ error: 'حسابك لا يملك صلاحية عرض سعة قواعد البيانات.' }, 403)
+      return await d1UsageResponse(env)
+    }
     if (path === 'projects') {
       if (!employee.manage_projects) return json({ error: 'حسابك لا يملك صلاحية إدارة معرض الأعمال.' }, 403)
       if (request.method === 'DELETE') return json({ error: 'صلاحية الموظف تسمح بإضافة المشروع وتعديله أو إخفائه، والحذف النهائي للإدارة فقط.' }, 403)
