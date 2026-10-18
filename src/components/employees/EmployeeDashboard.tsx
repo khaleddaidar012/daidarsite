@@ -2,6 +2,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Clock3, FolderKanban, CreditCard, Database, CalendarDays, WalletCards } from 'lucide-react'
 import { action, field, callApi, currentMonth, AttendanceTable, time, statusLabel, type Employee, type RecordRow, type EmployeeRequest } from './shared'
+import ProjectTracker from '@/components/shared/ProjectTracker'
 import EmployeeProjectManager from './EmployeeProjectManager'
 import HubManualSubscriptionManager from '@/components/shared/HubManualSubscriptionManager'
 import D1UsageDashboard from '@/components/admin/D1UsageDashboard'
@@ -21,7 +22,7 @@ export default function EmployeeDashboard() {
   const [revision, setRevision] = useState(0)
   const [requestType, setRequestType] = useState('leave')
   const [reportLoading, setReportLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'attendance' | 'projects' | 'hub' | 'databases'>('attendance')
+  const [activeTab, setActiveTab] = useState<'tracking' | 'attendance' | 'projects' | 'hub' | 'databases'>('attendance')
   function fail(e: Error & { status?: number }) { setError(e.message); if (e.status === 401) setEmployee(null) }
   useEffect(() => { callApi('employee', 'session').then(data => setEmployee(data.employee)).catch(e => { if (e.status !== 401) setError(e.message) }).finally(() => setLoading(false)) }, [])
   useEffect(() => {
@@ -45,6 +46,7 @@ export default function EmployeeDashboard() {
   if (loading) return <main className="p-10 text-center">جارٍ التحميل…</main>
   const tabs = [
     { id: 'attendance' as const, label: 'الحضور والانصراف', description: 'سجل يومك وتقاريرك', icon: Clock3 },
+    ...(employee?.track_projects === 1 ? [{ id: 'tracking' as const, label: 'تتبع المشاريع', description: 'الجدول الشهري وحالة التنفيذ', icon: CalendarDays }] : []),
     ...(employee?.manage_projects === 1 ? [{ id: 'projects' as const, label: 'إدارة المشاريع', description: 'معرض أعمال دعيدر', icon: FolderKanban }] : []),
     ...(employee?.manage_hub_subscriptions === 1 ? [{ id: 'hub' as const, label: 'اشتراكات هب', description: 'تسجيل دفعة أو تجديد', icon: CreditCard }] : []),
     ...(employee?.view_d1_usage === 1 ? [{ id: 'databases' as const, label: 'سعة قواعد البيانات', description: 'المساحة المستخدمة والمتاحة', icon: Database }] : []),
@@ -59,6 +61,7 @@ export default function EmployeeDashboard() {
     <section className="bg-white border rounded-2xl p-6"><h2 className="text-xl font-bold mb-4">طلب إجازة أو استئذان</h2><form onSubmit={submit} className="grid sm:grid-cols-2 gap-4"><label>نوع الطلب<select className={field} name="type" value={requestType} onChange={e => setRequestType(e.target.value)}><option value="leave">إجازة يوم</option><option value="early">استئذان انصراف مبكر</option></select></label><label>التاريخ<input className={field} type="date" name="day" min={serverDay} required /></label>{requestType === 'early' && <label>وقت الانصراف المطلوب (القاهرة)<input className={field} type="time" name="requested_time" required /></label>}<label className="sm:col-span-2">السبب<textarea className={field} name="reason" required maxLength={1000} rows={3} /></label><button className={action} disabled={busy}>إرسال الطلب للإدارة</button></form></section>
     <section className="bg-white border rounded-2xl p-6"><div className="flex flex-wrap justify-between items-center gap-4"><h2 className="text-xl font-bold">السجل الشهري</h2><label>الشهر<input className={`${field} mt-1 min-w-44`} type="month" value={month} onChange={e => { if (e.target.value) setMonth(e.target.value) }} /></label></div>{reportLoading ? <p className="py-6">جارٍ تحميل الشهر…</p> : <><AttendanceTable month={month} records={rows} requests={requests} daysOff={employee.weekly_days_off || [5]} />{employee.view_absences === 1 && payroll && <section className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-100 text-amber-700"><CalendarDays size={20} /></span><div><h3 className="font-bold">أيام الغياب المحتسبة</h3><p className="text-sm text-amber-800">{(payroll.absent_days || 0).toLocaleString('ar-EG')} {payroll.absent_days === 1 ? 'يوم' : 'أيام'} غياب هذا الشهر</p></div></div>{payroll.absent_dates?.length ? <ul className="mt-4 grid gap-2 sm:grid-cols-2">{payroll.absent_dates.map(day => <li key={day} className="rounded-lg bg-white px-3 py-2 text-sm">{new Date(day + 'T12:00:00Z').toLocaleDateString('ar-EG', { timeZone: 'Africa/Cairo', weekday: 'long', day: 'numeric', month: 'long' })}</li>)}</ul> : <p className="mt-3 text-sm text-emerald-700">لا توجد أيام غياب محتسبة حتى الآن.</p>}<p className="mt-3 text-xs text-slate-500">أيام الراحة الأسبوعية والإجازات الموافق عليها لا تُحسب غيابًا.</p></section>}{employee.view_due === 1 && payroll && typeof payroll.due_piasters === 'number' && <section className="mt-4 flex items-center gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-5"><span className="grid h-11 w-11 place-items-center rounded-xl bg-emerald-100 text-emerald-700"><WalletCards size={21} /></span><div><h3 className="font-bold">المستحق لهذا الشهر</h3><p className="mt-1 text-2xl font-extrabold text-emerald-800">{Math.round(payroll.due_piasters / 100).toLocaleString('ar-EG')} جنيه</p></div></section>}<h3 className="font-bold mt-6 mb-3">طلبات الشهر</h3>{requests.map(r => <article key={r.id} className="border rounded-xl p-4 mb-3"><h4 className="font-bold">{r.type === 'leave' ? 'إجازة' : 'انصراف مبكر'} — {r.day} {r.requested_time || ''} · {statusLabel[r.status]}</h4><p className="whitespace-pre-wrap break-words mt-2">{r.reason}</p>{r.admin_note && <p className="text-slate-500 mt-2">ملاحظة الإدارة: {r.admin_note}</p>}</article>)}{!requests.length && <p className="text-slate-500">لا توجد طلبات في هذا الشهر.</p>}</>}</section>
     </div>}
+    {activeTab === 'tracking' && employee.track_projects === 1 && <ProjectTracker scope="employee" />}
     {activeTab === 'projects' && employee.manage_projects === 1 && <EmployeeProjectManager />}
     {activeTab === 'hub' && employee.manage_hub_subscriptions === 1 && <HubManualSubscriptionManager scope="employee" />}
     {activeTab === 'databases' && employee.view_d1_usage === 1 && <D1UsageDashboard scope="employee" />}

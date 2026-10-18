@@ -9,6 +9,7 @@ export function middleware(request: NextRequest) {
   // Skip API routes, static files, and _next
   if (
     pathname.startsWith('/api') ||
+    pathname === '/track' || pathname.startsWith('/track/') ||
     pathname === '/admin' || pathname.startsWith('/admin/') ||
     pathname === '/employee' || pathname.startsWith('/employee/') ||
     pathname.startsWith('/_next') ||

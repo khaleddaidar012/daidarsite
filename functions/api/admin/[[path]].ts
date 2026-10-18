@@ -1,3 +1,4 @@
+import { workProjects } from '../../lib/work-projects'
 import { authenticated, hash, json, sameOrigin, verifyPassword, type Env } from '../../lib/store'
 import { adminEmployees } from '../../lib/employees'
 import { manageProjects } from '../../lib/projects'
@@ -41,6 +42,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
     if (!await authenticated(request, env)) return json({ error: 'سجل دخولك أولاً' }, 401)
     if (path === 'notifications') return await adminNotifications(request, env)
     if (['employees', 'attendance', 'employee-requests', 'payroll'].includes(path)) return await adminEmployees(request, env, path)
+    if (path === 'work-projects') return await workProjects(request, env, true)
     if (path === 'd1-usage' && request.method === 'GET') return await d1UsageResponse(env)
     if (path.startsWith('hub-')) return await adminHub(request, env, path, env.ADMIN_EMAIL.trim())
     if (path === 'session' && request.method === 'GET') return json({ email: env.ADMIN_EMAIL })

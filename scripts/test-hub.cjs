@@ -11,7 +11,7 @@ function load(file, dependencies = {}) {
 }
 const sqlite = new DatabaseSync(':memory:')
 sqlite.exec('PRAGMA foreign_keys=ON')
-for (const file of ['migrations/0001_admin.sql', 'migrations/0002_employees.sql', 'migrations/0003_hub.sql', 'migrations/0004_employee_work_permissions.sql', 'migrations/0005_d1_usage_permission.sql', 'migrations/0006_admin_notifications.sql', 'migrations/0007_employee_payroll.sql', 'migrations/0008_employee_payroll_visibility.sql']) sqlite.exec(fs.readFileSync(file, 'utf8'))
+for (const file of ['migrations/0001_admin.sql', 'migrations/0002_employees.sql', 'migrations/0003_hub.sql', 'migrations/0004_employee_work_permissions.sql', 'migrations/0005_d1_usage_permission.sql', 'migrations/0006_admin_notifications.sql', 'migrations/0007_employee_payroll.sql', 'migrations/0008_employee_payroll_visibility.sql', 'migrations/0009_project_tracking.sql']) sqlite.exec(fs.readFileSync(file, 'utf8'))
 const DB = {
   prepare(sql) {
     let args = []
@@ -26,7 +26,8 @@ const hubAdmin = load('functions/lib/hub-admin.ts', { './store': store, '../api/
 const notifications = load('functions/lib/notifications.ts', { './store': store })
 const projects = load('functions/lib/projects.ts', { './store': store, '../../src/data/projects': load('src/data/projects.ts') })
 const employees = load('functions/lib/employees.ts', { './store': store })
-const admin = load('functions/api/admin/[[path]].ts', { '../../lib/store': store, '../../lib/employees': employees, '../../lib/projects': projects, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
+const workProjects = load('functions/lib/work-projects.ts', { './store': store })
+const admin = load('functions/api/admin/[[path]].ts', { '../../lib/work-projects': workProjects, '../../lib/store': store, '../../lib/employees': employees, '../../lib/projects': projects, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
 const env = { DB, ADMIN_EMAIL: 'owner@example.com', ADMIN_PASSWORD_HASH: 'ab'.repeat(24) + ':' + 'cd'.repeat(32) }
 function req(base, path, method='GET', body, cookie, origin='https://hub.example') {
   return new Request(`${origin}/api/${base}/${path}`, { method, headers: { Origin: origin, ...(body instanceof FormData ? {} : {'Content-Type':'application/json'}), ...(cookie?{Cookie:cookie}:{}) }, body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body) })

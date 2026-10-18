@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "push": "\"C:\\Users\\GHOST\\AppData\\Local\\MinGit\\cmd\\git.exe\" push -u origin main"
+    "push": "git push -u origin main"
   },
   "dependencies": {
     "next": "^15.0.0",

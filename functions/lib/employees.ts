@@ -1,5 +1,5 @@
 import { hash, json, type Env } from './store'
-export type Employee = { id: string; name: string; job_title: string; email: string; active: number; password_hash: string; created_at: number; manage_projects: number; manage_hub_subscriptions: number; view_d1_usage: number; monthly_salary_piasters: number; weekly_days_off: string; view_absences: number; view_due: number }
+export type Employee = { id: string; name: string; job_title: string; email: string; active: number; password_hash: string; created_at: number; manage_projects: number; manage_hub_subscriptions: number; track_projects: number; view_d1_usage: number; monthly_salary_piasters: number; weekly_days_off: string; view_absences: number; view_due: number }
 export type Attendance = { id: string; employee_id: string; day: string; check_in: number; check_out: number | null }
 export type PayrollRow = { employee_id: string; name: string; job_title: string; active: number; monthly_salary_piasters: number; weekly_days_off: number[]; scheduled_days: number; elapsed_workdays: number; attended_days: number; approved_leave_days: number; absent_days: number; absent_dates: string[]; daily_rate_piasters: number; deduction_piasters: number; due_piasters: number }
 export function cairoDay(now = Date.now()) {
@@ -18,7 +18,7 @@ export async function employeeSession(request: Request, env: Env) {
   if (!token || !env.DB) return null
   return env.DB.prepare('SELECT e.* FROM employees e JOIN employee_sessions s ON s.employee_id = e.id WHERE s.token = ? AND s.expires_at > ? AND s.credential = e.password_hash AND e.active = 1').bind(await hash(token), Date.now()).first<Employee>()
 }
-export function safeEmployee(employee: Employee) { return { id: employee.id, name: employee.name, job_title: employee.job_title, email: employee.email, active: employee.active, manage_projects: employee.manage_projects, manage_hub_subscriptions: employee.manage_hub_subscriptions, view_d1_usage: employee.view_d1_usage, view_absences: employee.view_absences, view_due: employee.view_due, weekly_days_off: parseDaysOff(employee.weekly_days_off) } }
+export function safeEmployee(employee: Employee) { return { id: employee.id, name: employee.name, job_title: employee.job_title, email: employee.email, active: employee.active, manage_projects: employee.manage_projects, manage_hub_subscriptions: employee.manage_hub_subscriptions, view_d1_usage: employee.view_d1_usage, track_projects: employee.track_projects, view_absences: employee.view_absences, view_due: employee.view_due, weekly_days_off: parseDaysOff(employee.weekly_days_off) } }
 export async function monthlyAttendance(env: Env, month: string, employeeId?: string) {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return null
   const rows = await env.DB!.prepare(`SELECT * FROM attendance WHERE day >= ? AND day <= ?${employeeId ? ' AND employee_id = ?' : ''} ORDER BY day, check_in`)
@@ -129,7 +129,7 @@ export async function adminEmployees(request: Request, env: Env, path: string) {
   }
   if (path !== 'employees') return json({ error: 'غير مسموح' }, 405)
   if (request.method === 'GET') {
-    const rows = await env.DB!.prepare('SELECT id, name, job_title, email, active, manage_projects, manage_hub_subscriptions, view_d1_usage, monthly_salary_piasters, weekly_days_off, view_absences, view_due FROM employees ORDER BY created_at').all<Employee>()
+    const rows = await env.DB!.prepare('SELECT id, name, job_title, email, active, manage_projects, manage_hub_subscriptions, track_projects, view_d1_usage, monthly_salary_piasters, weekly_days_off, view_absences, view_due FROM employees ORDER BY created_at').all<Employee>()
     return json({ employees: rows.results.map(row => ({ ...row, weekly_days_off: parseDaysOff(row.weekly_days_off) })) })
   }
   if (request.method === 'DELETE') {
@@ -153,7 +153,7 @@ export async function adminEmployees(request: Request, env: Env, path: string) {
     if (body.id && !existing) return json({ error: 'الموظف غير موجود' }, 404)
     if ((!existing || body.password) && (typeof body.password !== 'string' || body.password.length < 12 || body.password.length > 256)) return json({ error: 'كلمة المرور يجب أن تكون بين ١٢ و٢٥٦ حرفًا' }, 422)
     if (body.active !== undefined && ![0, 1].includes(body.active)) return json({ error: 'حالة غير صحيحة' }, 422)
-    for (const key of ['manage_projects', 'manage_hub_subscriptions', 'view_d1_usage', 'view_absences', 'view_due']) if (body[key] !== undefined && ![0, 1].includes(body[key])) return json({ error: 'صلاحية موظف غير صحيحة' }, 422)
+    for (const key of ['track_projects', 'manage_projects', 'manage_hub_subscriptions', 'view_d1_usage', 'view_absences', 'view_due']) if (body[key] !== undefined && ![0, 1].includes(body[key])) return json({ error: 'صلاحية موظف غير صحيحة' }, 422)
     if (body.monthly_salary_piasters !== undefined && (!Number.isSafeInteger(body.monthly_salary_piasters) || body.monthly_salary_piasters < 0 || body.monthly_salary_piasters > 10000000000)) return json({ error: 'المرتب الشهري غير صحيح' }, 422)
     if (body.weekly_days_off !== undefined && (!Array.isArray(body.weekly_days_off) || body.weekly_days_off.length > 6 || body.weekly_days_off.some((day: unknown) => !Number.isInteger(day) || (day as number) < 0 || (day as number) > 6) || new Set(body.weekly_days_off).size !== body.weekly_days_off.length)) return json({ error: 'اختار أيام راحة أسبوعية صحيحة (بحد أقصى ٦ أيام)' }, 422)
     const email = body.email.trim().toLowerCase()
@@ -164,13 +164,14 @@ export async function adminEmployees(request: Request, env: Env, path: string) {
     const active = body.active ?? existing?.active ?? 1
     const manageProjects = body.manage_projects ?? existing?.manage_projects ?? 0
     const manageHubSubscriptions = body.manage_hub_subscriptions ?? existing?.manage_hub_subscriptions ?? 0
+    const trackProjects = body.track_projects ?? existing?.track_projects ?? 0
     const viewD1Usage = body.view_d1_usage ?? existing?.view_d1_usage ?? 0
     const viewAbsences = body.view_absences ?? existing?.view_absences ?? 1
     const viewDue = body.view_due ?? existing?.view_due ?? 0
     const salary = body.monthly_salary_piasters ?? existing?.monthly_salary_piasters ?? 0
     const daysOff = JSON.stringify(body.weekly_days_off ?? parseDaysOff(existing?.weekly_days_off || '[5]'))
-    await env.DB!.prepare('INSERT INTO employees(id,name,job_title,email,password_hash,active,created_at,manage_projects,manage_hub_subscriptions,view_d1_usage,monthly_salary_piasters,weekly_days_off,view_absences,view_due) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, job_title = excluded.job_title, email = excluded.email, password_hash = excluded.password_hash, active = excluded.active, manage_projects = excluded.manage_projects, manage_hub_subscriptions = excluded.manage_hub_subscriptions, view_d1_usage = excluded.view_d1_usage, monthly_salary_piasters=excluded.monthly_salary_piasters, weekly_days_off=excluded.weekly_days_off, view_absences=excluded.view_absences, view_due=excluded.view_due')
-      .bind(id, body.name.trim(), body.job_title.trim(), email, credential, active, existing?.created_at || Date.now(), manageProjects, manageHubSubscriptions, viewD1Usage, salary, daysOff, viewAbsences, viewDue).run()
+    await env.DB!.prepare('INSERT INTO employees(id,name,job_title,email,password_hash,active,created_at,manage_projects,manage_hub_subscriptions,track_projects,view_d1_usage,monthly_salary_piasters,weekly_days_off,view_absences,view_due) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, job_title = excluded.job_title, email = excluded.email, password_hash = excluded.password_hash, active = excluded.active, manage_projects = excluded.manage_projects, manage_hub_subscriptions = excluded.manage_hub_subscriptions, track_projects = excluded.track_projects, view_d1_usage = excluded.view_d1_usage, monthly_salary_piasters=excluded.monthly_salary_piasters, weekly_days_off=excluded.weekly_days_off, view_absences=excluded.view_absences, view_due=excluded.view_due')
+      .bind(id, body.name.trim(), body.job_title.trim(), email, credential, active, existing?.created_at || Date.now(), manageProjects, manageHubSubscriptions, trackProjects, viewD1Usage, salary, daysOff, viewAbsences, viewDue).run()
     if (!active || body.password || email !== existing?.email) await env.DB!.prepare('DELETE FROM employee_sessions WHERE employee_id = ?').bind(id).run()
     return json({ success: true })
   }

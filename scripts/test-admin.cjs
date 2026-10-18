@@ -27,8 +27,10 @@ const originalProjects = load('src/data/projects.ts')
 const projectLib = load('functions/lib/projects.ts', { './store': store, '../../src/data/projects': originalProjects })
 const hubApi = load('functions/api/hub/[[path]].ts', { '../../lib/store': store })
 const hubAdmin = load('functions/lib/hub-admin.ts', { './store': store, '../api/hub/[[path]]': hubApi })
-const admin = load('functions/api/admin/[[path]].ts', { '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
-const employeeApi = load('functions/api/employee/[[path]].ts', { '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
+const workProjectLib = load('functions/lib/work-projects.ts', { './store': store })
+const trackingApi = load('functions/api/tracking.ts', { '../lib/store': store }).onRequest
+const admin = load('functions/api/admin/[[path]].ts', { '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
+const employeeApi = load('functions/api/employee/[[path]].ts', { '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
 const visit = load('functions/api/visit.ts', { '../lib/store': store }).onRequestPost
 const publicProjects = load('functions/api/projects.ts', { '../lib/store': store }).onRequestGet
 const contact = load('functions/api/contact.ts', { '../lib/store': store, '../lib/notifications': notifications }).onRequestPost
@@ -113,6 +115,7 @@ async function test() {
   assert.equal(payroll[0].due_piasters, 288500)
   assert.equal(payroll[0].deduction_piasters, 11500)
   assert.equal(employeeLib.cairoDay(Date.parse('2026-10-12T21:30:00Z')), '2026-10-13')
+  sqlite.exec(fs.readFileSync('migrations/0009_project_tracking.sql', 'utf8'))
   const employeeForm = { name: 'خالد', job_title: 'مطور', email: 'khaled@example.com', password: employeePassword, active: 1, manage_projects: 0, manage_hub_subscriptions: 0, view_d1_usage: 0 }
   assert.equal((await call('employees', 'POST', employeeForm, cookie)).status, 200)
   assert.equal((await call('employees', 'POST', employeeForm, cookie)).status, 409)
@@ -142,6 +145,28 @@ async function test() {
   assert.equal(employeeIdentity.view_absences, 1)
   assert.equal(employeeIdentity.view_due, 0)
   assert.equal(employeeIdentity.monthly_salary_piasters, undefined)
+  assert.equal((await call('work-projects')).status,401)
+  assert.equal((await employeeCall('work-projects','GET',undefined,employeeCookie)).status,403)
+  const work = {title:'موقع العميل',client_name:'عميل خاص',start_date:'2026-10-18',end_date:'2026-11-03',status:'scheduled',public_note:'تم حجز موعد المشروع',amount_piasters:500000,paid_piasters:100000}
+  assert.equal((await call('work-projects','POST',{...work,end_date:'2026-02-30'},cookie)).status,422)
+  assert.equal((await call('work-projects','POST',work,cookie)).status,200)
+  const savedWork=(await (await call('work-projects','GET',undefined,cookie)).json()).projects[0]
+  assert.equal(savedWork.amount_piasters,500000)
+  await call('employees','POST',{...employeeForm,id:employeeIdentity.id,password:'',track_projects:1},cookie)
+  const employeeWork=(await (await employeeCall('work-projects','GET',undefined,employeeCookie)).json()).projects[0]
+  assert.equal(employeeWork.amount_piasters,undefined)
+  assert.equal(employeeWork.paid_piasters,undefined)
+  assert.equal((await employeeCall('work-projects','POST',{...work,id:savedWork.id},employeeCookie)).status,403)
+  const {amount_piasters,paid_piasters,...safeWork}=work
+  assert.equal((await employeeCall('work-projects','POST',{...safeWork,id:savedWork.id,status:'in_progress'},employeeCookie)).status,200)
+  assert.equal((await (await call('work-projects','GET',undefined,cookie)).json()).projects[0].amount_piasters,500000)
+  const publicWork=await trackingApi({env,request:new Request('https://test.example/api/tracking?token='+savedWork.share_token)})
+  assert.equal(publicWork.status,200)
+  assert.deepEqual(Object.keys((await publicWork.json()).project).sort(),['title','start_date','end_date','status','public_note','updated_at'].sort())
+  await call('work-projects','POST',{id:savedWork.id,rotate_link:true},cookie)
+  assert.equal((await trackingApi({env,request:new Request('https://test.example/api/tracking?token='+savedWork.share_token)})).status,404)
+  await call('employees','POST',{...employeeForm,id:employeeIdentity.id,password:'',track_projects:0},cookie)
+  assert.equal((await employeeCall('work-projects','GET',undefined,employeeCookie)).status,403)
   const visibleAttendance = await employeeCall('attendance?month=' + employeeLib.cairoDay().slice(0, 7), 'GET', undefined, employeeCookie)
   assert.equal(visibleAttendance.status, 200)
   assert.equal(typeof (await visibleAttendance.json()).payroll.absent_days, 'number')
@@ -309,6 +334,6 @@ async function test() {
     assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM messages WHERE email = 'customer@example.com' AND status = 'failed'").get().n, 1)
   } finally { global.fetch = oldFetch }
   sqlite.close()
-  console.log('Passed: admin security, original project editing, employee accounts and isolation, attendance deduplication and hours, leave/early requests and approval, account suspension and password reset, contact and analytics.')
+  console.log('Passed: project tracking permissions, private finances, public link rotation, admin security, original project editing, employee accounts and isolation, attendance deduplication and hours, leave/early requests and approval, account suspension and password reset, contact and analytics.')
 }
 test().catch(error => { console.error(error); process.exitCode = 1 })

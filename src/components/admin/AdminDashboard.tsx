@@ -2,6 +2,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import type { Project } from '@/types'
 import EmployeesManager from './EmployeesManager'
+import ProjectTracker from '@/components/shared/ProjectTracker'
 import AdminClock from './AdminClock'
 import { LayoutDashboard, FolderKanban, Users, Mail, ArrowUpLeft, LogOut, ExternalLink, ShieldCheck, Sparkles, Blocks, Database } from 'lucide-react'
 import './admin.css'
@@ -10,6 +11,7 @@ import D1UsageDashboard from './D1UsageDashboard'
 import AdminNotifications from './AdminNotifications'
 
 const sections = [
+  { id: 'tracking', label: 'تتبع المشاريع', icon: FolderKanban, detail: 'الجدول الشهري ومتابعة العملاء' },
   { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard, detail: 'متابعة أداء الموقع' },
   { id: 'projects', label: 'المشاريع', icon: FolderKanban, detail: 'إدارة معرض أعمالك' },
   { id: 'employees', label: 'فريق العمل', icon: Users, detail: 'الحضور والإجازات' },
@@ -93,7 +95,7 @@ export default function AdminDashboard() {
         <section className="bg-white border rounded-2xl p-5 sm:p-7"><div className="flex flex-wrap gap-4 justify-between items-center mb-5"><h2 className="text-xl font-bold">طلبات العملاء والإيميلات</h2><label>الفترة<select className={`${input} mt-1`} value={days} onChange={e => setDays(Number(e.target.value))}><option value={1}>آخر ٢٤ ساعة</option><option value={7}>آخر أسبوع</option><option value={30}>آخر شهر (٣٠ يوم)</option><option value={365}>آخر سنة (٣٦٥ يوم)</option></select></label></div>{limited && <p>تُعرض أحدث ٥٠٠ رسالة في هذه الفترة.</p>}{!messages.length && <p className="text-slate-500 py-6">لا توجد رسائل مسجلة في هذه الفترة.</p>}<div className="space-y-4">{messages.map(m => <article key={m.id} className="border rounded-xl p-4"><div className="flex flex-wrap gap-3 justify-between"><h3 className="font-bold">{m.name} — {m.service}</h3><span className="text-sm">{m.status === 'sent' ? 'تم الإرسال' : m.status === 'failed' ? 'فشل الإرسال' : 'قيد الإرسال'} · {new Date(m.created_at).toLocaleString('ar-EG', { timeZone: 'Africa/Cairo' })}</span></div><p className="mt-2"><a href={`mailto:${m.email}`}>{m.email}</a> · <span dir="ltr">{m.phone}</span></p><p className="whitespace-pre-wrap break-words text-slate-600 mt-3">{m.description}</p></article>)}</div></section>
         </div>
         <div hidden={activeSection !== 'hub'}><HubAdminManager /></div>
-        <div hidden={activeSection !== 'databases'}><D1UsageDashboard /></div>
+        <div hidden={activeSection !== 'tracking'}><ProjectTracker /></div><div hidden={activeSection !== 'databases'}><D1UsageDashboard /></div>
         <footer className="admin-footer"><span>دعيدر للحلول البرمجية</span><span>لوحة الإدارة · كل التفاصيل في مكان واحد</span></footer>
       </>}
     </div>
