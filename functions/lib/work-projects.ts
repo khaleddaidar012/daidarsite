@@ -1,4 +1,4 @@
-import { missingVisibilityTable, visibleBalanceProjects } from './project-client-visibility'
+import { missingVisibilityTable, visibleBalanceProjects, ensureClientVisibilityTable } from './project-client-visibility'
 import { json, type Env } from './store'
 const fields = 'id,title,client_name,start_date,end_date,status,public_note,share_token,updated_at'
 const validDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0,10) === v
@@ -23,6 +23,7 @@ export async function workProjects(request: Request, env: Env, admin: boolean) {
     if (!existing || typeof body.visible !== 'boolean') return json({error:'المشروع أو الاختيار غير صحيح'},422)
     if (body.visible && body.confirmed !== true) return json({error:'أكد موافقتك على إظهار المبلغ المتبقي للعميل أولًا'},422)
     try {
+      await ensureClientVisibilityTable(env)
       await env.DB!.prepare('INSERT INTO work_project_client_visibility(project_id,show_remaining,updated_at) VALUES(?,?,?) ON CONFLICT(project_id) DO UPDATE SET show_remaining=excluded.show_remaining,updated_at=excluded.updated_at').bind(body.id,body.visible?1:0,Date.now()).run()
     } catch(error) {
       if (missingVisibilityTable(error)) return json({error:'نفّذ تحديث قاعدة البيانات 0010_project_client_balance.sql أولًا لتفعيل هذا الاختيار'},503)
