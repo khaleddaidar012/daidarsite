@@ -1,6 +1,6 @@
 import { hash, json, type Env } from './store'
 export type Employee = { id: string; name: string; job_title: string; email: string; active: number; password_hash: string; created_at: number; manage_projects: number; manage_hub_subscriptions: number; track_projects: number; view_d1_usage: number; monthly_salary_piasters: number; weekly_days_off: string; view_absences: number; view_due: number }
-export type Attendance = { id: string; employee_id: string; day: string; check_in: number; check_out: number | null }
+export type Attendance = { id: string; employee_id: string; day: string; check_in: number; check_out: number | null; accomplishments?: string }
 export type PayrollRow = { employee_id: string; name: string; job_title: string; active: number; monthly_salary_piasters: number; weekly_days_off: number[]; scheduled_days: number; elapsed_workdays: number; attended_days: number; approved_leave_days: number; absent_days: number; absent_dates: string[]; daily_rate_piasters: number; deduction_piasters: number; due_piasters: number }
 export function cairoDay(now = Date.now()) {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(now))
@@ -25,10 +25,15 @@ export async function monthlyAttendance(env: Env, month: string, employeeId?: st
     .bind(`${month}-01`, `${month}-31`, ...(employeeId ? [employeeId] : [])).all<Attendance>()
   const now = Date.now()
   const today = cairoDay(now)
+  const reports = new Map<string,string>()
+  try {
+    const notes=await env.DB!.prepare(`SELECT r.shift_id,r.accomplishments FROM attendance_shift_reports r JOIN attendance_shifts a ON a.id=r.shift_id WHERE a.day>=? AND a.day<=?${employeeId?' AND a.employee_id=?':''}`).bind(month+'-01',month+'-31',...(employeeId?[employeeId]:[])).all<{shift_id:string;accomplishments:string}>()
+    for(const note of notes.results)reports.set(note.shift_id,note.accomplishments)
+  }catch(error){if(!(error instanceof Error && /no such table:\s*attendance_shift_reports/i.test(error.message)))throw error}
   return rows.results.map(row => {
     const open = row.check_out === null
     const end = row.check_out ?? (row.day === today ? now : null)
-    return { ...row, open, hours: end === null ? null : Math.max(0, (end - row.check_in) / 3600000) }
+    return { ...row, accomplishments:reports.get(row.id)||'', open, hours: end === null ? null : Math.max(0, (end - row.check_in) / 3600000) }
   })
 }
 export function calculatePayroll(employees: Employee[], attendance: Attendance[], requests: Array<{ employee_id: string; day: string; type: string; status: string }>, month: string, now = Date.now()): PayrollRow[] | null {

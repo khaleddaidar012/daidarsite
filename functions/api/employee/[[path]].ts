@@ -121,13 +121,24 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
     if (path === 'check-out' && request.method === 'POST') {
       const row = await env.DB.prepare('SELECT * FROM attendance_shifts WHERE employee_id = ? AND check_out IS NULL').bind(employee.id).first<Attendance>()
       if (!row) return json({ error: 'لا يوجد حضور مفتوح لتسجيل الانصراف' }, 409)
-      await env.DB.prepare('UPDATE attendance_shifts SET check_out = ? WHERE id = ? AND check_out IS NULL').bind(now, row.id).run()
-      await recordAdminNotification(env, { actor: employee.name, eventType: 'attendance_checkout', title: 'تسجيل انصراف', detail: `${employee.name} سجّل انصرافه`, target: 'employees' })
+      const raw=await request.text()
+      if(raw.length>10000)return json({error:'طلب كبير جدًا'},413)
+      let body:Record<string,unknown>
+      try{body=JSON.parse(raw)}catch{return json({error:'اكتب إنجازات الوردية قبل تأكيد الانصراف'},422)}
+      if(!body||typeof body!=='object'||typeof body.accomplishments!=='string'||!body.accomplishments.trim()||body.accomplishments.length>2000)return json({error:'اكتب إنجازات الوردية من حرف إلى ٢٠٠٠ حرف قبل تأكيد الانصراف'},422)
+      if(body.shift_id!==row.id)return json({error:'تغيّرت الوردية الحالية. حدّث الصفحة قبل تأكيد الانصراف'},409)
+      const results=await env.DB.batch([
+        env.DB.prepare('INSERT INTO attendance_shift_reports(shift_id,employee_id,accomplishments,submitted_at) SELECT id,employee_id,?,? FROM attendance_shifts WHERE id=? AND employee_id=? AND check_out IS NULL ON CONFLICT(shift_id) DO NOTHING').bind(body.accomplishments.trim(),now,row.id,employee.id),
+        env.DB.prepare('UPDATE attendance_shifts SET check_out=? WHERE id=? AND employee_id=? AND check_out IS NULL').bind(now,row.id,employee.id),
+      ]) as Array<{meta?:{changes?:number};changes?:number}>
+      if((results[1]?.meta?.changes??results[1]?.changes??0)===0)return json({error:'تم إغلاق هذه الوردية بالفعل. حدّث الصفحة'},409)
+      await recordAdminNotification(env, { actor: employee.name, eventType: 'attendance_checkout', title: 'انصراف وتقرير إنجازات', detail: `${employee.name} سجّل انصرافه وأرسل إنجازات ورديته: ${body.accomplishments.trim().slice(0,300)}`, target: 'employees' })
       return json({ success: true })
     }
     return json({ error: 'غير موجود' }, 404)
   } catch (error) {
     console.error('Employee request failed', error)
+    if(error instanceof Error&&/no such table:\s*attendance_shift_reports/i.test(error.message))return json({error:'نفّذ تحديث 0013_checkout_accomplishments.sql لحفظ الإنجازات وتأكيد الانصراف'},503)
     if (error instanceof Error && /no such table:\s*attendance_shifts/i.test(error.message)) return json({error:'يلزم تنفيذ تحديث قاعدة البيانات 0011_employee_multiple_shifts.sql لتفعيل الورديات المتعددة'},503)
     return json({ error: 'تعذر تنفيذ الطلب. تأكد من تشغيل migration 0002 في D1.' }, 500)
   }

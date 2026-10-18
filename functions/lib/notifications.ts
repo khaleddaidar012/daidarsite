@@ -14,6 +14,7 @@ export async function recordAdminNotification(env: Env, item: NotificationInput)
 }
 
 export async function adminNotifications(request: Request, env: Env) {
+ try {
   if (request.method === 'GET') {
     const [rows, count] = await Promise.all([
       env.DB!.prepare('SELECT id,actor,event_type,title,detail,target,created_at,read_at FROM admin_notifications ORDER BY created_at DESC LIMIT 50').all(),
@@ -37,4 +38,8 @@ export async function adminNotifications(request: Request, env: Env) {
     if (!found) return json({ error: 'الإشعار غير موجود' }, 404)
   }
   return json({ success: true })
+ }catch(error){
+   if(error instanceof Error&&/no such table:\s*admin_notifications/i.test(error.message))return json({error:'جدول الإشعارات غير موجود. نفّذ migrations/0006_admin_notifications.sql أو تحديث 0013_checkout_accomplishments.sql على قاعدة DB ثم حدّث الإشعارات.'},503)
+   throw error
+ }
 }
