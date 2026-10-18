@@ -32,8 +32,9 @@ const workProjectLib = load('functions/lib/work-projects.ts', { './store': store
 const trackingApi = load('functions/api/tracking.ts', { '../lib/store': store, '../lib/project-client-visibility': visibility }).onRequest
 const serviceConfig = load('src/lib/system-management.ts')
 const serviceSubsLib = load('functions/lib/service-subscriptions.ts', {'./store':store,'./employees':employeeLib,'../../src/lib/system-management':serviceConfig})
-const admin = load('functions/api/admin/[[path]].ts', { '../../lib/service-subscriptions':serviceSubsLib, '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
-const employeeApi = load('functions/api/employee/[[path]].ts', { '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
+const chatLib=load('functions/lib/staff-chat.ts',{'./store':store})
+const admin = load('functions/api/admin/[[path]].ts', { '../../lib/staff-chat':chatLib, '../../lib/service-subscriptions':serviceSubsLib, '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
+const employeeApi = load('functions/api/employee/[[path]].ts', { '../../lib/staff-chat':chatLib, '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
 const visit = load('functions/api/visit.ts', { '../lib/store': store }).onRequestPost
 const publicProjects = load('functions/api/projects.ts', { '../lib/store': store }).onRequestGet
 const contact = load('functions/api/contact.ts', { '../lib/store': store, '../lib/notifications': notifications }).onRequestPost
@@ -45,7 +46,7 @@ function request(path, method = 'GET', body, cookie, origin = 'https://test.exam
 }
 async function call(path, method, body, cookie, origin) { return admin({ request: request(path, method, body, cookie, origin), env }) }
 async function test() {
-  for (const path of ['session', 'stats', 'messages', 'projects', 'd1-usage']) assert.equal((await call(path)).status, 401)
+  for (const path of ['chat', 'session', 'stats', 'messages', 'projects', 'd1-usage']) assert.equal((await call(path)).status, 401)
   assert.equal((await call('projects', 'POST', {})).status, 401)
   assert.equal((await call('login', 'POST', { email: env.ADMIN_EMAIL, password }, undefined, 'https://evil.example')).status, 403)
   assert.equal((await call('login', 'POST', { email: env.ADMIN_EMAIL, password: 'wrong' })).status, 401)
@@ -149,6 +150,21 @@ async function test() {
   assert.equal(response.status, 200)
   const employeeCookie = response.headers.get('set-cookie').split(';')[0]
   const employeeIdentity = (await response.json()).employee
+  sqlite.exec(fs.readFileSync('migrations/0014_staff_chat.sql','utf8'))
+  const privateChat=await call('chat','POST',{action:'create',id:crypto.randomUUID(),kind:'direct',member_ids:[employeeIdentity.id]},cookie)
+  assert.equal(privateChat.status,200)
+  const privateChatId=(await privateChat.json()).id
+  const employeeChats=await employeeCall('chat','GET',undefined,employeeCookie)
+  assert.equal(employeeChats.status,200)
+  assert.equal((await employeeChats.json()).actor_key,'employee:'+employeeIdentity.id)
+  const chatReply=await employeeCall('chat','POST',{action:'send',thread_id:privateChatId,client_key:crypto.randomUUID(),body:'رد تجريبي',sender_key:'admin'},employeeCookie)
+  assert.equal(chatReply.status,200)
+  const adminChatMessages=await call('chat?thread='+privateChatId,'GET',undefined,cookie)
+  assert.equal((await adminChatMessages.json()).messages[0].sender_key,'employee:'+employeeIdentity.id)
+  const forbiddenChat=await call('chat','POST',{action:'create',id:crypto.randomUUID(),kind:'direct',member_ids:[employeeList[1].id]},cookie)
+  const forbiddenChatId=(await forbiddenChat.json()).id
+  assert.equal((await employeeCall('chat?thread='+forbiddenChatId,'GET',undefined,employeeCookie)).status,403)
+  assert.equal((await employeeCall('chat','POST',{action:'send',thread_id:privateChatId,client_key:crypto.randomUUID(),body:'طلب خارجي'},employeeCookie,'https://evil.example')).status,403)
   assert.equal(employeeIdentity.manage_projects, 0)
   assert.equal(employeeIdentity.view_absences, 1)
   assert.equal(employeeIdentity.view_due, 0)
@@ -377,6 +393,7 @@ async function test() {
   assert.equal((await employeeCall('requests', 'POST', { ...leave, day: '2020-02-30' }, employeeCookie)).status, 422)
   assert.equal((await call('employees', 'POST', { ...employeeForm, id: employeeList[0].id, password: '', active: 0 }, cookie)).status, 200)
   assert.equal((await employeeCall('session', 'GET', undefined, employeeCookie)).status, 401)
+  assert.equal((await employeeCall('chat', 'GET', undefined, employeeCookie)).status,401)
   assert.equal((await employeeCall('login', 'POST', { email: employeeForm.email, password: employeePassword })).status, 401)
   await call('employees', 'POST', { ...employeeForm, id: employeeList[0].id, password: '', active: 1 }, cookie)
   response = await employeeCall('login', 'POST', { email: employeeForm.email, password: employeePassword })

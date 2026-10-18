@@ -1,3 +1,4 @@
+import { staffChat } from '../../lib/staff-chat'
 import { workProjects } from '../../lib/work-projects'
 import { hash, json, sameOrigin, verifyPassword, type Env } from '../../lib/store'
 import { cairoDay, calculatePayroll, employeeSession, monthlyAttendance, safeEmployee, type Employee, type Attendance } from '../../lib/employees'
@@ -34,6 +35,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
     }
     const employee = await employeeSession(request, env)
     if (!employee) return json({ error: 'سجل دخولك أولاً' }, 401)
+    if(path==='chat')return await staffChat(request,env,{key:'employee:'+employee.id,name:employee.name,employeeId:employee.id})
     if (path === 'work-projects') { if (!employee.track_projects) return json({error:'حسابك لا يملك صلاحية تتبع المشاريع'},403); return await workProjects(request, env, false) }
     if (path === 'd1-usage' && request.method === 'GET') {
       if (!employee.view_d1_usage) return json({ error: 'حسابك لا يملك صلاحية عرض سعة قواعد البيانات.' }, 403)
