@@ -28,7 +28,9 @@ const projects = load('functions/lib/projects.ts', { './store': store, '../../sr
 const employees = load('functions/lib/employees.ts', { './store': store })
 const visibility = load('functions/lib/project-client-visibility.ts')
 const workProjects = load('functions/lib/work-projects.ts', { './store': store, './project-client-visibility': visibility })
-const admin = load('functions/api/admin/[[path]].ts', { '../../lib/work-projects': workProjects, '../../lib/store': store, '../../lib/employees': employees, '../../lib/projects': projects, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
+const serviceConfig = load('src/lib/system-management.ts')
+const serviceSubsLib = load('functions/lib/service-subscriptions.ts', {'./store':store,'./employees':employees,'../../src/lib/system-management':serviceConfig})
+const admin = load('functions/api/admin/[[path]].ts', { '../../lib/service-subscriptions':serviceSubsLib, '../../lib/work-projects': workProjects, '../../lib/store': store, '../../lib/employees': employees, '../../lib/projects': projects, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
 const env = { DB, ADMIN_EMAIL: 'owner@example.com', ADMIN_PASSWORD_HASH: 'ab'.repeat(24) + ':' + 'cd'.repeat(32) }
 function req(base, path, method='GET', body, cookie, origin='https://hub.example') {
   return new Request(`${origin}/api/${base}/${path}`, { method, headers: { Origin: origin, ...(body instanceof FormData ? {} : {'Content-Type':'application/json'}), ...(cookie?{Cookie:cookie}:{}) }, body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body) })

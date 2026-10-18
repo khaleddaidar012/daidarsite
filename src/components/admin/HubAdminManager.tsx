@@ -1,4 +1,5 @@
 'use client'
+import ServiceSubscriptionsManager from './ServiceSubscriptionsManager'
 import { useEffect, useState } from 'react'
 import { Check, Upload, RefreshCw, ShieldCheck, PackageCheck, CircleDollarSign } from 'lucide-react'
 import HubManualSubscriptionManager from '@/components/shared/HubManualSubscriptionManager'
@@ -15,9 +16,9 @@ export default function HubAdminManager() {
  async function upload(file?:File){if(!file||!catalog)return;setBusy(true);setError('');const data=new FormData();data.append('file',file);data.append('version',window.prompt('رقم الإصدار')||'');try{const r=await fetch('/api/admin/hub-releases',{method:'POST',body:data});const d=await r.json();if(!r.ok)throw new Error(d.error||'تعذر رفع الإصدار');await load();setNote('تم رفع الإصدار كمسودة. انشره بعد مراجعة الملف.')}catch(e){setError(e instanceof Error?e.message:'تعذر الرفع')}finally{setBusy(false)}}
  async function publish(id:string,published:boolean){setBusy(true);try{await jsonApi('hub-release-publish','POST',{id,published});await load()}catch(e){setError(e instanceof Error?e.message:'تعذر تحديث الإصدار')}finally{setBusy(false)}}
  async function decideTransfer(id:string,action:string){setBusy(true);try{const reason=action==='reject'?window.prompt('سبب الرفض')||'':'';await jsonApi('hub-transfers','POST',{id,action,reason});await load()}catch(e){setError(e instanceof Error?e.message:'تعذر معالجة الطلب')}finally{setBusy(false)}}
- if(!catalog)return <section className="rounded-2xl border bg-white p-6">{error||'جارٍ تحميل بوابة دعيدر هب…'}</section>
+ if(!catalog)return <div className="space-y-7"><ServiceSubscriptionsManager/><section className="rounded-2xl border bg-white p-6">{error||'جارٍ تحميل بوابة دعيدر هب…'}</section></div>
  const field='w-full rounded-xl border border-slate-300 bg-white p-3 text-slate-900'
- return <div className="space-y-7" dir="rtl">
+ return <div className="space-y-7" dir="rtl"><ServiceSubscriptionsManager/>
   {error&&<p role="alert" className="rounded-xl bg-red-50 p-4 text-red-700">{error}</p>}{note&&<p className="rounded-xl bg-emerald-50 p-4 text-emerald-700">{note}</p>}
   <section className="rounded-2xl border bg-white p-5 sm:p-7"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-extrabold">كتالوج دعيدر هب والتسعير</h2><p className="mt-1 text-sm text-slate-500">الأسعار بالجنيه؛ خزّنها كقروش صحيحة. أي إضافة مسودة لا تظهر بسعر ولا تُحسب في الطلب.</p></div><button onClick={saveCatalog} disabled={busy} className="rounded-xl bg-sky-600 px-4 py-3 font-bold text-white">حفظ التغييرات</button></div>
    <div className="mt-5 space-y-2">{catalog.products.map((p:any,i:number)=><label key={p.id} className="flex items-center gap-3 rounded-xl border p-4"><input type="checkbox" checked={p.available} onChange={e=>setCatalog({...catalog,products:catalog.products.map((x:any,j:number)=>j===i?{...x,available:e.target.checked}:x)})}/><span><b>{p.nameAr}</b><small className="ms-2 text-slate-500">إتاحته للشراء الفعلي تتطلب إصدارًا منشورًا</small></span></label>)}</div>

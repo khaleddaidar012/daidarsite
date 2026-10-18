@@ -1,3 +1,4 @@
+import { serviceSubscriptions } from '../../lib/service-subscriptions'
 import { workProjects } from '../../lib/work-projects'
 import { authenticated, hash, json, sameOrigin, verifyPassword, type Env } from '../../lib/store'
 import { adminEmployees } from '../../lib/employees'
@@ -40,6 +41,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       return json({ success: true }, 200, { 'Set-Cookie': `daidar_session=${token}; Path=/api/admin; HttpOnly; SameSite=Strict; Max-Age=28800${secure}` })
     }
     if (!await authenticated(request, env)) return json({ error: 'سجل دخولك أولاً' }, 401)
+    if (path === 'service-subscriptions') return await serviceSubscriptions(request, env)
     if (path === 'notifications') return await adminNotifications(request, env)
     if (['employees', 'attendance', 'employee-requests', 'payroll'].includes(path)) return await adminEmployees(request, env, path)
     if (path === 'work-projects') return await workProjects(request, env, true)

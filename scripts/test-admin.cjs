@@ -30,7 +30,9 @@ const hubAdmin = load('functions/lib/hub-admin.ts', { './store': store, '../api/
 const visibility = load('functions/lib/project-client-visibility.ts')
 const workProjectLib = load('functions/lib/work-projects.ts', { './store': store, './project-client-visibility': visibility })
 const trackingApi = load('functions/api/tracking.ts', { '../lib/store': store, '../lib/project-client-visibility': visibility }).onRequest
-const admin = load('functions/api/admin/[[path]].ts', { '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
+const serviceConfig = load('src/lib/system-management.ts')
+const serviceSubsLib = load('functions/lib/service-subscriptions.ts', {'./store':store,'./employees':employeeLib,'../../src/lib/system-management':serviceConfig})
+const admin = load('functions/api/admin/[[path]].ts', { '../../lib/service-subscriptions':serviceSubsLib, '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
 const employeeApi = load('functions/api/employee/[[path]].ts', { '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
 const visit = load('functions/api/visit.ts', { '../lib/store': store }).onRequestPost
 const publicProjects = load('functions/api/projects.ts', { '../lib/store': store }).onRequestGet
@@ -191,6 +193,31 @@ async function test() {
   assert.equal((await trackingApi({env,request:new Request('https://test.example/api/tracking?token='+savedWork.share_token)})).status,404)
   await call('employees','POST',{...employeeForm,id:employeeIdentity.id,password:'',track_projects:0},cookie)
   assert.equal((await employeeCall('work-projects','GET',undefined,employeeCookie)).status,403)
+  assert.equal((await call('service-subscriptions')).status,401)
+  assert.equal((await call('service-subscriptions','GET',undefined,employeeCookie)).status,401)
+  assert.equal((await call('service-subscriptions','GET',undefined,cookie)).status,503)
+  sqlite.exec(fs.readFileSync('migrations/0012_system_management_subscriptions.sql','utf8'))
+  const serviceInput={operation_key:crypto.randomUUID(),customer_name:'عميل الخدمة',phone:'01012345678',hours:2,start_hour:20,start_date:'2026-01-31',months:1,payment_method:'vodafone',note:'موعد مؤكد',amount_received_piasters:120000,payment_received:true}
+  assert.equal((await call('service-subscriptions','POST',{...serviceInput,payment_received:false},cookie)).status,422)
+  assert.equal((await call('service-subscriptions','POST',{...serviceInput,amount_received_piasters:1},cookie)).status,422)
+  assert.equal((await call('service-subscriptions','POST',{...serviceInput,start_hour:23},cookie)).status,422)
+  assert.equal((await call('service-subscriptions','POST',{...serviceInput,hours:4},cookie)).status,422)
+  assert.equal((await call('service-subscriptions','POST',{...serviceInput,start_date:'2026-02-30'},cookie)).status,422)
+  assert.equal((await call('service-subscriptions','POST',serviceInput,cookie,'https://evil.example')).status,403)
+  const serviceCreated=await call('service-subscriptions','POST',serviceInput,cookie)
+  assert.equal(serviceCreated.status,200)
+  const serviceId=(await serviceCreated.json()).id
+  const retryCreated=await call('service-subscriptions','POST',serviceInput,cookie)
+  assert.equal((await retryCreated.json()).id,serviceId)
+  assert.equal((await call('service-subscriptions','POST',{...serviceInput,phone:'01011111111'},cookie)).status,409)
+  const serviceRows=(await (await call('service-subscriptions','GET',undefined,cookie)).json()).subscriptions
+  assert.equal(serviceRows.length,1)
+  assert.equal(serviceRows[0].end_date,'2026-02-28')
+  assert.equal(serviceRows[0].monthly_price_piasters,120000)
+  assert.equal(serviceConfig.serviceEndDate('2024-01-31',1),'2024-02-29')
+  assert.equal(serviceConfig.serviceEndDate('2026-12-15',2),'2027-02-15')
+  assert.equal((await call('service-subscriptions','POST',{action:'cancel',id:serviceId},cookie)).status,200)
+  assert.equal((await (await call('service-subscriptions','GET',undefined,cookie)).json()).subscriptions[0].status,'cancelled')
   const visibleAttendance = await employeeCall('attendance?month=' + employeeLib.cairoDay().slice(0, 7), 'GET', undefined, employeeCookie)
   assert.equal(visibleAttendance.status, 200)
   assert.equal(typeof (await visibleAttendance.json()).payroll.absent_days, 'number')
