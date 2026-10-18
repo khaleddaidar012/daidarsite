@@ -15,11 +15,21 @@ export async function callApi(scope: 'admin' | 'employee', path: string, method 
 export function AttendanceTable({ month, records, requests = [], daysOff = [] }: { month: string; records: RecordRow[]; requests?: EmployeeRequest[]; daysOff?: number[] }) {
   const [year, m] = month.split('-').map(Number)
   const count = new Date(Date.UTC(year, m, 0)).getUTCDate()
-  return <div><p className="my-4 rounded-xl bg-sky-50 p-4 font-bold text-sky-950">إجمالي ساعات الحضور الفعلية: <span className="text-lg">{records.reduce((sum, r) => sum + (r.hours || 0), 0).toLocaleString('ar-EG', { maximumFractionDigits: 2 })}</span> ساعة · أيام الحضور: {records.length.toLocaleString('ar-EG')}</p><div className="overflow-x-auto"><table className="w-full text-sm text-right whitespace-nowrap"><thead><tr className="bg-slate-100">{['اليوم والتاريخ', 'حضور', 'انصراف', 'ساعات العمل', 'الإجازات والاستئذان'].map(h => <th className="p-3" key={h}>{h}</th>)}</tr></thead><tbody>{Array.from({ length: count }, (_, i) => {
-    const day = `${month}-${String(i + 1).padStart(2, '0')}`
-    const row = records.find(r => r.day === day)
-    const isDayOff = daysOff.includes(new Date(day + 'T00:00:00Z').getUTCDay())
-    const labels = requests.filter(r => r.day === day).map(r => `${r.type === 'leave' ? 'إجازة' : `استئذان ${r.requested_time}`} (${statusLabel[r.status]})`)
-    return <tr key={day} className="border-b"><td className="p-3">{new Date(day + 'T12:00:00Z').toLocaleDateString('ar-EG', { timeZone: 'Africa/Cairo', weekday: 'long', day: 'numeric', month: 'numeric' })}</td><td className="p-3">{row ? time(row.check_in) : '—'}</td><td className="p-3">{row ? row.open ? 'جارٍ' : time(row.check_out) : '—'}</td><td className="p-3">{row ? row.hours === null ? 'حضور مفتوح — لم يُحتسب بعد' : `${row.hours.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}${row.open ? ' (جارٍ)' : ''}` : isDayOff ? 'راحة أسبوعية' : 'لم يسجل'}</td><td className="p-3">{labels.join(' · ') || '—'}</td></tr>
-  })}</tbody></table></div><p className="text-xs text-slate-500 mt-3">كل الأوقات بتوقيت القاهرة. الحضور المفتوح لليوم يُحسب حتى الوقت الحالي، أما الحضور المفتوح في يوم سابق فلا يُحتسب حتى تسجيل الانصراف. الوردية الممتدة لليوم التالي تُحسب في يوم الحضور.</p></div>
+  const attendedDays = new Set(records.map(record => record.day)).size
+  const localDay = (value: number) => new Date(value).toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' })
+  return <div><p className="my-4 rounded-xl bg-sky-50 p-4 font-bold text-sky-950">إجمالي ساعات الحضور الفعلية: <span className="text-lg">{records.reduce((sum, r) => sum + (r.hours || 0), 0).toLocaleString('ar-EG', { maximumFractionDigits: 2 })}</span> ساعة · أيام الحضور: {attendedDays.toLocaleString('ar-EG')} · الورديات: {records.length.toLocaleString('ar-EG')}</p>
+    <div className="overflow-x-auto"><table className="w-full text-sm text-right whitespace-nowrap"><thead><tr className="bg-slate-100">{['اليوم والتاريخ', 'حضور', 'انصراف', 'ساعات العمل', 'الإجازات والاستئذان'].map(h => <th className="p-3" key={h}>{h}</th>)}</tr></thead><tbody>{Array.from({ length: count }, (_, i) => {
+      const day = `${month}-${String(i + 1).padStart(2, '0')}`
+      const shifts = records.filter(record => record.day === day).sort((a, b) => a.check_in - b.check_in)
+      const rows: Array<RecordRow | null> = shifts.length ? shifts : [null]
+      const isDayOff = daysOff.includes(new Date(day + 'T00:00:00Z').getUTCDay())
+      const labels = requests.filter(r => r.day === day).map(r => `${r.type === 'leave' ? 'إجازة' : `استئذان ${r.requested_time}`} (${statusLabel[r.status]})`)
+      return rows.map((row, index) => <tr key={row?.id || day} className="border-b">
+        {index === 0 && <td className="p-3 align-top" rowSpan={rows.length}>{new Date(day + 'T12:00:00Z').toLocaleDateString('ar-EG', { timeZone: 'Africa/Cairo', weekday: 'long', day: 'numeric', month: 'numeric' })}{shifts.length > 1 && <small className="block text-sky-700 mt-1">{shifts.length.toLocaleString('ar-EG')} ورديات</small>}</td>}
+        <td className="p-3">{row ? time(row.check_in) : '—'}</td>
+        <td className="p-3">{row ? row.open ? 'جارٍ' : <>{time(row.check_out)}{row.check_out !== null && localDay(row.check_out) !== day && <small className="block text-slate-500">{new Date(row.check_out).toLocaleDateString('ar-EG', { timeZone: 'Africa/Cairo', day: 'numeric', month: 'numeric' })}</small>}</> : '—'}</td>
+        <td className="p-3">{row ? row.hours === null ? 'حضور مفتوح — لم يُحتسب بعد' : `${row.hours.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}${row.open ? ' (جارٍ)' : ''}` : isDayOff ? 'راحة أسبوعية' : 'لم يسجل'}</td>
+        {index === 0 && <td className="p-3 align-top" rowSpan={rows.length}>{labels.join(' · ') || '—'}</td>}
+      </tr>)
+    })}</tbody></table></div><p className="text-xs text-slate-500 mt-3">كل الأوقات بتوقيت القاهرة. يمكن تسجيل ورديات متعددة في اليوم، مع حضور مفتوح واحد فقط. تُجمع ساعات كل الورديات، ويُحسب يوم الحضور مرة واحدة. الحضور المفتوح لليوم يُحسب حتى الوقت الحالي، أما الحضور المفتوح في يوم سابق فلا يُحتسب حتى تسجيل الانصراف. الوردية الممتدة لليوم التالي تُحسب في يوم بدايتها.</p></div>
 }

@@ -11,7 +11,7 @@ function load(file, dependencies = {}) {
 }
 const sqlite = new DatabaseSync(':memory:')
 sqlite.exec('PRAGMA foreign_keys=ON')
-for (const file of ['migrations/0001_admin.sql', 'migrations/0002_employees.sql', 'migrations/0003_hub.sql', 'migrations/0004_employee_work_permissions.sql', 'migrations/0005_d1_usage_permission.sql', 'migrations/0006_admin_notifications.sql', 'migrations/0007_employee_payroll.sql', 'migrations/0008_employee_payroll_visibility.sql', 'migrations/0009_project_tracking.sql']) sqlite.exec(fs.readFileSync(file, 'utf8'))
+for (const file of ['migrations/0001_admin.sql', 'migrations/0002_employees.sql', 'migrations/0003_hub.sql', 'migrations/0004_employee_work_permissions.sql', 'migrations/0005_d1_usage_permission.sql', 'migrations/0006_admin_notifications.sql', 'migrations/0007_employee_payroll.sql', 'migrations/0008_employee_payroll_visibility.sql', 'migrations/0009_project_tracking.sql', 'migrations/0011_employee_multiple_shifts.sql']) sqlite.exec(fs.readFileSync(file, 'utf8'))
 const DB = {
   prepare(sql) {
     let args = []

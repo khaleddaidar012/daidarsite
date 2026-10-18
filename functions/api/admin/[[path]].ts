@@ -76,6 +76,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
     return json({ error: 'غير موجود' }, 404)
   } catch (error) {
     console.error('Admin request failed', error)
+    if (error instanceof Error && /no such table:\s*attendance_shifts/i.test(error.message)) return json({error:'يلزم تنفيذ تحديث قاعدة البيانات 0011_employee_multiple_shifts.sql لتفعيل الورديات المتعددة'},503)
     return json({ error: 'تعذر تنفيذ الطلب. راجع إعدادات قاعدة البيانات.' }, 500)
   }
 }

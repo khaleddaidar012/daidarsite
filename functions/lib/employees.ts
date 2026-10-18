@@ -21,7 +21,7 @@ export async function employeeSession(request: Request, env: Env) {
 export function safeEmployee(employee: Employee) { return { id: employee.id, name: employee.name, job_title: employee.job_title, email: employee.email, active: employee.active, manage_projects: employee.manage_projects, manage_hub_subscriptions: employee.manage_hub_subscriptions, view_d1_usage: employee.view_d1_usage, track_projects: employee.track_projects, view_absences: employee.view_absences, view_due: employee.view_due, weekly_days_off: parseDaysOff(employee.weekly_days_off) } }
 export async function monthlyAttendance(env: Env, month: string, employeeId?: string) {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return null
-  const rows = await env.DB!.prepare(`SELECT * FROM attendance WHERE day >= ? AND day <= ?${employeeId ? ' AND employee_id = ?' : ''} ORDER BY day, check_in`)
+  const rows = await env.DB!.prepare(`SELECT * FROM attendance_shifts WHERE day >= ? AND day <= ?${employeeId ? ' AND employee_id = ?' : ''} ORDER BY day, check_in`)
     .bind(`${month}-01`, `${month}-31`, ...(employeeId ? [employeeId] : [])).all<Attendance>()
   const now = Date.now()
   const today = cairoDay(now)
@@ -103,7 +103,7 @@ export async function adminEmployees(request: Request, env: Env, path: string) {
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return json({ error: 'شهر غير صحيح' }, 400)
     const employees = await env.DB!.prepare('SELECT id,name,job_title,active,created_at,monthly_salary_piasters,weekly_days_off,view_absences,view_due FROM employees ORDER BY created_at').all<Employee>()
     const [attendance, requests] = await Promise.all([
-      env.DB!.prepare('SELECT id,employee_id,day,check_in,check_out FROM attendance WHERE day>=? AND day<=?').bind(month + '-01', month + '-31').all<Attendance>(),
+      env.DB!.prepare('SELECT id,employee_id,day,check_in,check_out FROM attendance_shifts WHERE day>=? AND day<=?').bind(month + '-01', month + '-31').all<Attendance>(),
       env.DB!.prepare("SELECT employee_id,day,type,status FROM employee_requests WHERE type='leave' AND status='approved' AND day>=? AND day<=?").bind(month + '-01', month + '-31').all<{ employee_id: string; day: string; type: string; status: string }>(),
     ])
     const payroll = calculatePayroll(employees.results, attendance.results, requests.results, month)

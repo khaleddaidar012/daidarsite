@@ -94,8 +94,8 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       const month = new URL(request.url).searchParams.get('month') || cairoDay().slice(0, 7)
       const rows = await monthlyAttendance(env, month, employee.id)
       if (!rows) return json({ error: 'شهر غير صحيح' }, 400)
-      const open = await env.DB.prepare('SELECT * FROM attendance WHERE employee_id = ? AND check_out IS NULL').bind(employee.id).first<Attendance>()
-      const today = await env.DB.prepare('SELECT * FROM attendance WHERE employee_id = ? AND day = ?').bind(employee.id, cairoDay()).first<Attendance>()
+      const open = await env.DB.prepare('SELECT * FROM attendance_shifts WHERE employee_id = ? AND check_out IS NULL').bind(employee.id).first<Attendance>()
+      const today = await env.DB.prepare('SELECT * FROM attendance_shifts WHERE employee_id = ? AND day = ? ORDER BY check_in DESC LIMIT 1').bind(employee.id, cairoDay()).first<Attendance>()
       let payrollView: { absent_days?: number; absent_dates?: string[]; due_piasters?: number } | null = null
       if (employee.view_absences || employee.view_due) {
         const approvedLeaves = await env.DB.prepare("SELECT employee_id,day,type,status FROM employee_requests WHERE employee_id=? AND type='leave' AND status='approved' AND day>=? AND day<=?").bind(employee.id, month + '-01', month + '-31').all<{ employee_id: string; day: string; type: string; status: string }>()
@@ -113,21 +113,22 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       return json({ records: rows, open, today, serverDay: cairoDay(), payroll: payrollView })
     }
     if (path === 'check-in' && request.method === 'POST') {
-      const inserted = await env.DB.prepare('INSERT OR IGNORE INTO attendance VALUES (?, ?, ?, ?, NULL)').bind(crypto.randomUUID(), employee.id, cairoDay(now), now).run() as { meta?: { changes?: number }; changes?: number }
-      const row = await env.DB.prepare('SELECT * FROM attendance WHERE employee_id = ? AND check_out IS NULL').bind(employee.id).first<Attendance>()
+      const inserted = await env.DB.prepare('INSERT OR IGNORE INTO attendance_shifts VALUES (?, ?, ?, ?, NULL)').bind(crypto.randomUUID(), employee.id, cairoDay(now), now).run() as { meta?: { changes?: number }; changes?: number }
+      const row = await env.DB.prepare('SELECT * FROM attendance_shifts WHERE employee_id = ? AND check_out IS NULL').bind(employee.id).first<Attendance>()
       if ((inserted.meta?.changes ?? inserted.changes ?? 0) > 0) await recordAdminNotification(env, { actor: employee.name, eventType: 'attendance_checkin', title: 'تسجيل حضور', detail: `${employee.name} سجّل حضوره`, target: 'employees' })
-      return row ? json({ record: row }) : json({ error: 'تم تسجيل حضور وانصراف اليوم بالفعل' }, 409)
+      return row ? json({ record: row }) : json({ error: 'تعذر بدء وردية جديدة. حدّث الصفحة وحاول مرة أخرى' }, 409)
     }
     if (path === 'check-out' && request.method === 'POST') {
-      const row = await env.DB.prepare('SELECT * FROM attendance WHERE employee_id = ? AND check_out IS NULL').bind(employee.id).first<Attendance>()
+      const row = await env.DB.prepare('SELECT * FROM attendance_shifts WHERE employee_id = ? AND check_out IS NULL').bind(employee.id).first<Attendance>()
       if (!row) return json({ error: 'لا يوجد حضور مفتوح لتسجيل الانصراف' }, 409)
-      await env.DB.prepare('UPDATE attendance SET check_out = ? WHERE id = ? AND check_out IS NULL').bind(now, row.id).run()
+      await env.DB.prepare('UPDATE attendance_shifts SET check_out = ? WHERE id = ? AND check_out IS NULL').bind(now, row.id).run()
       await recordAdminNotification(env, { actor: employee.name, eventType: 'attendance_checkout', title: 'تسجيل انصراف', detail: `${employee.name} سجّل انصرافه`, target: 'employees' })
       return json({ success: true })
     }
     return json({ error: 'غير موجود' }, 404)
   } catch (error) {
     console.error('Employee request failed', error)
+    if (error instanceof Error && /no such table:\s*attendance_shifts/i.test(error.message)) return json({error:'يلزم تنفيذ تحديث قاعدة البيانات 0011_employee_multiple_shifts.sql لتفعيل الورديات المتعددة'},503)
     return json({ error: 'تعذر تنفيذ الطلب. تأكد من تشغيل migration 0002 في D1.' }, 500)
   }
 }
