@@ -1,0 +1,23 @@
+.page {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(ellipse at 12% 15%, rgba(186, 230, 253, .5), transparent 45%),
+    radial-gradient(ellipse at 92% 85%, rgba(199, 210, 254, .35), transparent 45%),
+    #f5f9fd;
+  color-scheme: light;
+}
+.page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(14, 116, 144, .12) .8px, transparent .8px);
+  background-size: 24px 24px;
+  mask-image: linear-gradient(to bottom, #000, transparent 80%);
+}
+.card {
+  border: 1px solid rgba(203, 213, 225, .65);
+  box-shadow: 0 24px 80px -35px rgba(15, 55, 85, .22), 0 2px 8px rgba(15, 55, 85, .03);
+}
