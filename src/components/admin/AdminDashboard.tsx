@@ -43,7 +43,11 @@ export default function AdminDashboard() {
   const [limited, setLimited] = useState(false)
   const [form, setForm] = useState(empty)
   const [activeSection, setActiveSection] = useState<Section>('overview')
-  function navigate(section: Section) { setActiveSection(section); setError(''); setNotice(''); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get('section')
+    if (sections.some(section => section.id === requested)) setActiveSection(requested as Section)
+  }, [])
+  function navigate(section: Section) { const url = new URL(window.location.href); url.searchParams.set('section', section); window.history.replaceState({}, '', url); setActiveSection(section); setError(''); setNotice(''); window.scrollTo({ top: 0, behavior: 'smooth' }) }
   const handleError = (e: Error & { status?: number }) => { setError(e.message); if (e.status === 401) setSession(null) }
   useEffect(() => { api('session').then(data => setSession(data.email)).catch(e => { if (e.status !== 401) setError(e.message) }).finally(() => setLoading(false)) }, [])
   useEffect(() => {
