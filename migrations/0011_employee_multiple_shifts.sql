@@ -1,4 +1,3 @@
--- Keep the original attendance table as a historical backup; copy every record with its original id.
 CREATE TABLE attendance_shifts (
   id TEXT PRIMARY KEY,
   employee_id TEXT NOT NULL REFERENCES employees(id),

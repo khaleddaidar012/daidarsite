@@ -8,7 +8,7 @@ db.prepare('INSERT INTO employees(id,name,job_title,email,password_hash,active,c
 db.prepare('INSERT INTO attendance VALUES(?,?,?,?,?)').run('night','employee','2026-10-18',100,200)
 db.prepare('INSERT INTO attendance VALUES(?,?,?,?,?)').run('open','employee','2026-10-19',300,null)
 const legacy=db.prepare('SELECT * FROM attendance ORDER BY id').all()
-db.exec(fs.readFileSync('migrations/0011_employee_multiple_shifts.sql','utf8'))
+db.exec(fs.readFileSync('migrations/0011_employee_multiple_shifts.sql','utf8').replace(/\r?\n/g,' '))
 assert.deepEqual(db.prepare('SELECT * FROM attendance_shifts ORDER BY id').all(),legacy)
 assert.deepEqual(db.prepare('SELECT * FROM attendance ORDER BY id').all(),legacy)
 assert.throws(()=>db.prepare('INSERT INTO attendance_shifts VALUES(?,?,?,?,?)').run('duplicate-open','employee','2026-10-19',400,null),/UNIQUE/)
