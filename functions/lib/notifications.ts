@@ -16,17 +16,22 @@ export async function recordAdminNotification(env: Env, item: NotificationInput)
 export async function adminNotifications(request: Request, env: Env) {
  try {
   if (request.method === 'GET') {
-    const [rows, count] = await Promise.all([
+    const [rows, count, messagesCount] = await Promise.all([
       env.DB!.prepare('SELECT id,actor,event_type,title,detail,target,created_at,read_at FROM admin_notifications ORDER BY created_at DESC LIMIT 50').all(),
       env.DB!.prepare('SELECT COUNT(*) AS count FROM admin_notifications WHERE read_at IS NULL').first<{ count: number }>(),
+      env.DB!.prepare("SELECT COUNT(*) AS count FROM admin_notifications WHERE read_at IS NULL AND target='messages'").first<{ count: number }>(),
     ])
-    return json({ notifications: rows.results, unread: count?.count || 0 })
+    return json({ notifications: rows.results, unread: count?.count || 0, unreadMessages: messagesCount?.count || 0 })
   }
   if (request.method !== 'POST') return json({ error: 'طريقة الطلب غير مسموحة' }, 405)
   const raw = await request.text()
   if (raw.length > 2048) return json({ error: 'طلب كبير جدًا' }, 413)
-  const body = JSON.parse(raw) as { id?: unknown; all?: unknown }
+  const body = JSON.parse(raw) as { id?: unknown; all?: unknown; target?: unknown }
   const now = Date.now()
+  if (body.target === 'messages') {
+    await env.DB!.prepare("UPDATE admin_notifications SET read_at=? WHERE read_at IS NULL AND target='messages'").bind(now).run()
+    return json({ success: true })
+  }
   if (body.all === true) {
     await env.DB!.prepare('UPDATE admin_notifications SET read_at=? WHERE read_at IS NULL').bind(now).run()
     return json({ success: true })

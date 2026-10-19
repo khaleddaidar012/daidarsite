@@ -43,13 +43,21 @@ export default function AdminDashboard() {
   const [projects, setProjects] = useState<Project[]>([])
   const [days, setDays] = useState(7)
   const [limited, setLimited] = useState(false)
+  const [unreadMessages, setUnreadMessages] = useState(0)
   const [form, setForm] = useState(empty)
   const [activeSection, setActiveSection] = useState<Section>('overview')
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get('section')
     if (sections.some(section => section.id === requested)) setActiveSection(requested as Section)
   }, [])
-  function navigate(section: Section) { const url = new URL(window.location.href); url.searchParams.set('section', section); window.history.replaceState({}, '', url); setActiveSection(section); setError(''); setNotice(''); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+  function navigate(section: Section) {
+    const url = new URL(window.location.href); url.searchParams.set('section', section); window.history.replaceState({}, '', url)
+    setActiveSection(section); setError(''); setNotice(''); window.scrollTo({ top: 0, behavior: 'smooth' })
+    if (section === 'messages') {
+      setUnreadMessages(0)
+      api('notifications', 'POST', { target: 'messages' }).catch(() => {})
+    }
+  }
   const handleError = (e: Error & { status?: number }) => { setError(e.message); if (e.status === 401) setSession(null) }
   useEffect(() => { api('session').then(data => setSession(data.email)).catch(e => { if (e.status !== 401) setError(e.message) }).finally(() => setLoading(false)) }, [])
   useEffect(() => {
@@ -58,6 +66,14 @@ export default function AdminDashboard() {
     Promise.all([api('stats'), api('projects'), api(`messages?days=${days}`)]).then(([s, p, m]) => { if (active) { setStats(s.stats); setProjects(p.projects); setMessages(m.messages); setLimited(m.limited) } }).catch(e => { if (active) handleError(e) })
     return () => { active = false }
   }, [session, days])
+  useEffect(() => {
+    if (!session) { setUnreadMessages(0); return }
+    let active = true
+    const refresh = () => api('notifications').then(data => { if (active && activeSection !== 'messages') setUnreadMessages(data.unreadMessages || 0) }).catch(() => {})
+    refresh()
+    const timer = window.setInterval(refresh, 12000)
+    return () => { active = false; window.clearInterval(timer) }
+  }, [session, activeSection])
   async function login(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); setBusy(true); setError('')
     const data = new FormData(e.currentTarget)
@@ -78,7 +94,7 @@ export default function AdminDashboard() {
   const button = 'rounded-xl bg-sky-600 text-white px-5 py-3 font-bold disabled:opacity-50 hover:bg-sky-700'
   if (loading) return <main dir="rtl" className="min-h-screen grid place-items-center">جارٍ تحميل لوحة الإدارة…</main>
   return <main dir="rtl" className="admin-workspace min-h-screen text-slate-900">
-    <header className="admin-topbar"><div className="admin-topbar-inner"><a href="/admin" className="admin-brand"><img src="/logo.png" alt="دعيدر" /><span>دعيدر<span className="admin-brand-caption">مساحة الإدارة</span></span></a>{session && <nav aria-label="أقسام لوحة الإدارة" className="admin-nav">{sections.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={activeSection === id ? 'page' : undefined} onClick={() => navigate(id)} className={activeSection === id ? 'active' : ''}><Icon size={17} /><span>{label}</span></button>)}</nav>}<div className="admin-header-actions"><a href="/ar" target="_blank" rel="noreferrer" title="عرض الموقع" aria-label="عرض الموقع"><ExternalLink size={18} /></a>{session && <AdminNotifications onNavigate={navigate} />}{session && <button title="تسجيل الخروج" aria-label="تسجيل الخروج" disabled={busy} onClick={async () => { setBusy(true); try { await api('logout', 'POST'); setSession(null); setActiveSection('overview'); setStats([]); setMessages([]); setProjects([]); setForm(empty) } catch (e) { handleError(e as Error) } finally { setBusy(false) } }}><LogOut size={18} /></button>}</div></div></header>
+    <header className="admin-topbar"><div className="admin-topbar-inner"><a href="/admin" className="admin-brand"><img src="/logo.png" alt="دعيدر" /><span>دعيدر<span className="admin-brand-caption">مساحة الإدارة</span></span></a>{session && <nav aria-label="أقسام لوحة الإدارة" className="admin-nav">{sections.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={activeSection === id ? 'page' : undefined} onClick={() => navigate(id)} className={activeSection === id ? 'active' : ''}><Icon size={17} /><span>{label}</span>{id === 'messages' && unreadMessages > 0 && <span className="admin-unread-badge" aria-label={`${unreadMessages} رسالة غير مقروءة`}>{unreadMessages > 99 ? '99+' : unreadMessages.toLocaleString('ar-EG')}</span>}</button>)}</nav>}<div className="admin-header-actions"><a href="/ar" target="_blank" rel="noreferrer" title="عرض الموقع" aria-label="عرض الموقع"><ExternalLink size={18} /></a>{session && <AdminNotifications onNavigate={navigate} />}{session && <button title="تسجيل الخروج" aria-label="تسجيل الخروج" disabled={busy} onClick={async () => { setBusy(true); try { await api('logout', 'POST'); setSession(null); setActiveSection('overview'); setStats([]); setMessages([]); setProjects([]); setForm(empty) } catch (e) { handleError(e as Error) } finally { setBusy(false) } }}><LogOut size={18} /></button>}</div></div></header>
     <div className="admin-content max-w-6xl mx-auto">
       {error && <p role="alert" className="p-4 rounded-xl bg-red-50 text-red-700 mb-5">{error}</p>}
       {notice && <p role="status" className="p-4 rounded-xl bg-green-50 text-green-700 mb-5">{notice}</p>}
