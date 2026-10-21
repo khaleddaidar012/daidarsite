@@ -9,6 +9,8 @@ const icons = { overview: LayoutDashboard, projects: FolderKanban, employees: Us
 export default function AdminNotifications({ onNavigate }: { onNavigate: (section: Target) => void }) {
   const [items, setItems] = useState<Item[]>([])
   const [unread, setUnread] = useState(0)
+  const [badgeDismissed, setBadgeDismissed] = useState(false)
+  const [desktopPermission, setDesktopPermission] = useState<NotificationPermission | 'unsupported'>('default')
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
   const [busy,setBusy]=useState(false)
@@ -23,13 +25,22 @@ export default function AdminNotifications({ onNavigate }: { onNavigate: (sectio
       const next = data.notifications as Item[]
       if (known.current) {
         const fresh = next.filter(item => !known.current!.has(item.id)).slice(0, 3)
-        if (fresh.length) setToasts(current => [...fresh.reverse(), ...current].slice(0, 4))
+        if (fresh.length) {
+          setToasts(current => [...fresh.reverse(), ...current].slice(0, 4))
+          setBadgeDismissed(false)
+          if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+            for (const item of fresh) new Notification(item.title, { body: item.detail, icon: '/icon.png', tag: item.id })
+          }
+        }
       }
       known.current = new Set(next.map(item => item.id))
       setItems(next); setUnread(data.unread); setError('')
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'تعذر تحميل الإشعارات') }
   }, [])
 
+  useEffect(() => {
+    setDesktopPermission('Notification' in window ? Notification.permission : 'unsupported')
+  }, [])
   useEffect(() => {
     void load()
     const timer = window.setInterval(() => void load(), 12000)
@@ -56,20 +67,25 @@ export default function AdminNotifications({ onNavigate }: { onNavigate: (sectio
   }
   async function markAllRead(){
     setBusy(true)
-    try{await markRequest({all:true});setItems(current=>current.map(item=>({...item,read_at:item.read_at||Date.now()})));setUnread(0);setError('')}
+    try{await markRequest({all:true});setItems(current=>current.map(item=>({...item,read_at:item.read_at||Date.now()})));setUnread(0);setBadgeDismissed(false);setError('')}
     catch(cause){setError(cause instanceof Error?cause.message:'تعذر تحديث الإشعارات')}
     finally{setBusy(false)}
+  }
+  async function enableDesktopNotifications() {
+    if (!('Notification' in window)) { setDesktopPermission('unsupported'); return }
+    const permission = await Notification.requestPermission()
+    setDesktopPermission(permission)
   }
 
   return <>
     <div className="admin-notifications relative">
-      <button type="button" className="admin-notification-bell" aria-label={`الإشعارات${unread ? `، ${unread} غير مقروء` : ''}`} aria-expanded={open} onClick={() => setOpen(value => !value)}>
-        {unread ? <BellRing size={18} /> : <Bell size={18} />}{unread > 0 && <span className="admin-notification-badge">{unread > 99 ? '٩٩+' : unread.toLocaleString('ar-EG')}</span>}
+      <button type="button" className="admin-notification-bell" aria-label={`الإشعارات${unread ? `، ${unread} غير مقروء` : ''}`} aria-expanded={open} onClick={() => setOpen(value => { const next = !value; if (next) setBadgeDismissed(true); return next })}>
+        {unread ? <BellRing size={18} /> : <Bell size={18} />}{unread > 0 && !badgeDismissed && <span className="admin-notification-badge">{unread > 99 ? '٩٩+' : unread.toLocaleString('ar-EG')}</span>}
       </button>
       {open && <>
         <button aria-label="إغلاق قائمة الإشعارات" className="admin-notification-backdrop" onClick={() => setOpen(false)} />
         <section className="admin-notification-panel" aria-label="الإشعارات" dir="rtl">
-          <header><div><strong>الإشعارات</strong><span>{error?'تعذر التحديث':unread ? `${unread.toLocaleString('ar-EG')} غير مقروءة` : 'كل شيء محدث'}</span></div><button type="button" aria-label="إغلاق" onClick={() => setOpen(false)}><X size={18} /></button></header>
+          <header><div><strong>الإشعارات</strong><span>{error?'تعذر التحديث':unread ? `${unread.toLocaleString('ar-EG')} غير مقروءة` : 'كل شيء محدث'}</span></div><div className="flex items-center gap-2">{desktopPermission === 'default' && <button type="button" title="تفعيل إشعارات سطح المكتب" onClick={() => void enableDesktopNotifications()}><BellRing size={16} /></button>}{desktopPermission === 'granted' && <span className="text-xs text-emerald-700">تنبيهات سطح المكتب مفعّلة</span>}<button type="button" aria-label="إغلاق" onClick={() => setOpen(false)}><X size={18} /></button></div></header>
           {!!unread && <button type="button" disabled={busy} className="admin-notification-mark-all" onClick={markAllRead}><CheckCheck size={15} /> تمييز الكل كمقروء</button>}
           {error && <p className="admin-notification-error">{error}<button type="button" disabled={busy} onClick={()=>void load()} className="mt-2 block font-bold underline">إعادة المحاولة</button></p>}
           <div className="admin-notification-list">

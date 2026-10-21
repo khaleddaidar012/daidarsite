@@ -44,6 +44,8 @@ export default function AdminDashboard() {
   const [days, setDays] = useState(7)
   const [limited, setLimited] = useState(false)
   const [unreadMessages, setUnreadMessages] = useState(0)
+  const [unreadMessageIds, setUnreadMessageIds] = useState<Set<string>>(new Set())
+  const [openMessageIds, setOpenMessageIds] = useState<Set<string>>(new Set())
   const [form, setForm] = useState(empty)
   const [activeSection, setActiveSection] = useState<Section>('overview')
   useEffect(() => {
@@ -53,10 +55,6 @@ export default function AdminDashboard() {
   function navigate(section: Section) {
     const url = new URL(window.location.href); url.searchParams.set('section', section); window.history.replaceState({}, '', url)
     setActiveSection(section); setError(''); setNotice(''); window.scrollTo({ top: 0, behavior: 'smooth' })
-    if (section === 'messages') {
-      setUnreadMessages(0)
-      api('notifications', 'POST', { target: 'messages' }).catch(() => {})
-    }
   }
   const handleError = (e: Error & { status?: number }) => { setError(e.message); if (e.status === 401) setSession(null) }
   useEffect(() => { api('session').then(data => setSession(data.email)).catch(e => { if (e.status !== 401) setError(e.message) }).finally(() => setLoading(false)) }, [])
@@ -69,11 +67,29 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (!session) { setUnreadMessages(0); return }
     let active = true
-    const refresh = () => api('notifications').then(data => { if (active && activeSection !== 'messages') setUnreadMessages(data.unreadMessages || 0) }).catch(() => {})
+    const refresh = () => api('notifications').then(data => {
+      if (active) {
+        const ids = new Set<string>(data.unreadMessageIds || [])
+        setUnreadMessageIds(ids)
+        setUnreadMessages(ids.size)
+      }
+    }).catch(() => {})
     refresh()
     const timer = window.setInterval(refresh, 12000)
     return () => { active = false; window.clearInterval(timer) }
   }, [session, activeSection])
+  async function openMessage(message: Message) {
+    const expanded = new Set(openMessageIds)
+    const opening = !expanded.has(message.id)
+    if (opening) expanded.add(message.id); else expanded.delete(message.id)
+    setOpenMessageIds(expanded)
+    if (opening && unreadMessageIds.has(message.id)) {
+      setUnreadMessageIds(current => { const next = new Set(current); next.delete(message.id); return next })
+      setUnreadMessages(count => Math.max(0, count - 1))
+      try { await api('notifications', 'POST', { messageId: message.id }) }
+      catch (e) { setError((e as Error).message); setUnreadMessageIds(current => new Set(current).add(message.id)); setUnreadMessages(count => count + 1) }
+    }
+  }
   async function login(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); setBusy(true); setError('')
     const data = new FormData(e.currentTarget)
@@ -114,7 +130,7 @@ export default function AdminDashboard() {
         </section>
         </div>
         <div hidden={activeSection !== 'messages'}>
-        <section className="bg-white border rounded-2xl p-5 sm:p-7"><div className="flex flex-wrap gap-4 justify-between items-center mb-5"><h2 className="text-xl font-bold">طلبات العملاء والإيميلات</h2><label>الفترة<select className={`${input} mt-1`} value={days} onChange={e => setDays(Number(e.target.value))}><option value={1}>آخر ٢٤ ساعة</option><option value={7}>آخر أسبوع</option><option value={30}>آخر شهر (٣٠ يوم)</option><option value={365}>آخر سنة (٣٦٥ يوم)</option></select></label></div>{limited && <p>تُعرض أحدث ٥٠٠ رسالة في هذه الفترة.</p>}{!messages.length && <p className="text-slate-500 py-6">لا توجد رسائل مسجلة في هذه الفترة.</p>}<div className="space-y-4">{messages.map(m => <article key={m.id} className="border rounded-xl p-4"><div className="flex flex-wrap gap-3 justify-between"><h3 className="font-bold">{m.name} — {m.service}</h3><span className="text-sm">{m.status === 'sent' ? 'تم الإرسال' : m.status === 'failed' ? 'فشل الإرسال' : 'قيد الإرسال'} · {new Date(m.created_at).toLocaleString('ar-EG', { timeZone: 'Africa/Cairo' })}</span></div><p className="mt-2"><a href={`mailto:${m.email}`}>{m.email}</a> · <span dir="ltr">{m.phone}</span></p><p className="whitespace-pre-wrap break-words text-slate-600 mt-3">{m.description}</p></article>)}</div></section>
+        <section className="bg-white border rounded-2xl p-5 sm:p-7"><div className="flex flex-wrap gap-4 justify-between items-center mb-5"><h2 className="text-xl font-bold">طلبات العملاء والإيميلات</h2><label>الفترة<select className={`${input} mt-1`} value={days} onChange={e => setDays(Number(e.target.value))}><option value={1}>آخر ٢٤ ساعة</option><option value={7}>آخر أسبوع</option><option value={30}>آخر شهر (٣٠ يوم)</option><option value={365}>آخر سنة (٣٦٥ يوم)</option></select></label></div>{limited && <p>تُعرض أحدث ٥٠٠ رسالة في هذه الفترة.</p>}{!messages.length && <p className="text-slate-500 py-6">لا توجد رسائل مسجلة في هذه الفترة.</p>}<div className="space-y-4">{messages.map(m => { const isOpen = openMessageIds.has(m.id); const isUnread = unreadMessageIds.has(m.id); return <article key={m.id} className={`border rounded-xl p-4 ${isUnread ? 'border-red-200 bg-red-50/30' : ''}`}><div className="flex flex-wrap gap-3 justify-between items-center"><div className="flex items-center gap-2"><h3 className="font-bold">{m.name} — {m.service}</h3>{isUnread && <span className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white">جديد</span>}</div><div className="flex items-center gap-3"><span className="text-sm">{m.status === 'sent' ? 'تم الإرسال' : m.status === 'failed' ? 'فشل الإرسال' : 'قيد الإرسال'} · {new Date(m.created_at).toLocaleString('ar-EG', { timeZone: 'Africa/Cairo' })}</span><button type="button" className="text-sky-700 font-bold" aria-expanded={isOpen} onClick={() => void openMessage(m)}>{isOpen ? 'إغلاق الرسالة' : 'فتح الرسالة'}</button></div></div>{isOpen && <><p className="mt-2"><a href={`mailto:${m.email}`}>{m.email}</a> · <span dir="ltr">{m.phone}</span></p><p className="whitespace-pre-wrap break-words text-slate-600 mt-3">{m.description}</p></>}</article> })}</div></section>
         </div>
         <div hidden={activeSection !== 'hub'}><HubAdminManager /></div>
         {activeSection === 'chat' && <StaffChat/>}

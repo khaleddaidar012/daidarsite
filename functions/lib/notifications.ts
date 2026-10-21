@@ -1,12 +1,12 @@
 import { json, type Env } from './store'
 
 export type NotificationTarget = 'overview' | 'projects' | 'employees' | 'messages' | 'hub'
-type NotificationInput = { actor: string; eventType: string; title: string; detail: string; target: NotificationTarget }
+type NotificationInput = { id?: string; actor: string; eventType: string; title: string; detail: string; target: NotificationTarget }
 
 export async function recordAdminNotification(env: Env, item: NotificationInput) {
   try {
     await env.DB!.prepare('INSERT INTO admin_notifications(id,actor,event_type,title,detail,target,created_at) VALUES(?,?,?,?,?,?,?)')
-      .bind(crypto.randomUUID(), item.actor.slice(0, 160), item.eventType.slice(0, 80), item.title.slice(0, 160), item.detail.slice(0, 500), item.target, Date.now()).run()
+      .bind(item.id || crypto.randomUUID(), item.actor.slice(0, 160), item.eventType.slice(0, 80), item.title.slice(0, 160), item.detail.slice(0, 500), item.target, Date.now()).run()
   } catch (error) {
     // Notifications must never interrupt attendance, project, or subscription work.
     console.error('Could not record admin notification', error)
@@ -16,20 +16,22 @@ export async function recordAdminNotification(env: Env, item: NotificationInput)
 export async function adminNotifications(request: Request, env: Env) {
  try {
   if (request.method === 'GET') {
-    const [rows, count, messagesCount] = await Promise.all([
+    const [rows, count, messageRows] = await Promise.all([
       env.DB!.prepare('SELECT id,actor,event_type,title,detail,target,created_at,read_at FROM admin_notifications ORDER BY created_at DESC LIMIT 50').all(),
       env.DB!.prepare('SELECT COUNT(*) AS count FROM admin_notifications WHERE read_at IS NULL').first<{ count: number }>(),
-      env.DB!.prepare("SELECT COUNT(*) AS count FROM admin_notifications WHERE read_at IS NULL AND target='messages'").first<{ count: number }>(),
+      env.DB!.prepare("SELECT DISTINCT m.id FROM messages m JOIN admin_notifications n ON n.target='messages' AND n.read_at IS NULL AND (n.id=m.id OR (n.actor=m.name AND ABS(n.created_at-m.created_at)<300000))").all<{ id: string }>(),
     ])
-    return json({ notifications: rows.results, unread: count?.count || 0, unreadMessages: messagesCount?.count || 0 })
+    const unreadMessageIds = (messageRows.results || []).map(row => row.id)
+    return json({ notifications: rows.results, unread: count?.count || 0, unreadMessages: unreadMessageIds.length, unreadMessageIds })
   }
   if (request.method !== 'POST') return json({ error: 'طريقة الطلب غير مسموحة' }, 405)
   const raw = await request.text()
   if (raw.length > 2048) return json({ error: 'طلب كبير جدًا' }, 413)
-  const body = JSON.parse(raw) as { id?: unknown; all?: unknown; target?: unknown }
+  const body = JSON.parse(raw) as { id?: unknown; all?: unknown; target?: unknown; messageId?: unknown }
   const now = Date.now()
-  if (body.target === 'messages') {
-    await env.DB!.prepare("UPDATE admin_notifications SET read_at=? WHERE read_at IS NULL AND target='messages'").bind(now).run()
+  if (typeof body.messageId === 'string' && body.messageId.length <= 64) {
+    const result = await env.DB!.prepare("UPDATE admin_notifications SET read_at=? WHERE id=(SELECT n.id FROM admin_notifications n JOIN messages m ON m.id=? AND n.target='messages' AND n.read_at IS NULL AND (n.id=m.id OR (n.actor=m.name AND ABS(n.created_at-m.created_at)<300000)) ORDER BY CASE WHEN n.id=m.id THEN 0 ELSE ABS(n.created_at-m.created_at) END LIMIT 1)").bind(now, body.messageId).run() as { meta?: { changes?: number } }
+    if (result.meta?.changes === 0) return json({ success: true, alreadyRead: true })
     return json({ success: true })
   }
   if (body.all === true) {
