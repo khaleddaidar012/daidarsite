@@ -9,6 +9,7 @@ export interface Env {
   DB?: Database
   ADMIN_EMAIL?: string
   ADMIN_PASSWORD_HASH?: string
+  VAPID_PUBLIC_KEY?: string
   RESEND_API_KEY?: string
   RESEND_FROM_EMAIL?: string
   RESEND_TO_EMAIL?: string

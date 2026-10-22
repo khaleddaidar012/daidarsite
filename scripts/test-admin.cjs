@@ -2,7 +2,7 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const ts = require('typescript')
 const { DatabaseSync } = require('node:sqlite')
-const { pbkdf2Sync } = require('node:crypto')
+const { pbkdf2Sync, createECDH, createHmac, createDecipheriv, randomBytes } = require('node:crypto')
 function load(file, dependencies = {}) {
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
   const module = { exports: {} }
@@ -40,12 +40,33 @@ const publicProjects = load('functions/api/projects.ts', { '../lib/store': store
 const contact = load('functions/api/contact.ts', { '../lib/store': store, '../lib/notifications': notifications }).onRequestPost
 const salt = 'ab'.repeat(24)
 const password = 'test-password-long'
-const env = { DB, ADMIN_EMAIL: 'admin@example.com', ADMIN_PASSWORD_HASH: salt + ':' + pbkdf2Sync(password, salt, 100000, 32, 'sha256').toString('hex') }
+const env = { DB, ADMIN_EMAIL: 'admin@example.com', ADMIN_PASSWORD_HASH: salt + ':' + pbkdf2Sync(password, salt, 100000, 32, 'sha256').toString('hex'), VAPID_PUBLIC_KEY: 'B'.repeat(87) }
 function request(path, method = 'GET', body, cookie, origin = 'https://test.example') {
   return new Request('https://test.example/api/admin/' + path, { method, headers: { Origin: origin, 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) })
 }
 async function call(path, method, body, cookie, origin) { return admin({ request: request(path, method, body, cookie, origin), env }) }
 async function test() {
+  const pushLib = load('workers/attendance-push/worker.ts')
+  const receiver = createECDH('prime256v1'); receiver.generateKeys()
+  const pushSub = { endpoint: 'https://push.example/test', p256dh: receiver.getPublicKey().toString('base64url'), auth: randomBytes(16).toString('base64url') }
+  const pushPlaintext = JSON.stringify({ title: 'تأكيد الحضور', stage: 2 })
+  const encryptedPush = Buffer.from(await pushLib.encryptPushPayload(pushSub, pushPlaintext))
+  const senderLength = encryptedPush[20]
+  assert.equal(senderLength, 65)
+  const shared = receiver.computeSecret(encryptedPush.subarray(21, 21 + senderLength))
+  const hmac = (key, data) => createHmac('sha256', key).update(data).digest()
+  const expand = (prk, info, length) => { let prior=Buffer.alloc(0), output=Buffer.alloc(0), counter=1; while(output.length<length){prior=hmac(prk,Buffer.concat([prior,Buffer.from(info),Buffer.from([counter++])]));output=Buffer.concat([output,prior])}return output.subarray(0,length) }
+  const authPrk = hmac(Buffer.from(pushSub.auth,'base64url'), shared)
+  const inputKey = expand(authPrk, Buffer.concat([Buffer.from('WebPush: info\0'),Buffer.from(pushSub.p256dh,'base64url'),encryptedPush.subarray(21,86)]), 32)
+  const contentPrk = hmac(encryptedPush.subarray(0,16), inputKey)
+  const cek = expand(contentPrk, 'Content-Encoding: aes128gcm\0', 16)
+  const nonce = expand(contentPrk, 'Content-Encoding: nonce\0', 12)
+  const ciphertext = encryptedPush.subarray(21+senderLength)
+  const decipher = createDecipheriv('aes-128-gcm', cek, nonce)
+  decipher.setAuthTag(ciphertext.subarray(-16))
+  const decryptedPush = Buffer.concat([decipher.update(ciphertext.subarray(0,-16)),decipher.final()])
+  assert.equal(decryptedPush.at(-1), 2)
+  assert.equal(decryptedPush.subarray(0,-1).toString(), pushPlaintext)
   for (const path of ['chat', 'session', 'stats', 'messages', 'projects', 'd1-usage']) assert.equal((await call(path)).status, 401)
   assert.equal((await call('projects', 'POST', {})).status, 401)
   assert.equal((await call('login', 'POST', { email: env.ADMIN_EMAIL, password }, undefined, 'https://evil.example')).status, 403)
@@ -112,6 +133,7 @@ async function test() {
   sqlite.exec(fs.readFileSync('migrations/0011_employee_multiple_shifts.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0013_checkout_accomplishments.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0015_employee_hour_limits.sql', 'utf8'))
+  sqlite.exec(fs.readFileSync('migrations/0016_employee_web_push.sql', 'utf8'))
   for (const path of ['employees', 'attendance', 'employee-requests']) assert.equal((await call(path)).status, 401)
   const employeePassword = 'employee-test-password'
   const schedule = []
@@ -162,6 +184,12 @@ async function test() {
   assert.equal(response.status, 200)
   const employeeCookie = response.headers.get('set-cookie').split(';')[0]
   const employeeIdentity = (await response.json()).employee
+  assert.equal((await employeeCall('push-config','GET',undefined,employeeCookie)).status,200)
+  const testPushSubscription={endpoint:'https://fcm.googleapis.com/subscription/test',keys:{p256dh:'A'.repeat(87),auth:'B'.repeat(22)}}
+  assert.equal((await employeeCall('push-subscription','POST',testPushSubscription,employeeCookie)).status,200)
+  assert.equal((await employeeCall('push-subscription','POST',{...testPushSubscription,endpoint:'https://example.org/ssrf'},employeeCookie)).status,422)
+  assert.equal(sqlite.prepare('SELECT employee_id FROM employee_push_subscriptions WHERE endpoint=?').get(testPushSubscription.endpoint).employee_id,employeeIdentity.id)
+  assert.equal((await employeeCall('push-subscription','DELETE',{endpoint:testPushSubscription.endpoint},employeeCookie)).status,200)
   sqlite.exec(fs.readFileSync('migrations/0014_staff_chat.sql','utf8'))
   const privateChat=await call('chat','POST',{action:'create',id:crypto.randomUUID(),kind:'direct',member_ids:[employeeIdentity.id]},cookie)
   assert.equal(privateChat.status,200)

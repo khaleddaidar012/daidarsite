@@ -87,6 +87,26 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       return json({ success: true })
     }
     if (path === 'session' && request.method === 'GET') return json({ employee: safeEmployee(employee) })
+    if (path === 'push-config' && request.method === 'GET') return env.VAPID_PUBLIC_KEY ? json({ publicKey: env.VAPID_PUBLIC_KEY }) : json({ error: 'إشعارات الخلفية لم تُضبط بعد.' }, 503)
+    if (path === 'push-subscription' && request.method === 'POST') {
+      const raw = await request.text(); if (raw.length > 4096) return json({ error: 'بيانات الإشعار كبيرة جدًا' }, 413)
+      const body = JSON.parse(raw) as { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } }
+      let pushHost = ''
+      try { const url = new URL(String(body.endpoint)); pushHost = url.hostname.toLowerCase(); if (url.protocol !== 'https:' || url.username || url.password || url.port) pushHost = '' } catch {}
+      const allowedPushHost = pushHost === 'fcm.googleapis.com' || pushHost.endsWith('.push.services.mozilla.com') || pushHost.endsWith('.notify.windows.com') || pushHost.endsWith('.push.apple.com')
+      if (typeof body.endpoint !== 'string' || body.endpoint.length > 2048 || !allowedPushHost || typeof body.keys?.p256dh !== 'string' || !/^[A-Za-z0-9_-]{80,100}$/.test(body.keys.p256dh) || typeof body.keys?.auth !== 'string' || !/^[A-Za-z0-9_-]{20,40}$/.test(body.keys.auth)) return json({ error: 'بيانات اشتراك الإشعارات غير صحيحة' }, 422)
+      const count = await env.DB.prepare('SELECT COUNT(*) AS count FROM employee_push_subscriptions WHERE employee_id=?').bind(employee.id).first<{ count: number }>()
+      const already = await env.DB.prepare('SELECT endpoint FROM employee_push_subscriptions WHERE endpoint=? AND employee_id=?').bind(body.endpoint, employee.id).first()
+      if (!already && (count?.count || 0) >= 5) return json({ error: 'وصلت للحد الأقصى وهو ٥ أجهزة. ألغِ إشعار جهاز قديم أولًا.' }, 409)
+      await env.DB.prepare('INSERT INTO employee_push_subscriptions(endpoint,employee_id,p256dh,auth,created_at,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(endpoint) DO UPDATE SET employee_id=excluded.employee_id,p256dh=excluded.p256dh,auth=excluded.auth,updated_at=excluded.updated_at').bind(body.endpoint, employee.id, body.keys.p256dh, body.keys.auth, now, now).run()
+      return json({ success: true })
+    }
+    if (path === 'push-subscription' && request.method === 'DELETE') {
+      const body = await request.json().catch(() => ({})) as { endpoint?: unknown }
+      if (typeof body.endpoint !== 'string' || body.endpoint.length > 2048) return json({ error: 'الاشتراك غير صحيح' }, 422)
+      await env.DB.prepare('DELETE FROM employee_push_subscriptions WHERE endpoint=? AND employee_id=?').bind(body.endpoint, employee.id).run()
+      return json({ success: true })
+    }
     if (path === 'logout' && request.method === 'POST') {
       const token = request.headers.get('Cookie')?.split(';').map(x => x.trim()).find(x => x.startsWith('daidar_employee='))?.slice('daidar_employee='.length)
       if (token) await env.DB.prepare('DELETE FROM employee_sessions WHERE token = ?').bind(await hash(token)).run()
@@ -191,6 +211,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
     console.error('Employee request failed', error)
     if(error instanceof Error&&/no such table:\s*attendance_shift_reports/i.test(error.message))return json({error:'نفّذ تحديث 0013_checkout_accomplishments.sql لحفظ الإنجازات وتأكيد الانصراف'},503)
     if(error instanceof Error&&/no such table:\s*employee_presence_checks/i.test(error.message))return json({error:'نفّذ migration 0015_employee_hour_limits.sql لتفعيل حدود الساعات وتأكيد التواجد.'},503)
+    if(error instanceof Error&&/no such table:\s*employee_push_subscriptions/i.test(error.message))return json({error:'نفّذ migration 0016_employee_web_push.sql لتسجيل إشعارات الجهاز.'},503)
     if (error instanceof Error && /no such table:\s*attendance_shifts/i.test(error.message)) return json({error:'يلزم تنفيذ تحديث قاعدة البيانات 0011_employee_multiple_shifts.sql لتفعيل الورديات المتعددة'},503)
     return json({ error: 'تعذر تنفيذ الطلب. تأكد من تشغيل migration 0002 في D1.' }, 500)
   }

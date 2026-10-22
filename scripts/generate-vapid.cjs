@@ -1,0 +1,8 @@
+const { generateKeyPairSync } = require('node:crypto')
+const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' })
+const jwk = publicKey.export({ format: 'jwk' })
+const privateJwk = privateKey.export({ format: 'jwk' })
+const decode = value => Buffer.from(value, 'base64url')
+const publicUncompressed = Buffer.concat([Buffer.from([4]), decode(jwk.x), decode(jwk.y)]).toString('base64url')
+console.log('VAPID_PUBLIC_KEY=' + publicUncompressed)
+console.log('VAPID_PRIVATE_JWK=' + JSON.stringify(privateJwk))
