@@ -111,6 +111,7 @@ async function test() {
   sqlite.exec(fs.readFileSync('migrations/0008_employee_payroll_visibility.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0011_employee_multiple_shifts.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0013_checkout_accomplishments.sql', 'utf8'))
+  sqlite.exec(fs.readFileSync('migrations/0015_employee_hour_limits.sql', 'utf8'))
   for (const path of ['employees', 'attendance', 'employee-requests']) assert.equal((await call(path)).status, 401)
   const employeePassword = 'employee-test-password'
   const schedule = []
@@ -125,8 +126,12 @@ async function test() {
   const payroll = employeeLib.calculatePayroll([{ id: 'payroll-test', name: 'خالد', job_title: 'مطور', email: 'payroll@example.com', active: 1, password_hash: '', created_at: Date.parse('2026-01-01T00:00:00Z'), manage_projects: 0, manage_hub_subscriptions: 0, view_d1_usage: 0, monthly_salary_piasters: 300000, weekly_days_off: '[5,6]' }], attendanceForPayroll, [{ employee_id: 'payroll-test', day: '2026-06-10', type: 'leave', status: 'approved' }], '2026-06', Date.parse('2026-06-30T12:00:00Z'))
   assert.equal(payroll[0].absent_days, 1)
   assert.equal(payroll[0].approved_leave_days, 1)
-  assert.equal(payroll[0].due_piasters, 288500)
-  assert.equal(payroll[0].deduction_piasters, 11500)
+  assert.equal(payroll[0].max_daily_hours, 4)
+  assert.equal(payroll[0].max_monthly_hours, 104)
+  assert.equal(payroll[0].hourly_rate_piasters, Math.round(300000 / 104))
+  assert.equal(payroll[0].actual_hours, 80)
+  assert.equal(payroll[0].due_piasters, 242300)
+  assert.equal(payroll[0].deduction_piasters, 57700)
   assert.equal(employeeLib.cairoDay(Date.parse('2026-10-12T21:30:00Z')), '2026-10-13')
   sqlite.exec(fs.readFileSync('migrations/0009_project_tracking.sql', 'utf8'))
   const missingNotifications=await notifications.adminNotifications(new Request('https://test.example/api/admin/notifications'),{DB:{prepare(){throw Error('D1_ERROR: no such table: admin_notifications')}}})
@@ -331,12 +336,18 @@ async function test() {
   assert.equal(attendance.length, 1)
   assert.equal(attendance[0].employee_id, employeeList[0].id)
   assert.equal(sqlite.prepare("SELECT count(*) AS n FROM admin_notifications WHERE event_type='attendance_checkin'").get().n, 1)
+  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM employee_presence_checks WHERE employee_id=?').get(employeeList[0].id).n,1)
   assert.ok(attendance[0].check_in > now - 10000)
   assert.equal(attendance[0].day, employeeLib.cairoDay())
   sqlite.prepare('UPDATE attendance_shifts SET check_in = ? WHERE id = ?').run(Date.now() - 4.5 * 3600000, attendance[0].id)
   const openAttendance = await employeeLib.monthlyAttendance(env, employeeLib.cairoDay().slice(0, 7), employeeList[0].id)
   assert.equal(openAttendance.find(row => row.id === attendance[0].id).open, true)
   assert.ok(Math.abs(openAttendance.find(row => row.id === attendance[0].id).hours - 4.5) < 0.01)
+  sqlite.prepare("UPDATE employee_presence_checks SET next_check_at=?,state='waiting' WHERE shift_id=?").run(Date.now()-1,attendance[0].id)
+  const presencePrompt=await (await employeeCall('presence-check','GET',undefined,employeeCookie)).json()
+  assert.equal(presencePrompt.prompt.stage,1)
+  assert.equal((await employeeCall('presence-response','POST',{shift_id:attendance[0].id,response:'here'},employeeCookie)).status,200)
+  assert.equal(sqlite.prepare('SELECT prompt_stage FROM employee_presence_checks WHERE shift_id=?').get(attendance[0].id).prompt_stage,0)
   assert.equal((await employeeCall('check-out','POST',{},employeeCookie)).status,422)
   assert.equal((await employeeCall('check-out','POST',{...checkoutBody(employeeList[0].id),accomplishments:'   '},employeeCookie)).status,422)
   assert.equal((await employeeCall('check-out','POST',{...checkoutBody(employeeList[0].id),accomplishments:'x'.repeat(2001)},employeeCookie)).status,422)
@@ -375,6 +386,7 @@ async function test() {
   assert.equal(multiPayroll[0].attended_days,1)
   // Keep subsequent isolation fixtures unchanged after verifying both shifts are retained.
   sqlite.prepare('DELETE FROM attendance_shift_reports WHERE shift_id=?').run(secondShift.id)
+  sqlite.prepare('DELETE FROM employee_presence_checks WHERE shift_id=?').run(secondShift.id)
   sqlite.prepare('DELETE FROM attendance_shifts WHERE id=?').run(secondShift.id)
   sqlite.prepare('INSERT INTO attendance_shifts VALUES (?, ?, ?, ?, ?)').run('other', employeeList[1].id, employeeLib.cairoDay(), Date.now() - 3600000, Date.now())
   assert.equal((await (await employeeCall('attendance?month=' + month, 'GET', undefined, employeeCookie)).json()).records.length, 1)
@@ -452,7 +464,11 @@ async function test() {
   } finally { Date.now = oldNow }
   await call('logout', 'POST', undefined, cookie)
   assert.equal((await call('session', 'GET', undefined, cookie)).status, 401)
+  const rateTestNow = Date.now()
+  const beforeRateTest = Date.now
+  Date.now = () => rateTestNow
   for (let i = 0; i < 5; i++) response = await call('login', 'POST', { email: env.ADMIN_EMAIL, password: 'wrong' })
+  Date.now = beforeRateTest
   assert.equal(response.status, 429)
   const oldFetch = global.fetch
   env.RESEND_API_KEY = 'test-key'

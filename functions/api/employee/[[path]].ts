@@ -98,13 +98,18 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       if (!rows) return json({ error: 'شهر غير صحيح' }, 400)
       const open = await env.DB.prepare('SELECT * FROM attendance_shifts WHERE employee_id = ? AND check_out IS NULL').bind(employee.id).first<Attendance>()
       const today = await env.DB.prepare('SELECT * FROM attendance_shifts WHERE employee_id = ? AND day = ? ORDER BY check_in DESC LIMIT 1').bind(employee.id, cairoDay()).first<Attendance>()
-      let payrollView: { absent_days?: number; absent_dates?: string[]; due_piasters?: number } | null = null
-      if (employee.view_absences || employee.view_due) {
+      let payrollView: { absent_days?: number; absent_dates?: string[]; due_piasters?: number; actual_hours?: number; paid_hours?: number; max_daily_hours?: number; max_monthly_hours?: number; hourly_rate_piasters?: number } | null = null
+      {
         const approvedLeaves = await env.DB.prepare("SELECT employee_id,day,type,status FROM employee_requests WHERE employee_id=? AND type='leave' AND status='approved' AND day>=? AND day<=?").bind(employee.id, month + '-01', month + '-31').all<{ employee_id: string; day: string; type: string; status: string }>()
         const calculated = calculatePayroll([employee], rows, approvedLeaves.results, month)
         const ownPayroll = calculated?.[0]
         if (ownPayroll) {
           payrollView = {}
+          payrollView.actual_hours = ownPayroll.actual_hours
+          payrollView.paid_hours = ownPayroll.paid_hours
+          payrollView.max_daily_hours = ownPayroll.max_daily_hours
+          payrollView.max_monthly_hours = ownPayroll.max_monthly_hours
+          payrollView.hourly_rate_piasters = ownPayroll.hourly_rate_piasters
           if (employee.view_absences) { payrollView.absent_days = ownPayroll.absent_days; payrollView.absent_dates = ownPayroll.absent_dates }
           if (employee.view_due) {
             const adjustment = await env.DB.prepare('SELECT due_piasters FROM employee_payroll_adjustments WHERE employee_id=? AND month=?').bind(employee.id, month).first<{ due_piasters: number }>()
@@ -115,10 +120,53 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       return json({ records: rows, open, today, serverDay: cairoDay(), payroll: payrollView })
     }
     if (path === 'check-in' && request.method === 'POST') {
-      const inserted = await env.DB.prepare('INSERT OR IGNORE INTO attendance_shifts VALUES (?, ?, ?, ?, NULL)').bind(crypto.randomUUID(), employee.id, cairoDay(now), now).run() as { meta?: { changes?: number }; changes?: number }
+      const shiftId = crypto.randomUUID()
+      const inserted = await env.DB.prepare('INSERT OR IGNORE INTO attendance_shifts VALUES (?, ?, ?, ?, NULL)').bind(shiftId, employee.id, cairoDay(now), now).run() as { meta?: { changes?: number }; changes?: number }
       const row = await env.DB.prepare('SELECT * FROM attendance_shifts WHERE employee_id = ? AND check_out IS NULL').bind(employee.id).first<Attendance>()
-      if ((inserted.meta?.changes ?? inserted.changes ?? 0) > 0) await recordAdminNotification(env, { actor: employee.name, eventType: 'attendance_checkin', title: 'تسجيل حضور', detail: `${employee.name} سجّل حضوره`, target: 'employees' })
+      if ((inserted.meta?.changes ?? inserted.changes ?? 0) > 0 && row) {
+        await env.DB.prepare("INSERT INTO employee_presence_checks(shift_id,employee_id,state,prompt_stage,last_confirmed_at,next_check_at,updated_at) VALUES(?,?,'waiting',0,?,?,?)").bind(row.id, employee.id, now, now + 3600000, now).run()
+        await recordAdminNotification(env, { actor: employee.name, eventType: 'attendance_checkin', title: 'تسجيل حضور', detail: `${employee.name} سجّل حضوره`, target: 'employees' })
+      }
       return row ? json({ record: row }) : json({ error: 'تعذر بدء وردية جديدة. حدّث الصفحة وحاول مرة أخرى' }, 409)
+    }
+    if (path === 'presence-check' && request.method === 'GET') {
+      const monitor = await env.DB.prepare("SELECT p.*,a.check_in,a.day FROM employee_presence_checks p JOIN attendance_shifts a ON a.id=p.shift_id WHERE p.employee_id=? AND p.state!='closed' AND a.check_out IS NULL ORDER BY p.updated_at DESC LIMIT 1").bind(employee.id).first<{ shift_id:string;state:string;prompt_stage:number;last_confirmed_at:number;next_check_at:number;prompt_sent_at:number|null;check_in:number;day:string }>()
+      if (!monitor) return json({ prompt: null })
+      if (monitor.state === 'prompted' && monitor.next_check_at <= now) {
+        if (monitor.prompt_stage >= 3) {
+          await env.DB.batch([env.DB.prepare('UPDATE attendance_shifts SET check_out=? WHERE id=? AND check_out IS NULL').bind(monitor.last_confirmed_at, monitor.shift_id),env.DB.prepare("UPDATE employee_presence_checks SET state='closed',updated_at=? WHERE shift_id=?").bind(now, monitor.shift_id)])
+          return json({ prompt: null, closed: true })
+        }
+        const waitMinutes = monitor.prompt_stage === 1 ? 5 : 15
+        await env.DB.prepare("UPDATE employee_presence_checks SET state='retry_wait',next_check_at=?,updated_at=? WHERE shift_id=? AND state='prompted' AND next_check_at<=?").bind(now + waitMinutes * 60000, now, monitor.shift_id, now).run()
+        return json({ prompt: null })
+      }
+      if (monitor.state === 'retry_wait' && monitor.next_check_at <= now) {
+        const deadline = now + 120000
+        const changed = await env.DB.prepare("UPDATE employee_presence_checks SET state='prompted',prompt_stage=prompt_stage+1,prompt_sent_at=?,next_check_at=?,updated_at=? WHERE shift_id=? AND state='retry_wait' AND next_check_at<=?").bind(now, deadline, now, monitor.shift_id, now).run() as {meta?:{changes?:number};changes?:number}
+        if ((changed.meta?.changes ?? changed.changes ?? 0) > 0) return json({ prompt: { shift_id: monitor.shift_id, stage: monitor.prompt_stage + 1, deadline } })
+      }
+      if (monitor.state === 'waiting' && monitor.next_check_at <= now) {
+        const deadline = now + 120000
+        const changed = await env.DB.prepare("UPDATE employee_presence_checks SET state='prompted',prompt_stage=1,prompt_sent_at=?,next_check_at=?,updated_at=? WHERE shift_id=? AND state='waiting' AND next_check_at<=?").bind(now, deadline, now, monitor.shift_id, now).run() as {meta?:{changes?:number};changes?:number}
+        if ((changed.meta?.changes ?? changed.changes ?? 0) > 0) return json({ prompt: { shift_id: monitor.shift_id, stage: 1, deadline } })
+      }
+      return json({ prompt: null })
+    }
+    if (path === 'presence-response' && request.method === 'POST') {
+      const raw=await request.text(); if(raw.length>1024)return json({error:'طلب كبير جدًا'},413)
+      const body=JSON.parse(raw) as {shift_id?:unknown;response?:unknown}
+      if(typeof body.shift_id!=='string'||!['here','away'].includes(String(body.response)))return json({error:'الإجابة غير صحيحة'},422)
+      const monitor=await env.DB.prepare("SELECT shift_id FROM employee_presence_checks WHERE shift_id=? AND employee_id=? AND state='prompted'").bind(body.shift_id,employee.id).first<{shift_id:string}>()
+      if(!monitor)return json({error:'انتهت مهلة التأكيد أو لا يوجد إشعار حالي'},409)
+      const prompt=await env.DB.prepare('SELECT next_check_at FROM employee_presence_checks WHERE shift_id=?').bind(monitor.shift_id).first<{next_check_at:number}>()
+      if(!prompt || prompt.next_check_at<=now)return json({error:'انتهت مهلة التأكيد؛ انتظر التنبيه التالي'},409)
+      if(body.response==='away'){
+        await env.DB.batch([env.DB.prepare('UPDATE attendance_shifts SET check_out=? WHERE id=? AND employee_id=? AND check_out IS NULL').bind(now,monitor.shift_id,employee.id),env.DB.prepare("UPDATE employee_presence_checks SET state='closed',updated_at=? WHERE shift_id=?").bind(now,monitor.shift_id)])
+        return json({success:true,closed:true})
+      }
+      await env.DB.prepare("UPDATE employee_presence_checks SET state='waiting',prompt_stage=0,last_confirmed_at=?,next_check_at=?,prompt_sent_at=NULL,updated_at=? WHERE shift_id=? AND employee_id=?").bind(now,now+3600000,now,monitor.shift_id,employee.id).run()
+      return json({success:true,closed:false,next_check_at:now+3600000})
     }
     if (path === 'check-out' && request.method === 'POST') {
       const row = await env.DB.prepare('SELECT * FROM attendance_shifts WHERE employee_id = ? AND check_out IS NULL').bind(employee.id).first<Attendance>()
@@ -132,6 +180,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       const results=await env.DB.batch([
         env.DB.prepare('INSERT INTO attendance_shift_reports(shift_id,employee_id,accomplishments,submitted_at) SELECT id,employee_id,?,? FROM attendance_shifts WHERE id=? AND employee_id=? AND check_out IS NULL ON CONFLICT(shift_id) DO NOTHING').bind(body.accomplishments.trim(),now,row.id,employee.id),
         env.DB.prepare('UPDATE attendance_shifts SET check_out=? WHERE id=? AND employee_id=? AND check_out IS NULL').bind(now,row.id,employee.id),
+        env.DB.prepare("UPDATE employee_presence_checks SET state='closed',updated_at=? WHERE shift_id=?").bind(now,row.id),
       ]) as Array<{meta?:{changes?:number};changes?:number}>
       if((results[1]?.meta?.changes??results[1]?.changes??0)===0)return json({error:'تم إغلاق هذه الوردية بالفعل. حدّث الصفحة'},409)
       await recordAdminNotification(env, { actor: employee.name, eventType: 'attendance_checkout', title: 'انصراف وتقرير إنجازات', detail: `${employee.name} سجّل انصرافه وأرسل إنجازات ورديته: ${body.accomplishments.trim().slice(0,300)}`, target: 'employees' })
@@ -141,6 +190,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
   } catch (error) {
     console.error('Employee request failed', error)
     if(error instanceof Error&&/no such table:\s*attendance_shift_reports/i.test(error.message))return json({error:'نفّذ تحديث 0013_checkout_accomplishments.sql لحفظ الإنجازات وتأكيد الانصراف'},503)
+    if(error instanceof Error&&/no such table:\s*employee_presence_checks/i.test(error.message))return json({error:'نفّذ migration 0015_employee_hour_limits.sql لتفعيل حدود الساعات وتأكيد التواجد.'},503)
     if (error instanceof Error && /no such table:\s*attendance_shifts/i.test(error.message)) return json({error:'يلزم تنفيذ تحديث قاعدة البيانات 0011_employee_multiple_shifts.sql لتفعيل الورديات المتعددة'},503)
     return json({ error: 'تعذر تنفيذ الطلب. تأكد من تشغيل migration 0002 في D1.' }, 500)
   }
