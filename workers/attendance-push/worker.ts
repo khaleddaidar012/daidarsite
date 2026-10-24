@@ -100,8 +100,9 @@ async function processChecks(env: WorkerEnv) {
       const result = await env.DB.prepare("UPDATE employee_presence_checks SET state='prompted',prompt_stage=?,next_check_at=?,updated_at=? WHERE shift_id=? AND state='retry_wait' AND next_check_at<=?").bind(stage, deadline, now, check.shift_id, now).run() as { meta?: { changes?: number } }
       if ((result.meta?.changes || 0) > 0) await notify(check, stage, env, now)
     } else if (check.prompt_stage >= 3) {
+      const firstUnconfirmedAlertAt = check.prompt_sent_at || check.last_confirmed_at
       await env.DB.batch([
-        env.DB.prepare('UPDATE attendance_shifts SET check_out=? WHERE id=? AND check_out IS NULL').bind(check.last_confirmed_at, check.shift_id),
+        env.DB.prepare('UPDATE attendance_shifts SET check_out=? WHERE id=? AND check_out IS NULL').bind(firstUnconfirmedAlertAt, check.shift_id),
         env.DB.prepare("UPDATE employee_presence_checks SET state='closed',updated_at=? WHERE shift_id=? AND state='prompted' AND next_check_at<=?").bind(now, check.shift_id, now),
       ])
     } else {
