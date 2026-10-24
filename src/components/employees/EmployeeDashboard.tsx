@@ -8,6 +8,7 @@ import CheckoutDialog from './CheckoutDialog'
 import EmployeeProjectManager from './EmployeeProjectManager'
 import HubManualSubscriptionManager from '@/components/shared/HubManualSubscriptionManager'
 import D1UsageDashboard from '@/components/admin/D1UsageDashboard'
+type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }> }
 export default function EmployeeDashboard() {
   const [employee, setEmployee] = useState<Employee | null>(null)
   const [loading, setLoading] = useState(true)
@@ -24,15 +25,28 @@ export default function EmployeeDashboard() {
   const [revision, setRevision] = useState(0)
   const [presencePrompt, setPresencePrompt] = useState<{shift_id:string;stage:number;deadline:number}|null>(null)
   const [pushEnabled, setPushEnabled] = useState(false)
+  const [showInPagePrompts, setShowInPagePrompts] = useState(true)
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
+  const [isInstalled, setIsInstalled] = useState(false)
   const [checkoutShift, setCheckoutShift] = useState<RecordRow | null>(null)
   const [requestType, setRequestType] = useState('leave')
   const [reportLoading, setReportLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<'chat' | 'tracking' | 'attendance' | 'projects' | 'hub' | 'databases'>('attendance')
   function fail(e: Error & { status?: number }) { setError(e.message); if (e.status === 401) setEmployee(null) }
   useEffect(() => { callApi('employee', 'session').then(data => setEmployee(data.employee)).catch(e => { if (e.status !== 401) setError(e.message) }).finally(() => setLoading(false)) }, [])
+  useEffect(() => { setShowInPagePrompts(localStorage.getItem('daidar_employee_in_page_prompts') !== 'off') }, [])
   useEffect(() => {
-    if (!employee || !('serviceWorker' in navigator)) return
-    navigator.serviceWorker.getRegistration('/').then(registration => registration?.pushManager.getSubscription()).then(subscription => setPushEnabled(!!subscription)).catch(() => {})
+    const installed = window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & {standalone?:boolean}).standalone)
+    setIsInstalled(installed)
+    const onInstallPrompt = (event: Event) => { event.preventDefault(); setInstallPrompt(event as InstallPromptEvent) }
+    const onInstalled = () => { setIsInstalled(true); setInstallPrompt(null); setNotice('تم تثبيت تطبيق الموظفين على جهازك.') }
+    window.addEventListener('beforeinstallprompt', onInstallPrompt)
+    window.addEventListener('appinstalled', onInstalled)
+    return () => { window.removeEventListener('beforeinstallprompt', onInstallPrompt); window.removeEventListener('appinstalled', onInstalled) }
+  }, [])
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    navigator.serviceWorker.register('/employee-sw.js', { scope: '/' }).then(registration => employee ? registration.pushManager.getSubscription() : null).then(subscription => { if (employee) setPushEnabled(!!subscription) }).catch(() => {})
   }, [employee])
   useEffect(() => {
     if (!employee) return
@@ -48,7 +62,8 @@ export default function EmployeeDashboard() {
         const data = await callApi('employee', 'presence-check')
         if (!live) return
         if (data.prompt) {
-          setPresencePrompt(data.prompt)
+          if (showInPagePrompts) setPresencePrompt(data.prompt)
+          else setPresencePrompt(null)
           if ('Notification' in window && Notification.permission === 'granted' && 'serviceWorker' in navigator) navigator.serviceWorker.ready.then(registration => registration.showNotification(`تأكيد الحضور · التنبيه ${data.prompt.stage}`, { body: 'هل ما زلت تعمل؟ اضغط «موجود · كمل» أو «انصراف» من الإشعار.', icon: '/logo.png', tag: `attendance-${data.prompt.shift_id}`, requireInteraction: true, actions: [{ action: 'here', title: 'موجود · كمل' }, { action: 'away', title: 'انصراف' }], data: { shift_id: data.prompt.shift_id, stage: data.prompt.stage, url: '/employee' } } as NotificationOptions)).catch(() => {})
         } else if (data.closed) {
           setPresencePrompt(null); setRevision(n => n + 1); setNotice('أُغلقت الوردية عند آخر تأكيد حضور لعدم الرد على التنبيهات.')
@@ -60,7 +75,7 @@ export default function EmployeeDashboard() {
     void check()
     const timer = window.setInterval(() => void check(), 30000)
     return () => { live = false; window.clearInterval(timer) }
-  }, [employee, open?.id, revision, presencePrompt?.deadline])
+  }, [employee, open?.id, revision, presencePrompt?.deadline, showInPagePrompts])
   async function answerPresence(response: 'here'|'away') {
     if (!presencePrompt) return
     setBusy(true)
@@ -99,6 +114,13 @@ export default function EmployeeDashboard() {
       setPresencePrompt(null)
       setRevision(n => n + 1)
     } catch (e) { fail(e as Error) } finally { setBusy(false) }
+  }
+  async function installEmployeeApp() {
+    if (!installPrompt) return
+    await installPrompt.prompt()
+    const choice = await installPrompt.userChoice
+    setInstallPrompt(null)
+    if (choice.outcome === 'accepted') setNotice('بدأ تثبيت تطبيق الموظفين على جهازك.')
   }
   async function logoutEmployee() {
     setBusy(true)
@@ -139,14 +161,14 @@ export default function EmployeeDashboard() {
     ...(employee?.manage_hub_subscriptions === 1 ? [{ id: 'hub' as const, label: 'اشتراكات هب', description: 'تسجيل دفعة أو تجديد', icon: CreditCard }] : []),
     ...(employee?.view_d1_usage === 1 ? [{ id: 'databases' as const, label: 'سعة قواعد البيانات', description: 'المساحة المستخدمة والمتاحة', icon: Database }] : []),
   ]
-  return <main dir="rtl" className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-8"><div className="max-w-5xl mx-auto"><header className="flex flex-wrap justify-between items-center gap-4 mb-8"><div><p className="text-sky-600 font-bold">دعيدر للحلول البرمجية</p><h1 className="text-3xl font-bold mt-2">{employee ? `أهلًا ${employee.name}` : 'دخول الموظفين'}</h1>{employee && <p className="text-slate-500 mt-2">{employee.job_title}</p>}</div>{employee && <button className={action} disabled={busy} onClick={() => void logoutEmployee()}>تسجيل الخروج</button>}</header>{error && <p role="alert" className="bg-red-50 text-red-700 p-4 rounded-xl mb-5">{error}</p>}{notice && <p role="status" className="text-green-700 p-4 mb-5">{notice}</p>}
+  return <main dir="rtl" className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-8"><div className="max-w-5xl mx-auto"><header className="flex flex-wrap justify-between items-center gap-4 mb-8"><div><p className="text-sky-600 font-bold">دعيدر للحلول البرمجية</p><h1 className="text-3xl font-bold mt-2">{employee ? `أهلًا ${employee.name}` : 'دخول الموظفين'}</h1>{employee && <p className="text-slate-500 mt-2">{employee.job_title}</p>}</div><div className="flex flex-wrap gap-2">{employee && !isInstalled && installPrompt && <button type="button" className="rounded-xl border border-sky-300 bg-white px-4 py-2 font-bold text-sky-800" onClick={() => void installEmployeeApp()}>تثبيت تطبيق الموظفين</button>}{employee && !isInstalled && !installPrompt && <p className="self-center text-xs text-slate-500">لتثبيته: من قائمة المتصفح اختر «تثبيت الصفحة كتطبيق».</p>}{employee && <button className={action} disabled={busy} onClick={() => void logoutEmployee()}>تسجيل الخروج</button>}</div></header>{error && <p role="alert" className="bg-red-50 text-red-700 p-4 rounded-xl mb-5">{error}</p>}{notice && <p role="status" className="text-green-700 p-4 mb-5">{notice}</p>}
     {!employee ? <form onSubmit={login} className="max-w-md mx-auto bg-white border rounded-2xl p-6 space-y-4"><label className="block">البريد الإلكتروني<input className={field} name="email" type="email" autoComplete="username" required /></label><label className="block">كلمة المرور<input className={field} name="password" type="password" autoComplete="current-password" maxLength={256} required /></label><button className={`${action} w-full`} disabled={busy}>دخول</button><p className="text-sm text-slate-500">حسابك يتم إنشاؤه بواسطة الإدارة.</p></form> : <>
     <nav aria-label="أقسام الموظف" className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {tabs.map(tab => { const Icon = tab.icon; const selected = activeTab === tab.id; return <button key={tab.id} type="button" aria-pressed={selected} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-3 rounded-2xl border p-4 text-right transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${selected ? 'border-sky-600 bg-sky-600 text-white shadow-md shadow-sky-900/10' : 'border-slate-200 bg-white hover:border-sky-300 hover:bg-sky-50'}`}><span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${selected ? 'bg-white/15' : 'bg-sky-50 text-sky-700'}`}><Icon size={21} /></span><span><strong className="block">{tab.label}</strong><small className={selected ? 'text-sky-100' : 'text-slate-500'}>{tab.description}</small></span></button> })}
     </nav>
     {activeTab === 'attendance' && <div className="space-y-6">
     <section className="grid gap-3 sm:grid-cols-3"><article className="rounded-2xl border bg-white p-5"><p className="text-sm text-slate-500">حدك اليومي</p><p className="mt-1 text-2xl font-bold">{payroll?.max_daily_hours ?? employee.max_daily_hours ?? 4} ساعة</p></article><article className="rounded-2xl border bg-white p-5"><p className="text-sm text-slate-500">ساعاتك هذا الشهر</p><p className="mt-1 text-2xl font-bold">{(payroll?.actual_hours ?? 0).toLocaleString('ar-EG',{maximumFractionDigits:2})} <span className="text-base font-normal text-slate-500">/ {payroll?.max_monthly_hours ?? employee.max_monthly_hours ?? 104} ساعة</span></p></article>{employee.view_due === 1 && <article className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5"><p className="text-sm text-emerald-800">المستحق المحسوب حتى الآن</p><p className="mt-1 text-2xl font-bold text-emerald-900">{Math.round((payroll?.due_piasters || 0)/100).toLocaleString('ar-EG')} جنيه</p></article>}</section>
-    <section className="bg-white border rounded-2xl p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-xl font-bold mb-3">حضور وانصراف اليوم</h2><p className="mb-4">{open ? `حضور مفتوح منذ ${open.day} — ${time(open.check_in)}` : today?.check_out ? `آخر انصراف ${time(today.check_out)} — يمكنك بدء وردية جديدة` : 'لم تسجل حضورًا اليوم'}</p><p className="text-sm text-slate-500">التوقيت من الخادم بتوقيت القاهرة. يمكنك تسجيل أكثر من وردية في اليوم بعد إغلاق الوردية السابقة.</p></div><div className="flex flex-wrap gap-3"><button className={action} disabled={busy || reportLoading || !!open} onClick={() => punch('check-in')}>تسجيل حضور</button><button className="rounded-xl bg-slate-800 text-white px-5 py-3 font-bold disabled:opacity-50" disabled={busy || reportLoading || !open} onClick={() => { if(open)setCheckoutShift(open) }}>تسجيل انصراف</button><button disabled={busy || reportLoading} className="rounded-xl border px-4 py-3 font-bold text-sky-700 disabled:opacity-50" onClick={() => setRevision(n => n + 1)}>تحديث</button>{pushEnabled ? <><button type="button" className="rounded-xl border px-4 py-3 text-sm text-slate-600" disabled={busy} onClick={() => void disablePush()}>إيقاف إشعارات هذا الجهاز</button><button type="button" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900 disabled:opacity-50" disabled={busy || !open} onClick={() => void testPresenceNotification()}>اختبار الإشعار · خلال دقيقتين</button></> : <button type="button" className="rounded-xl border px-4 py-3 text-sm" disabled={busy} onClick={() => void enablePush()}>تفعيل إشعارات النظام</button>}</div></div><p className="mt-3 text-xs text-slate-500">اسمح بالإشعارات مرة واحدة. بعدها يظهر تنبيه النظام عند تصغير المتصفح، وتقدر تضغط «موجود» أو «انصراف» من الإشعار.</p>{pushEnabled && <p className="mt-2 text-xs text-amber-800">للتجربة: سجّل حضورًا ثم اضغط «اختبار الإشعار». التذكير العادي يظل بعد ساعة؛ الاختبار يسرّع تذكير ورديتك الحالية فقط.</p>}</section>
+    <section className="bg-white border rounded-2xl p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-xl font-bold mb-3">حضور وانصراف اليوم</h2><p className="mb-4">{open ? `حضور مفتوح منذ ${open.day} — ${time(open.check_in)}` : today?.check_out ? `آخر انصراف ${time(today.check_out)} — يمكنك بدء وردية جديدة` : 'لم تسجل حضورًا اليوم'}</p><p className="text-sm text-slate-500">التوقيت من الخادم بتوقيت القاهرة. يمكنك تسجيل أكثر من وردية في اليوم بعد إغلاق الوردية السابقة.</p></div><div className="flex flex-wrap gap-3"><button className={action} disabled={busy || reportLoading || !!open} onClick={() => punch('check-in')}>تسجيل حضور</button><button className="rounded-xl bg-slate-800 text-white px-5 py-3 font-bold disabled:opacity-50" disabled={busy || reportLoading || !open} onClick={() => { if(open)setCheckoutShift(open) }}>تسجيل انصراف</button><button disabled={busy || reportLoading} className="rounded-xl border px-4 py-3 font-bold text-sky-700 disabled:opacity-50" onClick={() => setRevision(n => n + 1)}>تحديث</button>{pushEnabled ? <><button type="button" className="rounded-xl border px-4 py-3 text-sm text-slate-600" disabled={busy} onClick={() => void disablePush()}>إيقاف إشعارات النظام</button><button type="button" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900 disabled:opacity-50" disabled={busy || !open} onClick={() => void testPresenceNotification()}>اختبار الإشعار · خلال دقيقتين</button></> : <button type="button" className="rounded-xl border px-4 py-3 text-sm" disabled={busy} onClick={() => void enablePush()}>تفعيل إشعارات النظام</button>}<label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border px-4 py-3 text-sm"><input type="checkbox" checked={showInPagePrompts} onChange={event => { const enabled = event.target.checked; setShowInPagePrompts(enabled); localStorage.setItem('daidar_employee_in_page_prompts', enabled ? 'on' : 'off'); if (!enabled) setPresencePrompt(null) }} /><span>إظهار التنبيه داخل الموقع</span></label></div></div><p className="mt-3 text-xs text-slate-500">إشعارات النظام تظهر خارج الصفحة. يمكنك إيقافها من هنا، كما يمكنك إخفاء النافذة داخل الموقع بشكل مستقل.</p>{!showInPagePrompts && <p className="mt-2 text-xs text-amber-800">نافذة التنبيه داخل الموقع مخفية على هذا الجهاز؛ تأكد من تشغيل إشعارات النظام حتى لا يفوتك التنبيه.</p>}{pushEnabled && <p className="mt-2 text-xs text-amber-800">للتجربة: سجّل حضورًا ثم اضغط «اختبار الإشعار». التذكير العادي يظل بعد ساعة؛ الاختبار يسرّع تذكير ورديتك الحالية فقط.</p>}</section>
     {presencePrompt && <div role="alertdialog" aria-modal="true" aria-labelledby="presence-heading" className="fixed bottom-5 right-5 z-50 w-[min(24rem,calc(100vw-2.5rem))] rounded-2xl border border-sky-200 bg-white p-5 shadow-2xl"><h2 id="presence-heading" className="text-lg font-extrabold">لسه موجود؟</h2><p className="mt-2 text-sm text-slate-600">أكد وجودك خلال دقيقتين لمواصلة احتساب الوقت. لو لم يصل رد، سنعيد التنبيه ثم نغلق الوردية عند آخر تأكيد.</p><div className="mt-4 flex gap-2"><button className={`${action} flex-1`} disabled={busy} onClick={()=>void answerPresence('here')}>أيوه، مكمل</button><button className="rounded-xl border px-4 py-2" disabled={busy} onClick={()=>void answerPresence('away')}>انصراف</button></div><p className="mt-2 text-xs text-slate-500">التنبيه رقم {presencePrompt.stage}</p></div>}
     <section className="bg-white border rounded-2xl p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-xl font-bold mb-3">حضور وانصراف اليوم</h2><p className="mb-4">{open ? `حضور مفتوح منذ ${open.day} — ${time(open.check_in)}` : today?.check_out ? `آخر انصراف ${time(today.check_out)} — يمكنك بدء وردية جديدة` : 'لم تسجل حضورًا اليوم'}</p><p className="text-sm text-slate-500">التوقيت من الخادم بتوقيت القاهرة. يمكنك تسجيل أكثر من وردية في اليوم بعد إغلاق الوردية السابقة.</p></div><div className="flex flex-wrap gap-3"><button className={action} disabled={busy || reportLoading || !!open} onClick={() => punch('check-in')}>تسجيل حضور</button><button className="rounded-xl bg-slate-800 text-white px-5 py-3 font-bold disabled:opacity-50" disabled={busy || reportLoading || !open} onClick={() => { if(open)setCheckoutShift(open) }}>تسجيل انصراف</button><button disabled={busy || reportLoading} className="rounded-xl border px-4 py-3 font-bold text-sky-700 disabled:opacity-50" onClick={() => setRevision(n => n + 1)}>تحديث</button></div></div></section>
     <section className="bg-white border rounded-2xl p-6"><h2 className="text-xl font-bold mb-4">طلب إجازة أو استئذان</h2><form onSubmit={submit} className="grid sm:grid-cols-2 gap-4"><label>نوع الطلب<select className={field} name="type" value={requestType} onChange={e => setRequestType(e.target.value)}><option value="leave">إجازة يوم</option><option value="early">استئذان انصراف مبكر</option></select></label><label>التاريخ<input className={field} type="date" name="day" min={serverDay} required /></label>{requestType === 'early' && <label>وقت الانصراف المطلوب (القاهرة)<input className={field} type="time" name="requested_time" required /></label>}<label className="sm:col-span-2">السبب<textarea className={field} name="reason" required maxLength={1000} rows={3} /></label><button className={action} disabled={busy}>إرسال الطلب للإدارة</button></form></section>
