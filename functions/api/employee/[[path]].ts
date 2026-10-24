@@ -161,27 +161,12 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
     }
     if (path === 'presence-check' && request.method === 'GET') {
       const monitor = await env.DB.prepare("SELECT p.*,a.check_in,a.day FROM employee_presence_checks p JOIN attendance_shifts a ON a.id=p.shift_id WHERE p.employee_id=? AND p.state!='closed' AND a.check_out IS NULL ORDER BY p.updated_at DESC LIMIT 1").bind(employee.id).first<{ shift_id:string;state:string;prompt_stage:number;last_confirmed_at:number;next_check_at:number;prompt_sent_at:number|null;check_in:number;day:string }>()
-      if (!monitor) return json({ prompt: null })
-      if (monitor.state === 'prompted' && monitor.next_check_at <= now) {
-        if (monitor.prompt_stage >= 3) {
-          await env.DB.batch([env.DB.prepare('UPDATE attendance_shifts SET check_out=? WHERE id=? AND check_out IS NULL').bind(monitor.last_confirmed_at, monitor.shift_id),env.DB.prepare("UPDATE employee_presence_checks SET state='closed',updated_at=? WHERE shift_id=?").bind(now, monitor.shift_id)])
-          return json({ prompt: null, closed: true })
-        }
-        const waitMinutes = monitor.prompt_stage === 1 ? 5 : 15
-        await env.DB.prepare("UPDATE employee_presence_checks SET state='retry_wait',next_check_at=?,updated_at=? WHERE shift_id=? AND state='prompted' AND next_check_at<=?").bind(now + waitMinutes * 60000, now, monitor.shift_id, now).run()
-        return json({ prompt: null })
+      if (!monitor) {
+        const openShift = await env.DB.prepare('SELECT id FROM attendance_shifts WHERE employee_id=? AND check_out IS NULL').bind(employee.id).first()
+        return json({ prompt: null, closed: !openShift })
       }
-      if (monitor.state === 'retry_wait' && monitor.next_check_at <= now) {
-        const deadline = now + 120000
-        const changed = await env.DB.prepare("UPDATE employee_presence_checks SET state='prompted',prompt_stage=prompt_stage+1,prompt_sent_at=?,next_check_at=?,updated_at=? WHERE shift_id=? AND state='retry_wait' AND next_check_at<=?").bind(now, deadline, now, monitor.shift_id, now).run() as {meta?:{changes?:number};changes?:number}
-        if ((changed.meta?.changes ?? changed.changes ?? 0) > 0) return json({ prompt: { shift_id: monitor.shift_id, stage: monitor.prompt_stage + 1, deadline } })
-      }
-      if (monitor.state === 'waiting' && monitor.next_check_at <= now) {
-        const deadline = now + 120000
-        const changed = await env.DB.prepare("UPDATE employee_presence_checks SET state='prompted',prompt_stage=1,prompt_sent_at=?,next_check_at=?,updated_at=? WHERE shift_id=? AND state='waiting' AND next_check_at<=?").bind(now, deadline, now, monitor.shift_id, now).run() as {meta?:{changes?:number};changes?:number}
-        if ((changed.meta?.changes ?? changed.changes ?? 0) > 0) return json({ prompt: { shift_id: monitor.shift_id, stage: 1, deadline } })
-      }
-      return json({ prompt: null })
+      if (monitor.state !== 'prompted' || monitor.next_check_at <= now) return json({ prompt: null })
+      return json({ prompt: { shift_id: monitor.shift_id, stage: monitor.prompt_stage, deadline: monitor.next_check_at } })
     }
     if (path === 'presence-response' && request.method === 'POST') {
       const raw=await request.text(); if(raw.length>1024)return json({error:'طلب كبير جدًا'},413)

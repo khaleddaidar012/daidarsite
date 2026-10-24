@@ -1,25 +1,70 @@
 self.addEventListener('push', event => {
   let data = {}
   try { data = event.data ? event.data.json() : {} } catch { data = { body: event.data?.text() || 'تأكيد الحضور مطلوب' } }
-  event.waitUntil(self.registration.showNotification(data.title || 'دعيدر · تأكيد الحضور', {
-    body: data.body || 'هل ما زلت تعمل؟',
-    icon: '/logo.png',
-    badge: '/logo.png',
-    tag: `attendance-${data.shift_id || 'check'}`,
-    renotify: true,
-    requireInteraction: true,
-    actions: [
-      { action: 'here', title: 'موجود · كمل' },
-      { action: 'away', title: 'انصراف' },
-    ],
-    data: { shift_id: data.shift_id, stage: data.stage, url: '/employee' },
-  }))
+  const tag = `attendance-${data.shift_id || 'check'}`
+  event.waitUntil((async () => {
+    await self.registration.showNotification(data.title || 'دعيدر · تأكيد الحضور', {
+      body: data.body || 'هل ما زلت تعمل؟',
+      icon: '/employee-icon-192.png',
+      badge: '/employee-icon-192.png',
+      tag,
+      renotify: true,
+      requireInteraction: true,
+      actions: [
+        { action: 'here', title: 'موجود · كمل' },
+        { action: 'away', title: 'انصراف' },
+      ],
+      data: { shift_id: data.shift_id, stage: data.stage, url: '/employee' },
+    })
+    await new Promise(resolve => setTimeout(resolve, 60000))
+    const notifications = await self.registration.getNotifications({ tag })
+    notifications.forEach(notification => notification.close())
+  })())
+})
+
+self.addEventListener('message', event => {
+  if (event.data?.type !== 'show-attendance-test') return
+  const stage = Math.min(3, Math.max(1, Number(event.data.stage) || 1))
+  const tag = `attendance-test-${stage}`
+  event.waitUntil((async () => {
+    await self.registration.showNotification(`اختبار تأكيد الحضور · التنبيه ${stage}`, {
+      body: 'اختبار فقط — اختر «موجود · كمل» أو «انصراف». لن يتغير سجل الحضور أو المرتب.',
+      icon: '/employee-icon-192.png',
+      badge: '/employee-icon-192.png',
+      tag,
+      renotify: true,
+      requireInteraction: true,
+      actions: [
+        { action: 'here', title: 'موجود · كمل' },
+        { action: 'away', title: 'انصراف' },
+      ],
+      data: { test: true, stage, url: '/employee' },
+    })
+    await new Promise(resolve => setTimeout(resolve, 60000))
+    const notifications = await self.registration.getNotifications({ tag })
+    notifications.forEach(notification => notification.close())
+  })())
 })
 
 self.addEventListener('notificationclick', event => {
   const { action, notification } = event
   const payload = notification.data || {}
   notification.close()
+  if (payload.test === true) {
+    event.waitUntil((async () => {
+      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      const target = windows.find(client => new URL(client.url).origin === self.location.origin)
+      const result = { type: 'employee-notification-test-response', stage: payload.stage, response: action === 'here' || action === 'away' ? action : 'opened' }
+      if (target) {
+        target.postMessage(result)
+        await target.focus()
+      } else {
+        const query = new URLSearchParams({ notificationTest: String(payload.stage || 1), response: result.response })
+        await self.clients.openWindow(`/employee?${query.toString()}`)
+      }
+    })())
+    return
+  }
   if (action === 'here' || action === 'away') {
     event.waitUntil((async () => {
       const response = await fetch('/api/employee/presence-response', {
