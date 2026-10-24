@@ -43,6 +43,9 @@ export async function encryptPushPayload(subscription: SubscriptionRow, payload:
 }
 async function vapidAuthorization(endpoint: string, env: WorkerEnv) {
   const key = JSON.parse(env.VAPID_PRIVATE_JWK) as JsonWebKey
+  if (!key.x || !key.y) throw new Error('VAPID private key is missing its public coordinates')
+  const derivedPublicKey = b64u(concat(Uint8Array.of(4), fromB64u(key.x), fromB64u(key.y)))
+  if (derivedPublicKey !== env.VAPID_PUBLIC_KEY) throw new Error('VAPID public/private key pair mismatch')
   const imported = await crypto.subtle.importKey('jwk', key, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign'])
   const audience = new URL(endpoint).origin
   const header = b64u(enc.encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })))
@@ -55,7 +58,10 @@ async function sendPush(subscription: SubscriptionRow, payload: unknown, env: Wo
   const body = await encryptPushPayload(subscription, JSON.stringify(payload))
   const response = await fetch(subscription.endpoint, { method: 'POST', headers: { Authorization: await vapidAuthorization(subscription.endpoint, env), 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '120', Urgency: 'high' }, body })
   if (response.status === 404 || response.status === 410) await env.DB.prepare('DELETE FROM employee_push_subscriptions WHERE endpoint=?').bind(subscription.endpoint).run()
-  else if (!response.ok) throw new Error(`Push service returned ${response.status}`)
+  else if (!response.ok) {
+    const detail = (await response.text()).slice(0, 240).replace(/[\r\n\t]+/g, ' ')
+    throw new Error(`Push service returned ${response.status}${detail ? `: ${detail}` : ''}`)
+  }
 }
 async function accrued(employeeId: string, shiftId: string, env: WorkerEnv, now: number) {
   const employee = await env.DB.prepare('SELECT monthly_salary_piasters,max_daily_hours,max_monthly_hours,view_due,weekly_days_off FROM employees WHERE id=?').bind(employeeId).first<EmployeeRow>()

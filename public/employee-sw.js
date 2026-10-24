@@ -1,3 +1,6 @@
+self.addEventListener('install', event => event.waitUntil(self.skipWaiting()))
+self.addEventListener('activate', event => event.waitUntil(self.clients.claim()))
+
 self.addEventListener('push', event => {
   let data = {}
   try { data = event.data ? event.data.json() : {} } catch { data = { body: event.data?.text() || 'تأكيد الحضور مطلوب' } }
@@ -27,22 +30,28 @@ self.addEventListener('message', event => {
   const stage = Math.min(3, Math.max(1, Number(event.data.stage) || 1))
   const tag = `attendance-test-${stage}`
   event.waitUntil((async () => {
-    await self.registration.showNotification(`اختبار تأكيد الحضور · التنبيه ${stage}`, {
-      body: 'اختبار فقط — اختر «موجود · كمل» أو «انصراف». لن يتغير سجل الحضور أو المرتب.',
-      icon: '/employee-icon-192.png',
-      badge: '/employee-icon-192.png',
-      tag,
-      renotify: true,
-      requireInteraction: true,
-      actions: [
-        { action: 'here', title: 'موجود · كمل' },
-        { action: 'away', title: 'انصراف' },
-      ],
-      data: { test: true, stage, url: '/employee' },
-    })
-    await new Promise(resolve => setTimeout(resolve, 60000))
-    const notifications = await self.registration.getNotifications({ tag })
-    notifications.forEach(notification => notification.close())
+    const port = event.ports?.[0]
+    try {
+      await self.registration.showNotification(`اختبار تأكيد الحضور · التنبيه ${stage}`, {
+        body: 'اختبار فقط — اختر «موجود · كمل» أو «انصراف». لن يتغير سجل الحضور أو المرتب.',
+        icon: '/employee-icon-192.png',
+        badge: '/employee-icon-192.png',
+        tag,
+        renotify: true,
+        requireInteraction: true,
+        actions: [
+          { action: 'here', title: 'موجود · كمل' },
+          { action: 'away', title: 'انصراف' },
+        ],
+        data: { test: true, stage, url: '/employee' },
+      })
+      port?.postMessage({ success: true })
+      await new Promise(resolve => setTimeout(resolve, 60000))
+      const notifications = await self.registration.getNotifications({ tag })
+      notifications.forEach(notification => notification.close())
+    } catch (error) {
+      port?.postMessage({ success: false, error: String(error) })
+    }
   })())
 })
 
