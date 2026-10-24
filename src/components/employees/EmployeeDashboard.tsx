@@ -40,6 +40,7 @@ export default function EmployeeDashboard() {
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
   const [isInstalled, setIsInstalled] = useState(false)
   const [checkoutShift, setCheckoutShift] = useState<RecordRow | null>(null)
+  const [pendingCheckoutShiftId, setPendingCheckoutShiftId] = useState('')
   const [requestType, setRequestType] = useState('leave')
   const [reportLoading, setReportLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<'chat' | 'tracking' | 'attendance' | 'projects' | 'hub' | 'databases'>('attendance')
@@ -49,6 +50,13 @@ export default function EmployeeDashboard() {
   useEffect(() => {
     if (!employee || !('serviceWorker' in navigator)) return
     const onMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'employee-checkout-request' && typeof event.data.shift_id === 'string') {
+        setPendingCheckoutShiftId(event.data.shift_id)
+        setReportLoading(true)
+        setRevision(n => n + 1)
+        setNotice('اكتب إنجازات ورديتك لإتمام الانصراف.')
+        return
+      }
       if (event.data?.type !== 'employee-notification-test-response') return
       setPresencePrompt(null)
       const stage = Math.min(3, Math.max(1, Number(event.data.stage) || 1))
@@ -57,6 +65,14 @@ export default function EmployeeDashboard() {
     }
     navigator.serviceWorker.addEventListener('message', onMessage)
     const params = new URLSearchParams(window.location.search)
+    const checkoutRequest = params.get('checkoutRequest')
+    if (checkoutRequest && checkoutRequest.length <= 80) {
+      setPendingCheckoutShiftId(checkoutRequest)
+      setReportLoading(true)
+      setRevision(n => n + 1)
+      setNotice('اكتب إنجازات ورديتك لإتمام الانصراف.')
+      window.history.replaceState({}, '', window.location.pathname)
+    }
     const testStage = Number(params.get('notificationTest'))
     const testResponse = params.get('response')
     if (testStage >= 1 && testStage <= 3 && ['here', 'away', 'opened'].includes(testResponse || '')) {
@@ -66,6 +82,16 @@ export default function EmployeeDashboard() {
     }
     return () => navigator.serviceWorker.removeEventListener('message', onMessage)
   }, [employee])
+  useEffect(() => {
+    if (!employee || !pendingCheckoutShiftId || reportLoading) return
+    if (open?.id === pendingCheckoutShiftId) {
+      setCheckoutShift(open)
+      setPendingCheckoutShiftId('')
+    } else {
+      setNotice('لم نتمكن من العثور على وردية مفتوحة. حدّث الصفحة وتحقق من سجل الحضور.')
+      setPendingCheckoutShiftId('')
+    }
+  }, [employee, pendingCheckoutShiftId, open?.id, reportLoading])
   useEffect(() => {
     const installed = window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & {standalone?:boolean}).standalone)
     setIsInstalled(installed)
@@ -148,6 +174,15 @@ export default function EmployeeDashboard() {
       if ('serviceWorker' in navigator) navigator.serviceWorker.ready.then(registration => registration.getNotifications({ tag: `attendance-test-${stage}` }).then(notifications => notifications.forEach(notification => notification.close()))).catch(() => {})
       setPresencePrompt(null)
       setNotice(`تم تسجيل «${response === 'here' ? 'موجود · كمل' : 'انصراف'}» في اختبار التنبيه ${stage}. لم يتغير سجل الحضور أو المرتب.`)
+      return
+    }
+    if (response === 'away') {
+      const shift = open?.id === presencePrompt.shift_id ? open : null
+      if ('serviceWorker' in navigator) navigator.serviceWorker.ready.then(registration => registration.getNotifications({ tag: `attendance-${presencePrompt.shift_id}` }).then(notifications => notifications.forEach(notification => notification.close()))).catch(() => {})
+      setPresencePrompt(null)
+      if (shift) setCheckoutShift(shift)
+      else { setPendingCheckoutShiftId(presencePrompt.shift_id); setRevision(n => n + 1) }
+      setNotice('اكتب إنجازات ورديتك في النافذة لإتمام الانصراف.')
       return
     }
     setBusy(true)

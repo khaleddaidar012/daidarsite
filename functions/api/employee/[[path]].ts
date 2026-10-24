@@ -176,10 +176,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       if(!monitor)return json({error:'انتهت مهلة التأكيد أو لا يوجد إشعار حالي'},409)
       const prompt=await env.DB.prepare('SELECT next_check_at FROM employee_presence_checks WHERE shift_id=?').bind(monitor.shift_id).first<{next_check_at:number}>()
       if(!prompt || prompt.next_check_at<=now)return json({error:'انتهت مهلة التأكيد؛ انتظر التنبيه التالي'},409)
-      if(body.response==='away'){
-        await env.DB.batch([env.DB.prepare('UPDATE attendance_shifts SET check_out=? WHERE id=? AND employee_id=? AND check_out IS NULL').bind(now,monitor.shift_id,employee.id),env.DB.prepare("UPDATE employee_presence_checks SET state='closed',updated_at=? WHERE shift_id=?").bind(now,monitor.shift_id)])
-        return json({success:true,closed:true})
-      }
+      if(body.response==='away')return json({error:'اكتب إنجازات ورديتك لإتمام الانصراف.',requires_checkout_report:true,shift_id:monitor.shift_id},409)
       await env.DB.prepare("UPDATE employee_presence_checks SET state='waiting',prompt_stage=0,last_confirmed_at=?,next_check_at=?,prompt_sent_at=NULL,updated_at=? WHERE shift_id=? AND employee_id=?").bind(now,now+3600000,now,monitor.shift_id,employee.id).run()
       return json({success:true,closed:false,next_check_at:now+3600000})
     }

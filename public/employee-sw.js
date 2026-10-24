@@ -53,7 +53,7 @@ self.addEventListener('notificationclick', event => {
   if (payload.test === true) {
     event.waitUntil((async () => {
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-      const target = windows.find(client => new URL(client.url).origin === self.location.origin)
+      const target = windows.find(client => { const url = new URL(client.url); return url.origin === self.location.origin && url.pathname.startsWith('/employee') })
       const result = { type: 'employee-notification-test-response', stage: payload.stage, response: action === 'here' || action === 'away' ? action : 'opened' }
       if (target) {
         target.postMessage(result)
@@ -65,21 +65,50 @@ self.addEventListener('notificationclick', event => {
     })())
     return
   }
-  if (action === 'here' || action === 'away') {
+  if (action === 'away') {
+    event.waitUntil((async () => {
+      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      const target = windows.find(client => { const url = new URL(client.url); return url.origin === self.location.origin && url.pathname.startsWith('/employee') })
+      if (target) {
+        target.postMessage({ type: 'employee-checkout-request', shift_id: payload.shift_id })
+        await target.focus()
+      } else {
+        const query = new URLSearchParams({ checkoutRequest: String(payload.shift_id || '') })
+        await self.clients.openWindow(`/employee?${query.toString()}`)
+      }
+    })())
+    return
+  }
+  if (action === 'here') {
     event.waitUntil((async () => {
       const response = await fetch('/api/employee/presence-response', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shift_id: payload.shift_id, response: action }),
+        body: JSON.stringify({ shift_id: payload.shift_id, response: 'here' }),
       })
-      if (!response.ok) await self.registration.showNotification('تعذر حفظ الرد', { body: 'افتح صفحة دعيدر وسجّل ردك على تنبيه الحضور.', icon: '/logo.png', data: { url: '/employee' } })
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}))
+        if (result.requires_checkout_report && result.shift_id) {
+          const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+          const target = windows.find(client => { const url = new URL(client.url); return url.origin === self.location.origin && url.pathname.startsWith('/employee') })
+          if (target) {
+            target.postMessage({ type: 'employee-checkout-request', shift_id: result.shift_id })
+            await target.focus()
+          } else {
+            const query = new URLSearchParams({ checkoutRequest: String(result.shift_id) })
+            await self.clients.openWindow(`/employee?${query.toString()}`)
+          }
+        } else {
+          await self.registration.showNotification('تعذر حفظ الرد', { body: 'افتح صفحة دعيدر وسجّل ردك على تنبيه الحضور.', icon: '/employee-icon-192.png', data: { url: '/employee' } })
+        }
+      }
     })())
     return
   }
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-    const target = windows.find(client => new URL(client.url).origin === self.location.origin)
+    const target = windows.find(client => { const url = new URL(client.url); return url.origin === self.location.origin && url.pathname.startsWith('/employee') })
     if (target) await target.focus()
     else await self.clients.openWindow(payload.url || '/employee')
   })())
