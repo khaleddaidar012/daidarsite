@@ -35,6 +35,16 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
     }
     const employee = await employeeSession(request, env)
     if (!employee) return json({ error: 'سجل دخولك أولاً' }, 401)
+    if (path === 'presence-test' && request.method === 'POST') {
+      const shift = await env.DB.prepare('SELECT id FROM attendance_shifts WHERE employee_id=? AND check_out IS NULL').bind(employee.id).first<{id:string}>()
+      if (!shift) return json({ error: 'سجّل الحضور أولًا لبدء اختبار التنبيه.' }, 409)
+      const subscription = await env.DB.prepare('SELECT endpoint FROM employee_push_subscriptions WHERE employee_id=? LIMIT 1').bind(employee.id).first()
+      if (!subscription) return json({ error: 'فعّل إشعارات النظام على هذا الجهاز أولًا.' }, 409)
+      const nextCheckAt = now + 60000
+      const result = await env.DB.prepare("UPDATE employee_presence_checks SET state='waiting',prompt_stage=0,next_check_at=?,prompt_sent_at=NULL,updated_at=? WHERE shift_id=? AND employee_id=? AND state!='closed'").bind(nextCheckAt, now, shift.id, employee.id).run() as {meta?:{changes?:number};changes?:number}
+      if ((result.meta?.changes ?? result.changes ?? 0) < 1) return json({ error: 'تعذر تجهيز الاختبار. حدّث الصفحة وحاول مرة أخرى.' }, 409)
+      return json({ success: true, next_check_at: nextCheckAt })
+    }
     if(path==='chat')return await staffChat(request,env,{key:'employee:'+employee.id,name:employee.name,employeeId:employee.id})
     if (path === 'work-projects') { if (!employee.track_projects) return json({error:'حسابك لا يملك صلاحية تتبع المشاريع'},403); return await workProjects(request, env, false) }
     if (path === 'd1-usage' && request.method === 'GET') {

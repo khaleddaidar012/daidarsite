@@ -8,11 +8,11 @@
     {
       "binding": "DB",
       "database_name": "daidar-admin",
-      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+      "database_id": "4f962096-a4cb-4bc3-8da6-3efaf80f8c6f"
     }
   ],
   "vars": {
-    "VAPID_PUBLIC_KEY": "REPLACE_WITH_GENERATED_PUBLIC_KEY",
+    "VAPID_PUBLIC_KEY": "BPjf86DIUI-bdIO9uJ_gEyjYVLqsslzmt1qYWd0U8F_YnPivx-Ly62bdHMn7XNRMY6IiGhE5Aws0WI_KZSkPTFE",
     "VAPID_SUBJECT": "mailto:admin@daidarsoluations.com"
   }
 }
