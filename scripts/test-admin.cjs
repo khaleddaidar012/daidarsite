@@ -4,7 +4,7 @@ const ts = require('typescript')
 const { DatabaseSync } = require('node:sqlite')
 const { pbkdf2Sync, createECDH, createHmac, createDecipheriv, randomBytes } = require('node:crypto')
 function load(file, dependencies = {}) {
-  if (file === 'functions/api/admin/[[path]].ts') dependencies['../../lib/password-vault'] = load('functions/lib/password-vault.ts', { './store': dependencies['../../lib/store'] })
+  if (['functions/api/admin/[[path]].ts', 'functions/api/employee/[[path]].ts'].includes(file)) dependencies['../../lib/password-vault'] = load('functions/lib/password-vault.ts', { './store': dependencies['../../lib/store'] })
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
   const module = { exports: {} }
   new Function('require', 'module', 'exports', code)(name => dependencies[name] || require(name), module, module.exports)
@@ -134,6 +134,8 @@ async function test() {
   sqlite.exec(fs.readFileSync('migrations/0011_employee_multiple_shifts.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0013_checkout_accomplishments.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0015_employee_hour_limits.sql', 'utf8'))
+  sqlite.exec(fs.readFileSync('migrations/0017_password_vault.sql', 'utf8'))
+  sqlite.exec(fs.readFileSync('migrations/0018_password_vault_projects_permissions.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0016_employee_web_push.sql', 'utf8'))
   for (const path of ['employees', 'attendance', 'employee-requests']) assert.equal((await call(path)).status, 401)
   const employeePassword = 'employee-test-password'
@@ -184,6 +186,27 @@ async function test() {
   response = await employeeCall('login', 'POST', { email: employeeForm.email, password: employeePassword })
   assert.equal(response.status, 200)
   const employeeCookie = response.headers.get('set-cookie').split(';')[0]
+  env.PASSWORD_VAULT_KEY = 'ab'.repeat(32)
+  assert.equal((await employeeCall('password-vault', 'GET', undefined, employeeCookie)).status, 403)
+  const vaultEmployeeId = employeeList.find(item => item.email === employeeForm.email).id
+  const grantVault = async (add, view) => {
+    assert.equal((await call('employees', 'POST', { ...employeeForm, id: vaultEmployeeId, password: '', add_passwords: add, view_passwords: view }, cookie)).status, 200)
+    const saved = (await (await call('employees', 'GET', undefined, cookie)).json()).employees.find(item => item.id === vaultEmployeeId)
+    assert.equal(saved.add_passwords, add); assert.equal(saved.view_passwords, view)
+  }
+  await grantVault(1, 0)
+  assert.equal((await employeeCall('password-vault', 'POST', { project: 'صلاحيات تجريبية', username: 'tester', password: 'test secret', is_admin: false }, employeeCookie)).status, 200)
+  const vaultAccounts = await (await employeeCall('password-vault', 'GET', undefined, employeeCookie)).json()
+  assert.equal(vaultAccounts.permissions.reveal, false)
+  assert.ok(!JSON.stringify(vaultAccounts).includes('test secret'))
+  const vaultId = vaultAccounts.accounts[0].id
+  assert.equal((await employeeCall('password-vault', 'POST', { id: vaultId, action: 'reveal', reveal: true, admin: true }, employeeCookie)).status, 403)
+  assert.equal((await employeeCall('password-vault', 'PUT', { id: vaultId }, employeeCookie)).status, 403)
+  await grantVault(0, 1)
+  assert.equal((await (await employeeCall('password-vault', 'POST', { id: vaultId, action: 'reveal' }, employeeCookie)).json()).password, 'test secret')
+  await grantVault(0, 0)
+  assert.equal((await employeeCall('password-vault', 'POST', { id: vaultId, action: 'reveal' }, employeeCookie)).status, 403)
+  delete env.PASSWORD_VAULT_KEY
   const employeeIdentity = (await response.json()).employee
   assert.equal((await employeeCall('push-config','GET',undefined,employeeCookie)).status,200)
   const testPushSubscription={endpoint:'https://fcm.googleapis.com/subscription/test',keys:{p256dh:'A'.repeat(87),auth:'B'.repeat(22)}}

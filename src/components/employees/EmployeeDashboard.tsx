@@ -7,6 +7,7 @@ import ProjectTracker from '@/components/shared/ProjectTracker'
 import CheckoutDialog from './CheckoutDialog'
 import EmployeeProjectManager from './EmployeeProjectManager'
 import HubManualSubscriptionManager from '@/components/shared/HubManualSubscriptionManager'
+import PasswordVault from '@/components/admin/PasswordVault'
 import D1UsageDashboard from '@/components/admin/D1UsageDashboard'
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }> }
 function decodeVapidKey(value: string) {
@@ -43,7 +44,7 @@ export default function EmployeeDashboard() {
   const [pendingCheckoutShiftId, setPendingCheckoutShiftId] = useState('')
   const [requestType, setRequestType] = useState('leave')
   const [reportLoading, setReportLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'chat' | 'tracking' | 'attendance' | 'projects' | 'hub' | 'databases'>('attendance')
+  const [activeTab, setActiveTab] = useState<'chat' | 'tracking' | 'attendance' | 'projects' | 'hub' | 'databases' | 'passwords'>('attendance')
   function fail(e: Error & { status?: number }) { setError(e.message); if (e.status === 401) setEmployee(null) }
   useEffect(() => { callApi('employee', 'session').then(data => setEmployee(data.employee)).catch(e => { if (e.status !== 401) setError(e.message) }).finally(() => setLoading(false)) }, [])
   useEffect(() => { setShowInPagePrompts(localStorage.getItem('daidar_employee_in_page_prompts') !== 'off') }, [])
@@ -319,6 +320,7 @@ export default function EmployeeDashboard() {
     ...(employee?.track_projects === 1 ? [{ id: 'tracking' as const, label: 'تتبع المشاريع', description: 'الجدول الشهري وحالة التنفيذ', icon: CalendarDays }] : []),
     ...(employee?.manage_projects === 1 ? [{ id: 'projects' as const, label: 'إدارة المشاريع', description: 'معرض أعمال دعيدر', icon: FolderKanban }] : []),
     ...(employee?.manage_hub_subscriptions === 1 ? [{ id: 'hub' as const, label: 'اشتراكات هب', description: 'تسجيل دفعة أو تجديد', icon: CreditCard }] : []),
+    ...((employee?.add_passwords === 1 || employee?.view_passwords === 1) ? [{ id: 'passwords' as const, label: 'كلمات مرور', description: 'حسابات وروابط دخول المشاريع', icon: WalletCards }] : []),
     ...(employee?.view_d1_usage === 1 ? [{ id: 'databases' as const, label: 'سعة قواعد البيانات', description: 'المساحة المستخدمة والمتاحة', icon: Database }] : []),
   ]
   return <main dir="rtl" className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-8"><div className="max-w-5xl mx-auto"><header className="flex flex-wrap justify-between items-center gap-4 mb-8"><div><p className="text-sky-600 font-bold">دعيدر للحلول البرمجية</p><h1 className="text-3xl font-bold mt-2">{employee ? `أهلًا ${employee.name}` : 'دخول الموظفين'}</h1>{employee && <p className="text-slate-500 mt-2">{employee.job_title}</p>}</div><div className="flex flex-wrap gap-2">{employee && !isInstalled && <button type="button" className="rounded-xl border border-sky-300 bg-white px-4 py-2 font-bold text-sky-800" onClick={() => void installEmployeeApp()}>تنزيل تطبيق الموظفين</button>}{employee && isInstalled && <span className="self-center rounded-xl bg-sky-50 px-4 py-2 text-sm font-bold text-sky-800">تطبيق الموظفين مثبت</span>}{employee && <button className={action} disabled={busy} onClick={() => void logoutEmployee()}>تسجيل الخروج</button>}</div></header>{error && <p role="alert" className="bg-red-50 text-red-700 p-4 rounded-xl mb-5">{error}</p>}{notice && <p role="status" className="text-green-700 p-4 mb-5">{notice}</p>}
@@ -339,6 +341,7 @@ export default function EmployeeDashboard() {
     {activeTab === 'tracking' && employee.track_projects === 1 && <ProjectTracker scope="employee" />}
     {activeTab === 'projects' && employee.manage_projects === 1 && <EmployeeProjectManager />}
     {activeTab === 'hub' && employee.manage_hub_subscriptions === 1 && <HubManualSubscriptionManager scope="employee" />}
+    {activeTab === 'passwords' && (employee.add_passwords === 1 || employee.view_passwords === 1) && <PasswordVault scope="employee" />}
     {activeTab === 'databases' && employee.view_d1_usage === 1 && <D1UsageDashboard scope="employee" />}
     </>}
   </div></main>

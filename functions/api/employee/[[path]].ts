@@ -1,3 +1,4 @@
+import { passwordVault } from '../../lib/password-vault'
 import { staffChat } from '../../lib/staff-chat'
 import { workProjects } from '../../lib/work-projects'
 import { hash, json, sameOrigin, verifyPassword, type Env } from '../../lib/store'
@@ -46,6 +47,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       return json({ success: true, next_check_at: nextCheckAt })
     }
     if(path==='chat')return await staffChat(request,env,{key:'employee:'+employee.id,name:employee.name,employeeId:employee.id})
+    if (path === 'password-vault') return await passwordVault(request, env, { admin: false, add: employee.add_passwords === 1, reveal: employee.view_passwords === 1 })
     if (path === 'work-projects') { if (!employee.track_projects) return json({error:'حسابك لا يملك صلاحية تتبع المشاريع'},403); return await workProjects(request, env, false) }
     if (path === 'd1-usage' && request.method === 'GET') {
       if (!employee.view_d1_usage) return json({ error: 'حسابك لا يملك صلاحية عرض سعة قواعد البيانات.' }, 403)
