@@ -9,9 +9,12 @@ import { LayoutDashboard, FolderKanban, Users, Mail, ArrowUpLeft, LogOut, Extern
 import './admin.css'
 import HubAdminManager from './HubAdminManager'
 import D1UsageDashboard from './D1UsageDashboard'
+import PasswordVault from './PasswordVault'
+import { KeyRound } from 'lucide-react'
 import AdminNotifications from './AdminNotifications'
 
 const sections = [
+  { id: 'passwords', label: 'كلمات مرور', icon: KeyRound, detail: 'حسابات المشاريع وكلمات المرور' },
   { id: 'chat', label: 'شات الموظفين', icon: MessageCircle, detail: 'المحادثات الخاصة ومجموعات الفريق' },
   { id: 'tracking', label: 'تتبع المشاريع', icon: FolderKanban, detail: 'الجدول الشهري ومتابعة العملاء' },
   { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard, detail: 'متابعة أداء الموقع' },
@@ -134,6 +137,7 @@ export default function AdminDashboard() {
         </div>
         <div hidden={activeSection !== 'hub'}><HubAdminManager /></div>
         {activeSection === 'chat' && <StaffChat/>}
+        {activeSection === 'passwords' && <PasswordVault />}
         <div hidden={activeSection !== 'tracking'}><ProjectTracker /></div><div hidden={activeSection !== 'databases'}><D1UsageDashboard /></div>
         <footer className="admin-footer"><span>دعيدر للحلول البرمجية</span><span>لوحة الإدارة · كل التفاصيل في مكان واحد</span></footer>
       </>}

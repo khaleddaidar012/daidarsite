@@ -6,6 +6,7 @@ export interface Statement {
 }
 export interface Database { prepare(sql: string): Statement; batch(statements: Statement[]): Promise<unknown> }
 export interface Env {
+  PASSWORD_VAULT_KEY?: string
   DB?: Database
   ADMIN_EMAIL?: string
   ADMIN_PASSWORD_HASH?: string

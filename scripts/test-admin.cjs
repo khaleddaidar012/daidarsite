@@ -4,6 +4,7 @@ const ts = require('typescript')
 const { DatabaseSync } = require('node:sqlite')
 const { pbkdf2Sync, createECDH, createHmac, createDecipheriv, randomBytes } = require('node:crypto')
 function load(file, dependencies = {}) {
+  if (file === 'functions/api/admin/[[path]].ts') dependencies['../../lib/password-vault'] = load('functions/lib/password-vault.ts', { './store': dependencies['../../lib/store'] })
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
   const module = { exports: {} }
   new Function('require', 'module', 'exports', code)(name => dependencies[name] || require(name), module, module.exports)
