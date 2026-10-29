@@ -9,7 +9,6 @@ const icons = { overview: LayoutDashboard, projects: FolderKanban, employees: Us
 export default function AdminNotifications({ onNavigate }: { onNavigate: (section: Target) => void }) {
   const [items, setItems] = useState<Item[]>([])
   const [unread, setUnread] = useState(0)
-  const [badgeDismissed, setBadgeDismissed] = useState(false)
   const [desktopPermission, setDesktopPermission] = useState<NotificationPermission | 'unsupported'>('default')
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
@@ -27,7 +26,6 @@ export default function AdminNotifications({ onNavigate }: { onNavigate: (sectio
         const fresh = next.filter(item => !known.current!.has(item.id)).slice(0, 3)
         if (fresh.length) {
           setToasts(current => [...fresh.reverse(), ...current].slice(0, 4))
-          setBadgeDismissed(false)
           if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
             for (const item of fresh) new Notification(item.title, { body: item.detail, icon: '/icon.png', tag: item.id })
           }
@@ -67,7 +65,7 @@ export default function AdminNotifications({ onNavigate }: { onNavigate: (sectio
   }
   async function markAllRead(){
     setBusy(true)
-    try{await markRequest({all:true});setItems(current=>current.map(item=>({...item,read_at:item.read_at||Date.now()})));setUnread(0);setBadgeDismissed(false);setError('')}
+    try{await markRequest({all:true});setItems(current=>current.map(item=>({...item,read_at:item.read_at||Date.now()})));setUnread(0);setError('')}
     catch(cause){setError(cause instanceof Error?cause.message:'تعذر تحديث الإشعارات')}
     finally{setBusy(false)}
   }
@@ -79,8 +77,8 @@ export default function AdminNotifications({ onNavigate }: { onNavigate: (sectio
 
   return <>
     <div className="admin-notifications relative">
-      <button type="button" className="admin-notification-bell" aria-label={`الإشعارات${unread ? `، ${unread} غير مقروء` : ''}`} aria-expanded={open} onClick={() => setOpen(value => { const next = !value; if (next) setBadgeDismissed(true); return next })}>
-        {unread ? <BellRing size={18} /> : <Bell size={18} />}{unread > 0 && !badgeDismissed && <span className="admin-notification-badge">{unread > 99 ? '٩٩+' : unread.toLocaleString('ar-EG')}</span>}
+      <button type="button" className="admin-notification-bell" aria-label={`الإشعارات${unread ? `، ${unread} غير مقروء` : ''}`} aria-expanded={open} onClick={() => { setOpen(!open); if (!open) void markAllRead() }}>
+        {unread ? <BellRing size={18} /> : <Bell size={18} />}{unread > 0 && <span className="admin-notification-badge">{unread > 99 ? '٩٩+' : unread.toLocaleString('ar-EG')}</span>}
       </button>
       {open && <>
         <button aria-label="إغلاق قائمة الإشعارات" className="admin-notification-backdrop" onClick={() => setOpen(false)} />
