@@ -1,6 +1,7 @@
+import { VAPID_PUBLIC_KEY } from '../../functions/lib/vapid'
 type Statement = { bind(...values: unknown[]): Statement; run(): Promise<unknown>; first<T>(): Promise<T | null>; all<T>(): Promise<{ results: T[] }> }
 type D1 = { prepare(sql: string): Statement; batch(items: Statement[]): Promise<unknown> }
-type WorkerEnv = { DB: D1; VAPID_PUBLIC_KEY: string; VAPID_PRIVATE_JWK: string; VAPID_SUBJECT: string }
+type WorkerEnv = { DB: D1; VAPID_PRIVATE_JWK: string; VAPID_SUBJECT: string }
 type CheckRow = { shift_id: string; employee_id: string; state: 'waiting' | 'prompted' | 'retry_wait'; prompt_stage: number; last_confirmed_at: number; prompt_sent_at: number | null; next_check_at: number; name: string }
 type SubscriptionRow = { endpoint: string; p256dh: string; auth: string }
 type EmployeeRow = { monthly_salary_piasters: number; max_daily_hours: number; max_monthly_hours: number; view_due: number; weekly_days_off: string }
@@ -45,21 +46,27 @@ async function vapidAuthorization(endpoint: string, env: WorkerEnv) {
   const key = JSON.parse(env.VAPID_PRIVATE_JWK) as JsonWebKey
   if (!key.x || !key.y) throw new Error('VAPID private key is missing its public coordinates')
   const derivedPublicKey = b64u(concat(Uint8Array.of(4), fromB64u(key.x), fromB64u(key.y)))
-  if (derivedPublicKey !== env.VAPID_PUBLIC_KEY) throw new Error('VAPID public/private key pair mismatch')
+  if (derivedPublicKey !== VAPID_PUBLIC_KEY) throw new Error('VAPID public/private key pair mismatch')
   const imported = await crypto.subtle.importKey('jwk', key, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign'])
   const audience = new URL(endpoint).origin
   const header = b64u(enc.encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })))
   const claims = b64u(enc.encode(JSON.stringify({ aud: audience, exp: Math.floor(Date.now() / 1000) + 12 * 60 * 60, sub: env.VAPID_SUBJECT })))
   const unsigned = `${header}.${claims}`
   const signature = new Uint8Array(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, imported, enc.encode(unsigned)))
-  return `vapid t=${unsigned}.${b64u(signature)}, k=${env.VAPID_PUBLIC_KEY}`
+  return `vapid t=${unsigned}.${b64u(signature)}, k=${VAPID_PUBLIC_KEY}`
 }
 async function sendPush(subscription: SubscriptionRow, payload: unknown, env: WorkerEnv) {
   const body = await encryptPushPayload(subscription, JSON.stringify(payload))
   const response = await fetch(subscription.endpoint, { method: 'POST', headers: { Authorization: await vapidAuthorization(subscription.endpoint, env), 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '120', Urgency: 'high' }, body })
-  if (response.status === 404 || response.status === 410) await env.DB.prepare('DELETE FROM employee_push_subscriptions WHERE endpoint=?').bind(subscription.endpoint).run()
+  if (response.status === 404 || response.status === 410) {
+    await env.DB.prepare('DELETE FROM employee_push_subscriptions WHERE endpoint=?').bind(subscription.endpoint).run()
+    throw new Error(`Push subscription expired: ${response.status}`)
+  }
   else if (!response.ok) {
     const detail = (await response.text()).slice(0, 240).replace(/[\r\n\t]+/g, ' ')
+    if (response.status === 403 && detail.includes('credentials in the authorization header do not correspond')) {
+      await env.DB.prepare('DELETE FROM employee_push_subscriptions WHERE endpoint=?').bind(subscription.endpoint).run()
+    }
     throw new Error(`Push service returned ${response.status}${detail ? `: ${detail}` : ''}`)
   }
 }
@@ -88,10 +95,11 @@ async function accrued(employeeId: string, shiftId: string, env: WorkerEnv, now:
 }
 async function notify(check: CheckRow, stage: number, env: WorkerEnv, now: number) {
   const subscriptions = await env.DB.prepare('SELECT endpoint,p256dh,auth FROM employee_push_subscriptions WHERE employee_id=?').bind(check.employee_id).all<SubscriptionRow>()
-  if (!subscriptions.results.length) return
+  if (!subscriptions.results.length) return false
   const summary = await accrued(check.employee_id, check.shift_id, env, now)
   const body = `${check.name}، لسه موجود؟ ساعات الشهر ${summary.hours} / ${summary.max}${summary.due === null ? '' : ` · المستحق ${summary.due.toLocaleString('ar-EG')} جنيه`}`
-  await Promise.all(subscriptions.results.map(subscription => sendPush(subscription, { title: `تأكيد الحضور · التنبيه ${stage}`, body, shift_id: check.shift_id, stage }, env).catch(error => console.error('Push delivery failed', error))))
+  const delivered = await Promise.all(subscriptions.results.map(subscription => sendPush(subscription, { title: `تأكيد الحضور · التنبيه ${stage}`, body, shift_id: check.shift_id, stage }, env).then(() => true).catch(error => { console.error('Push delivery failed', error); return false })))
+  return delivered.some(Boolean)
 }
 async function processChecks(env: WorkerEnv) {
   const now = Date.now()
@@ -100,15 +108,19 @@ async function processChecks(env: WorkerEnv) {
     if (check.state === 'waiting') {
       const deadline = now + 60000
       const result = await env.DB.prepare("UPDATE employee_presence_checks SET state='prompted',prompt_stage=1,prompt_sent_at=?,next_check_at=?,updated_at=? WHERE shift_id=? AND state='waiting' AND next_check_at<=?").bind(now, deadline, now, check.shift_id, now).run() as { meta?: { changes?: number } }
-      if ((result.meta?.changes || 0) > 0) await notify(check, 1, env, now)
+      if ((result.meta?.changes || 0) > 0) await deliverPrompt(check, 1, env, now, deadline)
     } else if (check.state === 'retry_wait') {
       const stage = check.prompt_stage + 1, deadline = now + 60000
       const result = await env.DB.prepare("UPDATE employee_presence_checks SET state='prompted',prompt_stage=?,next_check_at=?,updated_at=? WHERE shift_id=? AND state='retry_wait' AND next_check_at<=?").bind(stage, deadline, now, check.shift_id, now).run() as { meta?: { changes?: number } }
-      if ((result.meta?.changes || 0) > 0) await notify(check, stage, env, now)
+      if ((result.meta?.changes || 0) > 0) await deliverPrompt(check, stage, env, now, deadline)
+    } else if (check.prompt_stage === 0) {
+      // No push service accepted this prompt. Allow an in-page response, but
+      // never count a delivery failure as employee absence.
+      await env.DB.prepare("UPDATE employee_presence_checks SET state='waiting',prompt_sent_at=NULL,next_check_at=?,updated_at=? WHERE shift_id=? AND state='prompted' AND prompt_stage=0 AND next_check_at=?").bind(now + 60000, now, check.shift_id, check.next_check_at).run()
     } else if (check.prompt_stage >= 3) {
       const firstUnconfirmedAlertAt = check.prompt_sent_at || check.last_confirmed_at
       await env.DB.batch([
-        env.DB.prepare('UPDATE attendance_shifts SET check_out=? WHERE id=? AND check_out IS NULL').bind(firstUnconfirmedAlertAt, check.shift_id),
+        env.DB.prepare("UPDATE attendance_shifts SET check_out=? WHERE id=? AND check_out IS NULL AND EXISTS (SELECT 1 FROM employee_presence_checks WHERE shift_id=? AND state='prompted' AND prompt_stage>=3 AND next_check_at=?)").bind(firstUnconfirmedAlertAt, check.shift_id, check.shift_id, check.next_check_at),
         env.DB.prepare("UPDATE employee_presence_checks SET state='closed',updated_at=? WHERE shift_id=? AND state='prompted' AND next_check_at<=?").bind(now, check.shift_id, now),
       ])
     } else {
@@ -116,6 +128,13 @@ async function processChecks(env: WorkerEnv) {
       const firstAlertAt = check.prompt_sent_at || now
       await env.DB.prepare("UPDATE employee_presence_checks SET state='retry_wait',next_check_at=?,updated_at=? WHERE shift_id=? AND state='prompted' AND next_check_at<=?").bind(firstAlertAt + delayFromFirstAlert * 60000, now, check.shift_id, now).run()
     }
+  }
+}
+async function deliverPrompt(check: CheckRow, stage: number, env: WorkerEnv, now: number, deadline: number) {
+  let delivered = false
+  try { delivered = await notify(check, stage, env, now) } catch (error) { console.error('Attendance notification failed', error) }
+  if (!delivered) {
+    await env.DB.prepare("UPDATE employee_presence_checks SET prompt_stage=0,prompt_sent_at=?,updated_at=? WHERE shift_id=? AND state='prompted' AND prompt_stage=? AND next_check_at=?").bind(now, now, check.shift_id, stage, deadline).run()
   }
 }
 export default {

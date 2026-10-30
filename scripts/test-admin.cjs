@@ -23,6 +23,7 @@ const DB = {
 const store = load('functions/lib/store.ts')
 const d1Usage = load('functions/lib/d1-usage.ts', { './store': store })
 const notifications = load('functions/lib/notifications.ts', { './store': store })
+const vapid = load('functions/lib/vapid.ts')
 const employeeLib = load('functions/lib/employees.ts', { './store': store })
 const originalProjects = load('src/data/projects.ts')
 const projectLib = load('functions/lib/projects.ts', { './store': store, '../../src/data/projects': originalProjects })
@@ -35,7 +36,7 @@ const serviceConfig = load('src/lib/system-management.ts')
 const serviceSubsLib = load('functions/lib/service-subscriptions.ts', {'./store':store,'./employees':employeeLib,'../../src/lib/system-management':serviceConfig})
 const chatLib=load('functions/lib/staff-chat.ts',{'./store':store})
 const admin = load('functions/api/admin/[[path]].ts', { '../../lib/staff-chat':chatLib, '../../lib/service-subscriptions':serviceSubsLib, '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
-const employeeApi = load('functions/api/employee/[[path]].ts', { '../../lib/staff-chat':chatLib, '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
+const employeeApi = load('functions/api/employee/[[path]].ts', { '../../lib/staff-chat':chatLib, '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications, '../../lib/vapid': vapid }).onRequest
 const visit = load('functions/api/visit.ts', { '../lib/store': store }).onRequestPost
 const publicProjects = load('functions/api/projects.ts', { '../lib/store': store }).onRequestGet
 const contact = load('functions/api/contact.ts', { '../lib/store': store, '../lib/notifications': notifications }).onRequestPost
@@ -47,7 +48,7 @@ function request(path, method = 'GET', body, cookie, origin = 'https://test.exam
 }
 async function call(path, method, body, cookie, origin) { return admin({ request: request(path, method, body, cookie, origin), env }) }
 async function test() {
-  const pushLib = load('workers/attendance-push/worker.ts')
+  const pushLib = load('workers/attendance-push/worker.ts', { '../../functions/lib/vapid': vapid })
   const receiver = createECDH('prime256v1'); receiver.generateKeys()
   const pushSub = { endpoint: 'https://push.example/test', p256dh: receiver.getPublicKey().toString('base64url'), auth: randomBytes(16).toString('base64url') }
   const pushPlaintext = JSON.stringify({ title: 'تأكيد الحضور', stage: 2 })
@@ -208,7 +209,9 @@ async function test() {
   assert.equal((await employeeCall('password-vault', 'POST', { id: vaultId, action: 'reveal' }, employeeCookie)).status, 403)
   delete env.PASSWORD_VAULT_KEY
   const employeeIdentity = (await response.json()).employee
-  assert.equal((await employeeCall('push-config','GET',undefined,employeeCookie)).status,200)
+  const pushConfig = await employeeCall('push-config','GET',undefined,employeeCookie)
+  assert.equal(pushConfig.status,200)
+  assert.equal((await pushConfig.json()).publicKey,vapid.VAPID_PUBLIC_KEY)
   const testPushSubscription={endpoint:'https://fcm.googleapis.com/subscription/test',keys:{p256dh:'A'.repeat(87),auth:'B'.repeat(22)}}
   assert.equal((await employeeCall('push-subscription','POST',testPushSubscription,employeeCookie)).status,200)
   assert.equal((await employeeCall('push-subscription','POST',{...testPushSubscription,endpoint:'https://example.org/ssrf'},employeeCookie)).status,422)
@@ -404,7 +407,22 @@ async function test() {
   assert.equal(accelerated.prompt_stage,0)
   assert.ok(accelerated.next_check_at>=Date.now()+59000&&accelerated.next_check_at<=Date.now()+60000)
   await employeeCall('push-subscription','DELETE',{endpoint:testPushSubscription.endpoint},employeeCookie)
-  sqlite.prepare('UPDATE employee_presence_checks SET next_check_at=? WHERE shift_id=?').run(Date.now()-1,attendance[0].id)
+  // Missing push delivery must keep the shift open and offer an in-page prompt.
+  const workerDB = { ...DB, prepare(sql) { const statement = DB.prepare(sql); const run = statement.run; statement.run = async () => { const result = await run(); return { meta: { changes: Number(result.changes) } } }; return statement } }
+  async function runPresenceWorker() { let work; await pushLib.default.scheduled({cron:'* * * * *'}, {...env, DB:workerDB}, {waitUntil(promise) {work=promise}}); await work }
+  for (let attempt=0; attempt<4; attempt++) {
+    sqlite.prepare('UPDATE employee_presence_checks SET next_check_at=? WHERE shift_id=?').run(Date.now()-1,attendance[0].id)
+    await runPresenceWorker()
+    const monitor=sqlite.prepare('SELECT state,prompt_stage FROM employee_presence_checks WHERE shift_id=?').get(attendance[0].id)
+    assert.equal(monitor.state,'prompted'); assert.equal(monitor.prompt_stage,0)
+    const fallback=await (await employeeCall('presence-check','GET',undefined,employeeCookie)).json()
+    assert.equal(fallback.prompt.stage,1)
+    sqlite.prepare('UPDATE employee_presence_checks SET next_check_at=? WHERE shift_id=?').run(Date.now()-1,attendance[0].id)
+    await runPresenceWorker()
+    assert.equal(sqlite.prepare('SELECT check_out FROM attendance_shifts WHERE id=?').get(attendance[0].id).check_out,null)
+    assert.equal(sqlite.prepare('SELECT state FROM employee_presence_checks WHERE shift_id=?').get(attendance[0].id).state,'waiting')
+  }
+  sqlite.prepare("UPDATE employee_presence_checks SET state='prompted',prompt_stage=1,prompt_sent_at=?,next_check_at=? WHERE shift_id=?").run(Date.now(),Date.now()+60000,attendance[0].id)
   const presencePrompt=await (await employeeCall('presence-check','GET',undefined,employeeCookie)).json()
   assert.equal(presencePrompt.prompt.stage,1)
   assert.equal((await employeeCall('presence-response','POST',{shift_id:attendance[0].id,response:'here'},employeeCookie)).status,200)

@@ -7,6 +7,7 @@ import { manageProjects } from '../../lib/projects'
 import { adminHub } from '../../lib/hub-admin'
 import { d1UsageResponse } from '../../lib/d1-usage'
 import { recordAdminNotification } from '../../lib/notifications'
+import { VAPID_PUBLIC_KEY } from '../../lib/vapid'
 export async function onRequest({ request, env }: { request: Request; env: Env }) {
   try {
     if (!env.DB) return json({ error: 'الخدمة غير جاهزة' }, 503)
@@ -99,7 +100,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       return json({ success: true })
     }
     if (path === 'session' && request.method === 'GET') return json({ employee: safeEmployee(employee) })
-    if (path === 'push-config' && request.method === 'GET') return env.VAPID_PUBLIC_KEY ? json({ publicKey: env.VAPID_PUBLIC_KEY }) : json({ error: 'إشعارات الخلفية لم تُضبط بعد.' }, 503)
+    if (path === 'push-config' && request.method === 'GET') return json({ publicKey: VAPID_PUBLIC_KEY })
     if (path === 'push-subscription' && request.method === 'POST') {
       const raw = await request.text(); if (raw.length > 4096) return json({ error: 'بيانات الإشعار كبيرة جدًا' }, 413)
       const body = JSON.parse(raw) as { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } }
@@ -168,7 +169,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
         return json({ prompt: null, closed: !openShift })
       }
       if (monitor.state !== 'prompted' || monitor.next_check_at <= now) return json({ prompt: null })
-      return json({ prompt: { shift_id: monitor.shift_id, stage: monitor.prompt_stage, deadline: monitor.next_check_at } })
+      return json({ prompt: { shift_id: monitor.shift_id, stage: monitor.prompt_stage || 1, delivery_failed: monitor.prompt_stage === 0, deadline: monitor.next_check_at } })
     }
     if (path === 'presence-response' && request.method === 'POST') {
       const raw=await request.text(); if(raw.length>1024)return json({error:'طلب كبير جدًا'},413)
