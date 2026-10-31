@@ -4,6 +4,8 @@ const ts = require('typescript')
 const { DatabaseSync } = require('node:sqlite')
 
 function load(file, dependencies = {}) {
+  if (file === 'functions/api/admin/[[path]].ts') dependencies['../../lib/password-vault'] = load('functions/lib/password-vault.ts', { './store': dependencies['../../lib/store'] })
+  if (file === 'functions/api/hub/[[path]].ts') dependencies['../../../src/lib/hub-basic'] = load('src/lib/hub-basic.ts')
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
   const module = { exports: {} }
   new Function('require', 'module', 'exports', code)(name => dependencies[name] || require(name), module, module.exports)
@@ -72,6 +74,26 @@ async function test() {
   const demoOrder=(await demo.json()).order
   assert.equal(demoOrder.snapshot.total,35000)
   assert.equal(demoOrder.snapshot.paymentMode,'demo')
+  const basicBody={orderId:crypto.randomUUID(),activityId:'supermarket',selected:true,total:1,period:'yearly',addons:['weight']}
+  assert.equal((await hubCall('orders/basic','POST',{...basicBody,selected:false},userA)).status,422)
+  assert.equal((await hubCall('orders/basic','POST',{...basicBody,activityId:'fake'},userA)).status,422)
+  const basicResponse=await hubCall('orders/basic','POST',basicBody,userA)
+  assert.equal(basicResponse.status,201)
+  const basicOrder=(await basicResponse.json()).order
+  assert.equal(basicOrder.snapshot.total,35000);assert.equal(basicOrder.snapshot.period,'monthly');assert.equal(basicOrder.snapshot.addons.length,0)
+  assert.equal(basicOrder.snapshot.paymentMode,'manual')
+  assert.equal((await (await hubCall('orders/basic','POST',basicBody,userA)).json()).order.id,basicOrder.id)
+  assert.equal((await hubCall('orders/basic','POST',basicBody,userB)).status,409)
+  const proofPath='orders/'+basicOrder.id+'/proof-intent'
+  for(const sourcePhone of ['','0101234567','010123456789','abcdefghijk','02012345678']) assert.equal((await hubCall(proofPath,'POST',{sourcePhone},userA)).status,422)
+  assert.equal((await hubCall(proofPath,'POST',{sourcePhone:'01012345678'},userB)).status,404)
+  assert.equal((await hubCall(proofPath,'POST',{sourcePhone:'٠١٠١٢٣٤٥٦٧٨'},userA)).status,200)
+  const basicSaved=sqlite.prepare('SELECT snapshot,status FROM hub_orders WHERE id=?').get(basicOrder.id)
+  assert.equal(basicSaved.status,'under_review');assert.equal(JSON.parse(basicSaved.snapshot).transferSourcePhone,'01012345678')
+  assert.equal((await hubCall(proofPath,'POST',{sourcePhone:'01012345678'},userA)).status,200)
+  assert.equal((await hubCall(proofPath,'POST',{sourcePhone:'01112345678'},userA)).status,409)
+  assert.equal((await adminCall('hub-orders','POST',{id:basicOrder.id,action:'approve'},adminCookie)).status,409)
+
   const draftAddon=await hubCall('orders','POST',{productId:'daidar-flow',activityId:'supermarket',period:'monthly',devices:1,addons:['weight']},userA)
   assert.equal(draftAddon.status,409)
   const addonConfig=(await (await adminCall('hub-catalog','GET',undefined,adminCookie)).json()).catalog
@@ -133,7 +155,7 @@ async function test() {
   const license=(await activation.json()).license
   const activationDate=new Date(license.payload.activatedAt),expiryDate=new Date(license.payload.expiresAt)
   assert.equal(expiryDate.getUTCMonth(),(activationDate.getUTCMonth()+1)%12)
-  assert.equal(expiryDate.getUTCDate(),activationDate.getUTCDate())
+  assert.equal(expiryDate.getUTCDate(),Math.min(activationDate.getUTCDate(),new Date(Date.UTC(expiryDate.getUTCFullYear(),expiryDate.getUTCMonth()+1,0)).getUTCDate()))
   const pub=await crypto.subtle.importKey('jwk',license.publicKey,{name:'Ed25519'},false,['verify'])
   const verifyBytes=new TextEncoder().encode(canonical(license.payload))
   const signature=Uint8Array.from(atob(license.signature),c=>c.charCodeAt(0))

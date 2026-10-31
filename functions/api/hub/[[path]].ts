@@ -1,3 +1,4 @@
+import { BASIC_ACTIVITIES, BASIC_MONTHLY_PRICE, normalizeTransferPhone, validTransferPhone } from '../../../src/lib/hub-basic'
 import { hash, json, sameOrigin, type Env } from '../../lib/store'
 
 const encoder = new TextEncoder()
@@ -189,6 +190,18 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       const releases = subs.results.length ? (await env.DB.prepare('SELECT id,version,filename,created_at FROM hub_releases WHERE published=1 ORDER BY created_at DESC').all()).results : []
       return json({ serverNow: now, orders: rows.results.map(r => ({ ...r, proof_available_at: Number(r.created_at) + 120000, snapshot: JSON.parse(String(r.snapshot)) })), subscriptions: subs.results.map(r => ({ ...r, snapshot: JSON.parse(String(r.snapshot)), ...(typeof r.expires_at === 'number' && r.expires_at <= now && r.status === 'active' ? { status: 'expired' } : {}) })), releases })
     }
+    if (path === 'orders/basic' && request.method === 'POST') {
+      const body = await readBody(request)
+      const activity = BASIC_ACTIVITIES.find(item => item.id === body.activityId)
+      const id = str(body.orderId, 64)
+      if (!activity || !/^[a-f0-9-]{36}$/i.test(id) || body.selected !== true) return json({ error: 'اختر النشاط والنظام الأساسي أولًا.' }, 422)
+      const snapshot = { plan: 'basic', productId: 'daidar-flow', product: 'دعيدر فلو — النظام الأساسي', activityId: activity.id, activity: activity.ar, addons: [], devices: 1, period: 'monthly', basePrice: BASIC_MONTHLY_PRICE, total: BASIC_MONTHLY_PRICE, currency: 'EGP', paymentMode: 'manual', note: 'طلب اشتراك بمراجعة التحويل يدويًا واستكمال التجهيز والتفعيل مع الإدارة.' }
+      const number = 'DH-' + new Date(now).toISOString().slice(2,10).replaceAll('-', '') + '-' + crypto.randomUUID().slice(0,6).toUpperCase()
+      await env.DB.prepare('INSERT OR IGNORE INTO hub_orders(id,order_number,user_id,snapshot,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)').bind(id, number, user.id, JSON.stringify(snapshot), 'awaiting_transfer', now, now).run()
+      const saved = await env.DB.prepare('SELECT id,order_number,snapshot,status,created_at FROM hub_orders WHERE id=? AND user_id=?').bind(id, user.id).first<{id:string;order_number:string;snapshot:string;status:string;created_at:number}>()
+      if (!saved || JSON.parse(saved.snapshot).plan !== 'basic' || JSON.parse(saved.snapshot).activityId !== activity.id) return json({ error: 'تعذر حفظ الطلب؛ حدّث الصفحة وحاول مجددًا.' }, 409)
+      return json({ order: { id:saved.id, orderNumber:saved.order_number, snapshot:JSON.parse(saved.snapshot), status:saved.status, createdAt:saved.created_at, proofAvailableAt:saved.created_at } }, 201)
+    }
     if (path === 'orders' && request.method === 'POST') {
       const body = await readBody(request)
       const config = await catalog(env)
@@ -217,6 +230,17 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       const id = path.split('/')[1]
       const row = await env.DB.prepare('SELECT created_at,status,snapshot FROM hub_orders WHERE id=? AND user_id=?').bind(id, user.id).first<{ created_at: number; status: string; snapshot: string }>()
       if (!row) return json({ error: 'الطلب غير موجود.' }, 404)
+      const snapshot = JSON.parse(row.snapshot)
+      if (snapshot.plan === 'basic' && snapshot.paymentMode === 'manual') {
+        const body = await readBody(request)
+        const phone = normalizeTransferPhone(str(body.sourcePhone, 30))
+        if (!validTransferPhone(phone)) return json({ error: 'أدخل رقم المحمول المحوّل منه كاملًا: ١١ رقمًا يبدأ بـ01.' }, 422)
+        if (row.status === 'under_review' && snapshot.transferSourcePhone === phone) return json({ success:true, sourcePhone:phone })
+        if (!['awaiting_transfer','needs_info'].includes(row.status)) return json({ error:'حالة الطلب لا تسمح بهذا الإجراء.' },409)
+        snapshot.transferSourcePhone = phone
+        await env.DB.prepare("UPDATE hub_orders SET snapshot=?,status='under_review',proof_requested_at=?,updated_at=? WHERE id=? AND user_id=? AND status IN ('awaiting_transfer','needs_info')").bind(JSON.stringify(snapshot),now,now,id,user.id).run()
+        return json({ success:true, sourcePhone:phone, message:'تم تسجيل بيانات التحويل للمراجعة اليدوية، ولم يتم تأكيد الدفع.' })
+      }
       if (row.status !== 'awaiting_transfer') return json({ error: 'حالة الطلب لا تسمح بهذا الإجراء.' }, 409)
       if (now < row.created_at + 120000) return json({ error: 'انتظر انتهاء العداد المحفوظ في الطلب.' }, 425)
       await env.DB.prepare("UPDATE hub_orders SET status='under_review',proof_requested_at=?,updated_at=? WHERE id=? AND user_id=? AND status='awaiting_transfer'").bind(now, now, id, user.id).run()
