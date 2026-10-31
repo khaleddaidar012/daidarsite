@@ -1,0 +1,28 @@
+{
+  "name": "daidar-flow-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Daidar Flow — offline-first Windows desktop shell",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "tsc --noEmit && node scripts/build.mjs",
+    "start": "npm run build && electron .",
+    "test": "npm run build && node --test tests/policy.test.cjs && node tests/startup.cjs && node tests/branding.cjs && node tests/responsive.cjs && node tests/dashboard.cjs"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "lucide-react": "0.460.0",
+    "@fontsource/cairo": "5.3.0"
+  },
+  "devDependencies": {
+    "electron": "45.2.1",
+    "vite": "8.3.5",
+    "esbuild": "0.28.2",
+    "playwright": "1.64.1",
+    "typescript": "5.9.3",
+    "@types/node": "22.20.5",
+    "@types/react": "18.3.31",
+    "@types/react-dom": "18.3.7"
+  }
+}

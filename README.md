@@ -154,3 +154,7 @@ brand: {
 - تباين ألوان يلبي معيار WCAG AA
 - دعم `prefers-reduced-motion`
 - معالم HTML5 دلالية
+
+## Daidar Flow Desktop
+
+واجهة تطبيق Windows المستقلة في [desktop/daidar-flow](desktop/daidar-flow/README.md)، وخطة التنفيذ في [tasks](tasks/README.md). المرحلة الحالية واجهة فقط حتى Task10؛ ليست جزءًا من نشر الموقع أو ملف تثبيت نهائي.

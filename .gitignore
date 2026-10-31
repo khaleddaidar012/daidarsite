@@ -37,3 +37,7 @@ yarn-error.log*
 .wrangler
 .dev.vars
 .dev.vars.*
+
+# Isolated desktop application build and QA output
+/desktop/daidar-flow/dist/
+/desktop/daidar-flow/artifacts/
