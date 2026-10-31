@@ -44,6 +44,19 @@ test("real DPAPI admin vault, durations, reissue audit, no overwrite or reposito
       const license = verifyLicense(fs.readFileSync(out, "utf8"), keys);
       assert.equal(license.months, month);
     }
+    const anonymousFile = path.join(temp, "without-customer.dfl");
+    run("issue", [
+      "--device",
+      "DFD1-" + "A".repeat(64),
+      "--months",
+      "1",
+      "--out",
+      anonymousFile,
+    ]);
+    assert.equal(
+      verifyLicense(fs.readFileSync(anonymousFile, "utf8"), keys).customer,
+      "عميل بدون اسم",
+    );
     const previous = path.join(temp, "3.dfl"),
       out = path.join(temp, "transfer.dfl");
     const params = [

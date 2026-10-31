@@ -1,5 +1,6 @@
 import { build } from "vite";
 import { build as bundle } from "esbuild";
+import path from "node:path";
 await build({
   root: process.cwd(),
   base: "./",
@@ -56,4 +57,20 @@ await bundle({
   platform: "node",
   format: "cjs",
   outfile: "dist/license-service.cjs",
+});
+await build({
+  root: "admin/ui",
+  base: "./",
+  publicDir: path.resolve("public"),
+  css: { postcss: { plugins: [] } },
+  build: { outDir: path.resolve("admin-dist/gui/renderer"), emptyOutDir: true },
+});
+await bundle({
+  entryPoints: ["admin/ui/main.ts", "admin/ui/preload.ts"],
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+  outdir: "admin-dist/gui",
+  outExtension: { ".js": ".cjs" },
+  external: ["electron"],
 });

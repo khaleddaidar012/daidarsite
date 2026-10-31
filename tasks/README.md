@@ -20,8 +20,11 @@
 - [16 — تقوية الحماية](./16-security-hardening.md)
 - [17 — مثبت Windows](./17-windows-installer.md)
 - [18 — وحدات الأعمال](./18-future-business-modules.md)
+- [19 — واجهة إدارة إصدار التراخيص](./19-license-admin-ui.md)
 
 المصدر: طلب المستخدم المرفق بتاريخ 2026-10-31. التطبيق مستقل في desktop/daidar-flow؛ الموقع الحالي يحتفظ بمنطقه.
 
 ## الحالة النهائية
 المهام01–16 Done، مع اقتصار16 على حماية التراخيص. المهام17–18 Pending؛ Installer ووظائف الأعمال لم تنفذ. تقرير المرحلة الثانية في [PHASE2_REPORT.md](../desktop/daidar-flow/PHASE2_REPORT.md)، وتفاصيل التشغيل في desktop/daidar-flow/README.md.
+
+المهمة19 Done بطلب إضافي: واجهة إدارة مستقلة للإصدار ونسخ/حفظ الأكواد، واسم العميل اختياري. لم تبدأ17–18.
