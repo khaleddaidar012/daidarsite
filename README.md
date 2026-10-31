@@ -157,4 +157,4 @@ brand: {
 
 ## Daidar Flow Desktop
 
-واجهة تطبيق Windows المستقلة في [desktop/daidar-flow](desktop/daidar-flow/README.md)، وخطة التنفيذ في [tasks](tasks/README.md). المرحلة الحالية واجهة فقط حتى Task10؛ ليست جزءًا من نشر الموقع أو ملف تثبيت نهائي.
+تطبيق Windows المستقل في [desktop/daidar-flow](desktop/daidar-flow/README.md)، وخطة التنفيذ في [tasks](tasks/README.md). اكتملت الواجهة والتراخيص حتى Task16؛ وظائف الأعمال والمثبت مؤجلة، والتطبيق ليس جزءًا من نشر الموقع.

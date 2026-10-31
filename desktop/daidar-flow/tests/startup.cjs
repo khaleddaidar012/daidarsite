@@ -1,12 +1,17 @@
 const assert = require("node:assert/strict");
 const path = require("node:path");
+const fs = require("node:fs"),
+  os = require("node:os");
 const { _electron: electron } = require("playwright");
 const { expect } = require("playwright/test");
 (async () => {
   const env = { ...process.env, DAIDAR_FLOW_TEST: "1" };
   delete env.ELECTRON_RUN_AS_NODE;
+  const profile = fs.mkdtempSync(
+    path.join(os.tmpdir(), "daidar-startup-test-"),
+  );
   const app = await electron.launch({
-    args: [path.resolve(__dirname, "..")],
+    args: [path.resolve(__dirname, ".."), "--user-data-dir=" + profile],
     env,
     timeout: 30000,
   });
@@ -79,6 +84,16 @@ const { expect } = require("playwright/test");
     );
   } finally {
     await app.close();
+    if (
+      path.dirname(path.resolve(profile)) === path.resolve(os.tmpdir()) &&
+      path.basename(profile).startsWith("daidar-startup-test-")
+    )
+      fs.rmSync(profile, {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 100,
+      });
   }
 })().catch((error) => {
   console.error(error);

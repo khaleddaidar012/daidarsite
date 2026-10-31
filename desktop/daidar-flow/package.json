@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsc --noEmit && node scripts/build.mjs",
     "start": "npm run build && electron .",
-    "test": "npm run build && node --test tests/policy.test.cjs && node tests/startup.cjs && node tests/branding.cjs && node tests/responsive.cjs && node tests/dashboard.cjs"
+    "test": "npm run build && node --test tests/policy.test.cjs tests/device.test.cjs tests/license-protocol.test.cjs tests/license-time.test.cjs tests/license-admin.test.cjs tests/license-security.test.cjs && node tests/startup.cjs && node tests/branding.cjs && node tests/responsive.cjs && node tests/dashboard.cjs && node tests/license-native.cjs",
+    "admin": "node admin-dist/license-admin.cjs"
   },
   "dependencies": {
     "react": "18.3.1",

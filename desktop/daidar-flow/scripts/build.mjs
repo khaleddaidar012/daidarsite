@@ -29,3 +29,31 @@ await bundle({
   format: "cjs",
   outfile: "dist/brand-policy.cjs",
 });
+await bundle({
+  entryPoints: ["src/main/licensing/protocol.ts"],
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+  outfile: "dist/license-protocol.cjs",
+});
+await bundle({
+  entryPoints: ["src/main/licensing/device.ts"],
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+  outfile: "dist/device.cjs",
+});
+await bundle({
+  entryPoints: ["admin/license-admin.ts"],
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+  outfile: "admin-dist/license-admin.cjs",
+});
+await bundle({
+  entryPoints: ["src/main/licensing/service.ts"],
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+  outfile: "dist/license-service.cjs",
+});

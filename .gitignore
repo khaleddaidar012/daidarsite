@@ -41,3 +41,6 @@ yarn-error.log*
 # Isolated desktop application build and QA output
 /desktop/daidar-flow/dist/
 /desktop/daidar-flow/artifacts/
+/desktop/daidar-flow/admin-dist/
+*.dpapi
+*.dfl

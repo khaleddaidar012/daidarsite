@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import type { FeatureId } from "../shared/features";
 import type { AppInfo } from "../shared/contracts";
+import type { LicenseView } from "../shared/licensing";
+import { ActivationPanel, countdown, statusLabels } from "./ActivationPanel";
 const icons: Record<string, typeof Package> = {
   Package,
   ShoppingCart,
@@ -31,6 +33,9 @@ const icons: Record<string, typeof Package> = {
   CloudUpload,
 };
 export default function App() {
+  const [license, setLicense] = useState<LicenseView | null>(null);
+  const [activationOpen, setActivationOpen] = useState(false);
+  const [licenseRefreshError, setLicenseRefreshError] = useState(false);
   async function openBrand(id: BrandLink) {
     try {
       const opened = await window.daidar.openBrandLink(id);
@@ -54,7 +59,7 @@ export default function App() {
         title: result.title || "دعيدر فلو",
         text:
           result.status === "locked"
-            ? "هذه الميزة تتطلب ترقية. التفعيل سيُتاح في مرحلة التراخيص القادمة."
+            ? "هذه الميزة تتطلب ترقية. افتح التفعيل والاشتراك وأدخل ترخيصًا ساريًا يشمل الميزة."
             : result.status === "coming-soon"
               ? "قريبًا — وظائف هذه الأداة قيد التجهيز للمرحلة القادمة."
               : "الأداة غير متاحة.",
@@ -86,6 +91,42 @@ export default function App() {
   useEffect(() => {
     if (info) void document.fonts.ready.then(() => window.daidar.ready());
   }, [info]);
+  useEffect(() => {
+    if (!info) return;
+    let alive = true,
+      pending = false;
+    async function refresh() {
+      if (pending) return;
+      pending = true;
+      try {
+        const value = await window.daidar.getLicense();
+        if (alive) {
+          setLicense(value);
+          setLicenseRefreshError(false);
+        }
+      } catch {
+        if (alive) {
+          setLicenseRefreshError(true);
+          setLicense((previous) => ({
+            ...(previous ?? info!.license),
+            status: "storage-error",
+            paidFeatures: [],
+            remainingMs: 0,
+          }));
+        }
+      } finally {
+        pending = false;
+      }
+    }
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 1000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [info]);
   if (!info)
     return (
       <main className="startup-state">
@@ -98,6 +139,7 @@ export default function App() {
         )}
       </main>
     );
+  const currentLicense = license ?? info.license;
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -113,69 +155,121 @@ export default function App() {
             <i />
             يعمل بدون إنترنت
           </span>
-          <span className="edition">النسخة المجانية</span>
+          <span className="edition">
+            {currentLicense.paidFeatures.length
+              ? "النسخة المفعّلة"
+              : "النسخة المجانية"}
+          </span>
+          <button
+            type="button"
+            className="activation-nav"
+            onClick={() => setActivationOpen((value) => !value)}
+          >
+            التفعيل والاشتراك
+          </button>
         </div>
       </header>
       <main className="dashboard">
         <div className="dashboard-inner">
-          <div className="intro">
-            <div>
-              <p className="eyebrow">مساحة عملك، ببساطة</p>
-              <h2>أهلًا بك في دعيدر فلو</h2>
-              <p>إدارة المبيعات والمخزون والكاشير، من مكان واحد.</p>
+          {(licenseRefreshError ||
+            [
+              "expiring",
+              "expired",
+              "clock-review",
+              "storage-error",
+              "device-mismatch",
+              "device-unavailable",
+              "invalid",
+            ].includes(currentLicense.status)) && (
+            <div className="license-alert" role="status">
+              <div>
+                <strong>
+                  {licenseRefreshError
+                    ? "تعذر تحديث حالة الاشتراك"
+                    : statusLabels[currentLicense.status]}
+                </strong>
+                <p>
+                  {currentLicense.status === "expiring"
+                    ? `باقي ${countdown(currentLicense.remainingMs)}. جدّد قبل انتهاء الاشتراك.`
+                    : "المميزات المجانية مستمرة. راجع تفاصيل التفعيل أو تواصل مع الإدارة."}
+                </p>
+              </div>
+              <button type="button" onClick={() => setActivationOpen(true)}>
+                تفاصيل الاشتراك
+              </button>
             </div>
-            <span className="workspace-symbol" aria-hidden="true">
-              <LayoutGrid size={27} />
-            </span>
-          </div>
-          <div className="section-heading">
-            <h3>أدوات نشاطك</h3>
-            <p>ابدأ بالأساسيات، ووسّع أدواتك مع نمو شغلك.</p>
-          </div>
-          <div className="feature-grid" aria-label="أدوات دعيدر فلو">
-            {info.features.map((feature) => {
-              const Icon = icons[feature.icon] || Package;
-              const locked = feature.tier === "paid";
-              return (
-                <article
-                  className={`feature-card ${locked ? "is-locked" : ""}`}
-                  key={feature.id}
-                  data-feature={feature.id}
-                >
-                  <div className="feature-card-top">
-                    <span className="feature-icon">
-                      <Icon aria-hidden="true" />
-                    </span>
-                    <span className="feature-status">
-                      {locked && <Lock size={10} aria-hidden="true" />}
-                      {locked ? "يتطلب ترقية" : "متاح"}
-                    </span>
-                  </div>
-                  <h4>{feature.title}</h4>
-                  <p>{feature.description}</p>
-                  <button
-                    type="button"
-                    className="feature-action"
-                    aria-label={`${locked ? "الترقية للاستخدام" : "فتح"} — ${feature.title}`}
-                    onClick={() => void openFeature(feature.id)}
-                  >
-                    {locked ? (
-                      <Lock size={12} aria-hidden="true" />
-                    ) : (
-                      <ArrowLeft size={13} aria-hidden="true" />
-                    )}
-                    {locked ? "الترقية للاستخدام" : "فتح الأداة"}
-                  </button>
-                </article>
-              );
-            })}
-          </div>
-          <p className="phase-note">
-            <Info size={15} />
-            <span>
-              إصدار الواجهة الأولية — وظائف الأدوات ستُضاف في المراحل القادمة.
-            </span>
-          </p>
+          )}
+          {activationOpen ? (
+            <ActivationPanel
+              license={currentLicense}
+              onChange={setLicense}
+              onBack={() => setActivationOpen(false)}
+            />
+          ) : (
+            <>
+              <div className="intro">
+                <div>
+                  <p className="eyebrow">مساحة عملك، ببساطة</p>
+                  <h2>أهلًا بك في دعيدر فلو</h2>
+                  <p>إدارة المبيعات والمخزون والكاشير، من مكان واحد.</p>
+                </div>
+                <span className="workspace-symbol" aria-hidden="true">
+                  <LayoutGrid size={27} />
+                </span>
+              </div>
+              <div className="section-heading">
+                <h3>أدوات نشاطك</h3>
+                <p>ابدأ بالأساسيات، ووسّع أدواتك مع نمو شغلك.</p>
+              </div>
+              <div className="feature-grid" aria-label="أدوات دعيدر فلو">
+                {info.features.map((feature) => {
+                  const Icon = icons[feature.icon] || Package;
+                  const locked =
+                    feature.tier === "paid" &&
+                    !currentLicense.paidFeatures.includes(feature.id);
+                  return (
+                    <article
+                      className={`feature-card ${locked ? "is-locked" : ""}`}
+                      key={feature.id}
+                      data-feature={feature.id}
+                    >
+                      <div className="feature-card-top">
+                        <span className="feature-icon">
+                          <Icon aria-hidden="true" />
+                        </span>
+                        <span className="feature-status">
+                          {locked && <Lock size={10} aria-hidden="true" />}
+                          {locked ? "يتطلب ترقية" : "متاح"}
+                        </span>
+                      </div>
+                      <h4>{feature.title}</h4>
+                      <p>{feature.description}</p>
+                      <button
+                        type="button"
+                        className="feature-action"
+                        aria-label={`${locked ? "الترقية للاستخدام" : "فتح"} — ${feature.title}`}
+                        onClick={() => void openFeature(feature.id)}
+                      >
+                        {locked ? (
+                          <Lock size={12} aria-hidden="true" />
+                        ) : (
+                          <ArrowLeft size={13} aria-hidden="true" />
+                        )}
+                        {locked ? "الترقية للاستخدام" : "فتح الأداة"}
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
+              <p className="phase-note">
+                <Info size={15} />
+                <span>
+                  إصدار الواجهة الأولية — وظائف الأدوات ستُضاف في المراحل
+                  القادمة.
+                </span>
+              </p>
+            </>
+          )}
         </div>
       </main>
       <footer className="app-footer">

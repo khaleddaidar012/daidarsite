@@ -1,5 +1,12 @@
 import { approvedBrandUrl } from "../shared/brand";
-import { features, featureAccess } from "../shared/features";
+import { features } from "../shared/features";
+import { LicenseService } from "./licensing/service";
+import { protectedStore } from "./licensing/storage";
+import { readWindowsSources } from "./licensing/device";
+import publicKeys from "./licensing/public-keys.json";
+import { MAX_LICENSE_BYTES } from "./licensing/protocol";
+import fs from "node:fs/promises";
+import { readBounded } from "./licensing/files";
 import {
   app,
   BrowserWindow,
@@ -9,6 +16,7 @@ import {
   session,
   dialog,
   shell,
+  clipboard,
 } from "electron";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -22,9 +30,19 @@ let mainWindow: BrowserWindow | null = null;
 let splashWindow: BrowserWindow | null = null;
 let initialized = false;
 const origin = "daidar://app";
+const primaryInstance = app.requestSingleInstanceLock();
+if (!primaryInstance) app.quit();
+app.on("second-instance", () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  }
+});
 app
   .whenReady()
   .then(async () => {
+    if (!primaryInstance) return;
     const root = path.resolve(__dirname, "renderer");
     protocol.handle("daidar", (request) => {
       const url = new URL(request.url);
@@ -62,6 +80,12 @@ app
     );
     await splashWindow.loadURL(origin + "/splash.html");
     if (process.env.DAIDAR_FLOW_TEST !== "1") splashWindow.show();
+    const licensing = new LicenseService({
+      store: protectedStore(app.getPath("userData")),
+      keys: publicKeys,
+      readDevice: readWindowsSources,
+    });
+    await licensing.initialize();
     mainWindow = new BrowserWindow({
       width: 1280,
       height: 900,
@@ -90,14 +114,63 @@ app
       )
         throw Error("Untrusted IPC sender");
     }
-    ipcMain.handle("app:info", (event) => {
+    ipcMain.handle("app:info", async (event) => {
       trusted(event);
+      const license = await licensing.status();
       return {
         name: "دعيدر فلو",
         version: app.getVersion(),
-        edition: "free",
+        edition: license.paidFeatures.length ? "paid" : "free",
+        license,
         features,
       };
+    });
+    ipcMain.handle("license:status", (event) => {
+      trusted(event);
+      return licensing.status();
+    });
+    ipcMain.handle("license:activate", (event, code: unknown) => {
+      trusted(event);
+      return licensing.activate(code);
+    });
+    ipcMain.handle("license:copy-device", async (event) => {
+      trusted(event);
+      const id = (await licensing.status()).deviceId;
+      if (!id) return false;
+      clipboard.writeText(id);
+      return true;
+    });
+    let importing = false;
+    ipcMain.handle("license:import", async (event) => {
+      trusted(event);
+      if (importing || !mainWindow) return null;
+      importing = true;
+      try {
+        const choice = await dialog.showOpenDialog(mainWindow, {
+          title: "اختر ملف الترخيص الموقع",
+          properties: ["openFile"],
+          filters: [
+            { name: "Daidar Flow license", extensions: ["dfl", "lic", "txt"] },
+          ],
+        });
+        if (choice.canceled || !choice.filePaths[0]) return null;
+        const file = await fs.open(choice.filePaths[0], "r");
+        let code: string;
+        try {
+          code = (await readBounded(file, MAX_LICENSE_BYTES)).toString("utf8");
+        } finally {
+          await file.close();
+        }
+        return await licensing.activate(code);
+      } catch {
+        return {
+          ok: false,
+          message: "تعذر قراءة ملف الترخيص أو حجمه أكبر من المسموح.",
+          license: await licensing.status(),
+        };
+      } finally {
+        importing = false;
+      }
     });
     ipcMain.handle("brand:open", async (event, id: unknown) => {
       trusted(event);
@@ -112,7 +185,7 @@ app
     });
     ipcMain.handle("feature:open", (event, id: unknown) => {
       trusted(event);
-      return featureAccess(id);
+      return licensing.openFeature(id);
     });
     let nativeReady = false,
       rendererReady = false;
