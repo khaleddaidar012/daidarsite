@@ -54,7 +54,10 @@ const { expect } = require("playwright/test");
     await page
       .getByRole("button", { name: "فتح — المخزون", exact: true })
       .click();
-    await page.getByRole("status").filter({ hasText: "قريبًا" }).waitFor();
+    await page.getByRole("heading", { name: "المخزون", exact: true }).waitFor();
+    await page
+      .getByRole("button", { name: "العودة للأدوات", exact: true })
+      .click();
     assert.equal(new URL(page.url()).pathname, "/index.html");
     assert.equal(await page.locator(".feature-card.is-locked").count(), 5);
     assert.equal(

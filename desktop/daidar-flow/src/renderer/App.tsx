@@ -1,5 +1,5 @@
 import { brandLinks, type BrandLink } from "../shared/brand";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   LayoutGrid,
   Info,
@@ -22,6 +22,7 @@ import type { FeatureId } from "../shared/features";
 import type { AppInfo } from "../shared/contracts";
 import type { LicenseView } from "../shared/licensing";
 import { ActivationPanel, countdown, statusLabels } from "./ActivationPanel";
+import Inventory from "./Inventory";
 const icons: Record<string, typeof Package> = {
   Package,
   ShoppingCart,
@@ -35,6 +36,8 @@ const icons: Record<string, typeof Package> = {
 export default function App() {
   const [license, setLicense] = useState<LicenseView | null>(null);
   const [activationOpen, setActivationOpen] = useState(false);
+  const [inventoryOpen, setInventoryOpen] = useState(false);
+  const closeInventory = useCallback(() => setInventoryOpen(false), []);
   const [licenseRefreshError, setLicenseRefreshError] = useState(false);
   async function openBrand(id: BrandLink) {
     try {
@@ -55,6 +58,12 @@ export default function App() {
   async function openFeature(id: FeatureId) {
     try {
       const result = await window.daidar.openFeature(id);
+      if (id === "inventory" && result.status === "coming-soon") {
+        setInventoryOpen(true);
+        setActivationOpen(false);
+        setFeedback(null);
+        return;
+      }
       setFeedback({
         title: result.title || "دعيدر فلو",
         text:
@@ -205,6 +214,8 @@ export default function App() {
               onChange={setLicense}
               onBack={() => setActivationOpen(false)}
             />
+          ) : inventoryOpen ? (
+            <Inventory onBack={closeInventory} />
           ) : (
             <>
               <div className="intro">
@@ -264,7 +275,7 @@ export default function App() {
               <p className="phase-note">
                 <Info size={15} />
                 <span>
-                  إصدار الواجهة الأولية — وظائف الأدوات ستُضاف في المراحل
+                  المخزون جاهز لإدارة منتجاتك. باقي الأدوات ستُضاف في المراحل
                   القادمة.
                 </span>
               </p>

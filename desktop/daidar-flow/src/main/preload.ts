@@ -1,6 +1,14 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { DesktopBridge } from "../shared/contracts";
+import type { InventoryBridge } from "../shared/inventory";
+const inventory: InventoryBridge = {
+  list: (input) => ipcRenderer.invoke("inventory:list", input),
+  create: (input) => ipcRenderer.invoke("inventory:create", input),
+  update: (input) => ipcRenderer.invoke("inventory:update", input),
+  remove: (input) => ipcRenderer.invoke("inventory:remove", input),
+};
 const bridge: DesktopBridge = {
+  inventory: Object.freeze(inventory),
   getLicense: () => ipcRenderer.invoke("license:status"),
   activateLicense: (code) => ipcRenderer.invoke("license:activate", code),
   importLicense: () => ipcRenderer.invoke("license:import"),

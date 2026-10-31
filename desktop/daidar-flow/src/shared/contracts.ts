@@ -1,6 +1,7 @@
 import type { BrandLink } from "./brand";
 import type { Feature, FeatureId } from "./features";
 import type { ActivationResult, LicenseView } from "./licensing";
+import type { InventoryBridge } from "./inventory";
 export interface AppInfo {
   name: string;
   version: string;
@@ -9,6 +10,7 @@ export interface AppInfo {
   features: readonly Feature[];
 }
 export interface DesktopBridge {
+  inventory: InventoryBridge;
   getLicense(): Promise<LicenseView>;
   activateLicense(code: string): Promise<ActivationResult>;
   importLicense(): Promise<ActivationResult | null>;

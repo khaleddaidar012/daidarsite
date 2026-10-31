@@ -1,6 +1,13 @@
 import { build } from "vite";
 import { build as bundle } from "esbuild";
 import path from "node:path";
+await bundle({
+  entryPoints: ["src/main/inventory/store.ts"],
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+  outfile: "dist/inventory-store.cjs",
+});
 await build({
   root: process.cwd(),
   base: "./",

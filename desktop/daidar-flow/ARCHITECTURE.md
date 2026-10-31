@@ -6,7 +6,7 @@ Electron + React 18 + TypeScript + Vite in an isolated package. Existing Next.js
 - preload: narrow typed bridge; no generic invoke or filesystem access.
 - renderer: RTL presentation only; no Node integration or business authority.
 - shared: serializable contracts and feature policy.
-- SQLite: selected future local source of truth behind main/services; no sales DB or SQLite dependency now. Transactions, migrations and explicit export/backup policy precede future modules. Cloud sync is a separate opt-in adapter with conflict handling and retry queues, not a UI dependency.
+- SQLite: local products database implemented with built-in node:sqlite behind main/inventory, with versioned migrations, WAL/FULL durability, fixed-point values, bounded pagination and validated parameterized queries. No third-party database dependency, sales database, seed data or cloud sync. See INVENTORY.md and INVENTORY_REPORT.md. Future movements/sales/backup remain separate work.
 
 ## Licensing implemented in Tasks 11–16
 Free: inventory, sales, POS. Paid: explicit signed entitlements for 1/3/6/12 calendar months, validated in Main per protected request. Existing Hub uses an independent activation contract; desktop DFL1 is product-separated and neither changes nor accepts Hub licenses. See [the implemented contract, threat model and transfer policy](LICENSING.md) and [administrator operations](admin/README.md).

@@ -1,6 +1,6 @@
 # خطة Daidar Flow
 
-تُنفذ مهمة واحدة في كل مرة، ويُسجل فحصها قبل التالية. اكتملت الواجهة 01–10 ثم التراخيص 11–16 بناءً على طلب المرحلة الثانية. لا وظائف أعمال أو دفع أو Installer في النطاق الحالي.
+تُنفذ مهمة واحدة في كل مرة، ويُسجل فحصها قبل التالية. اكتملت الواجهة01–10 والتراخيص11–16 وأداة الإدارة19، ثم المخزون الأساسي20–29. لا مبيعات أوPOS أو دفع أو Installer في النطاق الحالي.
 
 - [01 — تحليل المشروع](./01-project-analysis.md)
 - [02 — الهيكل التقني](./02-project-architecture.md)
@@ -21,10 +21,20 @@
 - [17 — مثبت Windows](./17-windows-installer.md)
 - [18 — وحدات الأعمال](./18-future-business-modules.md)
 - [19 — واجهة إدارة إصدار التراخيص](./19-license-admin-ui.md)
+- [20 — معمارية المخزون](./20-inventory-architecture.md)
+- [21 — مخطط SQLite](./21-sqlite-products-schema.md)
+- [22 — شاشة المخزون](./22-inventory-dashboard-ui.md)
+- [23 — كروت المنتجات](./23-product-cards.md)
+- [24 — النموذج المنسدل](./24-collapsible-product-form.md)
+- [25 — CRUD المنتجات](./25-product-crud.md)
+- [26 — دعم الباركود](./26-barcode-support.md)
+- [27 — البحث والتصفح](./27-inventory-search.md)
+- [28 — التحقق والأخطاء](./28-inventory-validation.md)
+- [29 — اختبار وتحسين المخزون](./29-inventory-testing.md)
 
 المصدر: طلب المستخدم المرفق بتاريخ 2026-10-31. التطبيق مستقل في desktop/daidar-flow؛ الموقع الحالي يحتفظ بمنطقه.
 
 ## الحالة النهائية
-المهام01–16 Done، مع اقتصار16 على حماية التراخيص. المهام17–18 Pending؛ Installer ووظائف الأعمال لم تنفذ. تقرير المرحلة الثانية في [PHASE2_REPORT.md](../desktop/daidar-flow/PHASE2_REPORT.md)، وتفاصيل التشغيل في desktop/daidar-flow/README.md.
+المهام01–16 و19 و20–29 Done؛16 تخص حماية التراخيص، و19 أداة إدارة مستقلة باسم عميل اختياري. المهمة17 Pending. المهمة18 In Progress لأن المخزون الأساسي فقط أصبح فعليًا؛ المبيعات والكاشير والإضافات ما زالت مؤجلة.
 
-المهمة19 Done بطلب إضافي: واجهة إدارة مستقلة للإصدار ونسخ/حفظ الأكواد، واسم العميل اختياري. لم تبدأ17–18.
+[تقرير التراخيص](../desktop/daidar-flow/PHASE2_REPORT.md) · [تقرير المخزون](../desktop/daidar-flow/INVENTORY_REPORT.md). التشغيل موثق في desktop/daidar-flow/README.md.

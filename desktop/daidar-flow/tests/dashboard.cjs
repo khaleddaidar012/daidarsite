@@ -28,6 +28,15 @@ withApp(async (app, page) => {
       feature.tier === "free" ? "coming-soon" : "locked",
     );
     await page.locator('[data-feature="' + feature.id + '"] button').click();
+    if (feature.id === "inventory") {
+      await page
+        .getByRole("heading", { name: "المخزون", exact: true })
+        .waitFor();
+      await page
+        .getByRole("button", { name: "العودة للأدوات", exact: true })
+        .click();
+      continue;
+    }
     await page.getByRole("status").filter({ hasText: feature.title }).waitFor();
     await page
       .getByRole("button", { name: "إغلاق الرسالة", exact: true })

@@ -44,3 +44,6 @@ yarn-error.log*
 /desktop/daidar-flow/admin-dist/
 *.dpapi
 *.dfl
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

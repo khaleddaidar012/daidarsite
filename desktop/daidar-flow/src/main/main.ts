@@ -7,6 +7,7 @@ import publicKeys from "./licensing/public-keys.json";
 import { MAX_LICENSE_BYTES } from "./licensing/protocol";
 import fs from "node:fs/promises";
 import { readBounded } from "./licensing/files";
+import { ProductsStore, inventoryResult } from "./inventory/store";
 import {
   app,
   BrowserWindow,
@@ -114,6 +115,35 @@ app
       )
         throw Error("Untrusted IPC sender");
     }
+    let products: ProductsStore | null = null;
+    const inventory = () =>
+      products ??
+      (products = new ProductsStore(
+        path.join(app.getPath("userData"), "inventory.sqlite"),
+      ));
+    ipcMain.handle("inventory:list", (event, input: unknown) => {
+      trusted(event);
+      return inventoryResult(() => inventory().list(input));
+    });
+    ipcMain.handle("inventory:create", (event, input: unknown) => {
+      trusted(event);
+      return inventoryResult(() => inventory().create(input));
+    });
+    ipcMain.handle("inventory:update", (event, input: unknown) => {
+      trusted(event);
+      return inventoryResult(() => inventory().update(input));
+    });
+    ipcMain.handle("inventory:remove", (event, input: unknown) => {
+      trusted(event);
+      return inventoryResult(() => inventory().remove(input));
+    });
+    app.once("before-quit", () => {
+      try {
+        products?.close();
+      } catch {
+        /* WAL remains recoverable; never delete files on close errors. */
+      }
+    });
     ipcMain.handle("app:info", async (event) => {
       trusted(event);
       const license = await licensing.status();
