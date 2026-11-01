@@ -4,7 +4,13 @@ Local Node.js 24 + Playwright application assistant for Windows. SQLite is built
 
 ## Start on Windows
 
-Install Node.js 24 LTS and Microsoft Edge, then double-click `Start-Job-Agent.cmd`. Or, in PowerShell:
+Install Node.js 24 LTS and Microsoft Edge, then double-click `Start-Job-Agent.cmd`. The dashboard opens locally; everyday setup, searches, job entry, checking, draft preparation, application review and approval are available in its UI.
+
+In the dashboard, upload the CV, enter salary floors and sponsorship preference under “Salary and availability preferences,” and click “Add the first five leads.” Google search opens results in a new tab; check roles and their original pages yourself, then add the original job link to the tracker. To discover from a company's public Lever/Greenhouse listing, add its company and board ID and affirm that you checked the official source and terms. The dashboard then imports matching titles. Use “Verify opening,” prepare a draft, review terms, and open the application review. The final approval prompt appears in the UI, and you click Submit yourself in the application browser.
+
+Google result pages are for human review; the tool does not scrape Google or crawl arbitrary pages. Companies whose board is not Lever/Greenhouse can still be added by original URL, but job requirements must be entered manually for a meaningful CV score. CAPTCHA, login and unlabelled uploads require manual handling.
+
+For developers or recovery only, the equivalent PowerShell commands are:
 
 ```powershell
 cd 'C:\MyFiles\web development\daidar_site_2\daidar-solutions\tools\job-agent'
