@@ -1,5 +1,7 @@
 # متابعة العمل — 2026-10-18
 
+- 2026-11-01: Added isolated local Node.js/Playwright job application assistant at `tools/job-agent/` with Windows launcher, SQLite/CSV tracker, CV evidence, conservative form filling, explicit per-application approval and confirmation checks. Private CV/profile/preferences/tracker data is ignored by Git. Initial five leads include stretch/manual-only cases, not five fully qualified opportunities; see tool README. Browser mechanics use synthetic fixtures; no employer application was submitted. No website or Cloudflare deployment is verified by this work.
+
 - بُسّطت خزنة كلمات المرور إلى قائمة مشاريع وبحث ونموذج يظهر عند الإضافة/التعديل فقط. إضافة الحساب وتعديل الروابط من داخل المشروع لتجنب اختلاف الأسماء بين النموذجين. تعرض الروابط كاملة مع الفتح والنسخ وحالة واضحة للرابط غير المضاف، ويُفتح المشروع تلقائيًا بعد حفظ روابطه. أسماء المشاريع الإنجليزية تتطابق دون حساسية لحالة الأحرف، والروابط بدون بروتوكول تُستكمل بـHTTPS. لا يحتاج تحديث قاعدة جديد. اختُبر الشكل والحفظ على معاينة محلية ببيانات تجريبية فقط.
 
 - أصبحت مشاريع خزنة كلمات المرور قوائم قابلة للفتح والإغلاق مع روابط دخول المستخدم والأدمن. أضيفت صلاحيتا موظف مستقلتان للإضافة وكشف/نسخ الباسوردات، والتعديل والحذف للإدارة فقط. يلزم تنفيذ `0018_password_vault_projects_permissions.sql` مرة واحدة بعد0017 وإعادة النشر؛ لم ينفّذ الوكيل التحديث على الإنتاج.

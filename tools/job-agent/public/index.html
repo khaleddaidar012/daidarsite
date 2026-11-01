@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Job Application Agent</title><link rel="stylesheet" href="/style.css"></head>
+<body><header><div class="brand">JA<span> / PERSONAL WORKSPACE</span></div><span class="local">● LOCAL ONLY</span></header>
+<main><div class="heading"><div><p class="eyebrow">A deliberate next step</p><h1>Your application desk.</h1><p class="intro">Evidence from your CV. Clear gaps. Every application under your control.</p></div><a class="button" href="/api/export">Export CSV ↗</a></div>
+<section class="stats" id="stats" aria-label="Application counts"></section>
+<div class="toolbar"><h2>First five · review queue</h2><label>Filter <select id="filter"><option value="">All statuses</option><option>discovered</option><option>prepared</option><option>approved</option><option>submitted</option><option>needs-manual-action</option><option>failed</option></select></label></div>
+<p class="notice">A score measures technical evidence coverage, not overall suitability. Review seniority, location, policy and missing answers separately. Final submission always requires explicit approval in the terminal.</p>
+<div id="error" role="alert"></div><section id="jobs" aria-live="polite"></section>
+<footer>Private files stay in the local data folder. No passwords, identity documents or sensitive answers are filled automatically.</footer></main><script src="/app.js" defer></script></body></html>

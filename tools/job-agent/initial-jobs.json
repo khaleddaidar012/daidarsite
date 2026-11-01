@@ -1,0 +1,40 @@
+[
+  {
+    "company":"Bask Health","role":"Junior Front-End Software Engineer",
+    "url":"https://apply.workable.com/bask-health-1/j/01A6A33272/",
+    "applicationUrl":"https://apply.workable.com/bask-health-1/j/01A6A33272/apply/",
+    "salary":"Not published","location":"Egypt and four other countries","eligibility":"Egypt listed; remote","employment":"Full-time","sector":"HealthTech","priority":5,"policy":"unreviewed",
+    "requirements":[{"skill":"React","weight":2},{"skill":"TypeScript","weight":2},{"skill":"Next.js","weight":2},{"skill":"Tailwind"},{"skill":"JavaScript"},{"skill":"Node.js"},{"skill":"SQL"},{"skill":"tRPC"},{"skill":"Drizzle"},{"skill":"SST"}],
+    "cautions":["Strong sector and stack fit. SQL, tRPC, Drizzle and SST are not stated in the CV. Listing asks for 1+ year; CV dates give years only, so exact duration is unconfirmed.","Product company; recurring-customer and employment-contract details need independent confirmation. Required salary/photo questions may need manual action."]
+  },
+  {
+    "company":"Bask Health","role":"Front-End Software Engineer (Remote)",
+    "url":"https://apply.workable.com/bask-health-1/j/0594E67655/",
+    "applicationUrl":"https://apply.workable.com/bask-health-1/j/0594E67655/apply/",
+    "salary":"Not published","location":"Egypt, Brazil, United States","eligibility":"Egypt listed; remote","employment":"Full-time","sector":"HealthTech","priority":4,"policy":"unreviewed",
+    "requirements":[{"skill":"React","weight":2},{"skill":"TypeScript","weight":2},{"skill":"Next.js","weight":2},{"skill":"JavaScript"},{"skill":"Node.js"},{"skill":"SQL"}],
+    "cautions":["Level and full requirement list need review on the original page. Same employer as the junior role: choose the best opening before applying to both.","Portfolio, salary expectation and photo requested on the form. No salary or photo will be invented or uploaded automatically."]
+  },
+  {
+    "company":"Stllr Network","role":"Mid-Senior Fullstack Developer (Remote)",
+    "url":"https://stllr.freshteam.com/jobs/xw5VWmv7bY87/mid-senior-fullstack-developer-remote",
+    "salary":"Not published","location":"Remote, Egypt preferred","eligibility":"Egypt-based candidates preferred","employment":"Full-time","sector":"Creator platform / SaaS","priority":3,"policy":"unreviewed",
+    "requirements":[{"skill":"React","weight":2},{"skill":"Next.js","weight":2},{"skill":"Node.js","weight":2},{"skill":"Express"},{"skill":"React Native"},{"skill":"SQL"},{"skill":"AWS"}],
+    "cautions":["Stretch role: requests 3–5 years; the CV does not substantiate that duration. React Native, relational databases and cloud-provider experience are gaps.","Outside preferred sectors; established recurring customers not independently verified."]
+  },
+  {
+    "company":"Canonical","role":"Web Frontend Engineer - JS, CSS, React, Flutter",
+    "url":"https://job-boards.greenhouse.io/canonical/jobs/5150422",
+    "salary":"Egypt salary not published (US-only range excluded)","location":"Home based - Worldwide","eligibility":"Worldwide remote; country hiring details need confirmation","employment":"Employment terms to confirm","sector":"Enterprise infrastructure","priority":2,"policy":"manual-only",
+    "requirements":[{"skill":"React","weight":2},{"skill":"TypeScript","weight":2},{"skill":"JavaScript"},{"skill":"Flutter"}],
+    "cautions":["MANUAL ONLY: application explicitly requires the applicant's own words and prohibits AI-generated content. No cover letter or form filling by this agent.","Academic evidence, Linux experience and ability to travel for company events require manual answers. Established enterprise product company; not specifically ERP."]
+  },
+  {
+    "company":"SOUM","role":"Backend Software Engineer",
+    "url":"https://jobs.lever.co/soum/8421b799-704a-4c9f-8c24-2c63ca4f6f65",
+    "applicationUrl":"https://jobs.lever.co/soum/8421b799-704a-4c9f-8c24-2c63ca4f6f65/apply",
+    "salary":"Not published","location":"Egypt / Remote / Uzbekistan","eligibility":"Egypt explicitly listed; remote","employment":"Full-time","sector":"Marketplace / logistics-adjacent","priority":1,"policy":"unreviewed",
+    "requirements":[{"skill":"Node.js","weight":2},{"skill":"TypeScript","weight":2},{"skill":"MongoDB","weight":2},{"skill":"NestJS"},{"skill":"PostgreSQL"},{"skill":"AWS"},{"skill":"Docker"}],
+    "cautions":["Stretch role: requires 4–5+ years, not supported by the CV. NestJS, PostgreSQL, gRPC, ClickHouse and distributed systems are not evidenced.","Sunday–Thursday, 09:00–18:00 Saudi time. Established marketplace; recurring B2B customers not verified. Technical score does not override seniority gap."]
+  }
+]
