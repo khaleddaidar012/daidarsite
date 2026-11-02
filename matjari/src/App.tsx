@@ -88,20 +88,13 @@ export const App: React.FC = () => {
           // ignore
         }
 
-        // Restore saved session from localStorage if present
-        const savedUserStr = localStorage.getItem('my_store_user');
-        if (savedUserStr) {
-          try {
-            const savedUser = JSON.parse(savedUserStr) as User;
-            setCurrentUser(savedUser);
-
-            if (savedUser.role === 'merchant' && savedUser.store_id) {
-              const store = await api.getStore(savedUser.store_id);
-              setCurrentStore(store);
-            }
-          } catch {
-            localStorage.removeItem('my_store_user');
-          }
+        // Restore identity only from the server's HttpOnly session cookie.
+        localStorage.removeItem('my_store_user');
+        const session = await api.session();
+        if (session) {
+          setCurrentUser(session.user);
+          setCurrentStore(session.store);
+          setCurrentSubscription(session.subscription);
         }
 
         // 0. Explicit Landing Page View (?view=landing)
@@ -126,12 +119,7 @@ export const App: React.FC = () => {
 
         // 2. Direct Explore Stores View (?view=explore_stores) - Strictly Super Admin Only
         if (urlView === 'explore_stores') {
-          let isSuperAdmin = false;
-          if (savedUserStr) {
-            try {
-              isSuperAdmin = JSON.parse(savedUserStr)?.role === 'super_admin';
-            } catch {}
-          }
+          const isSuperAdmin = session?.user.role === 'super_admin';
           if (isSuperAdmin) {
             setView('explore_stores');
           } else {
@@ -180,7 +168,6 @@ export const App: React.FC = () => {
     setCurrentUser(user);
     setCurrentStore(store);
     setCurrentSubscription(subscription);
-    localStorage.setItem('my_store_user', JSON.stringify(user));
     setHasPassedLoginPortal(true);
     sessionStorage.setItem('has_passed_login_portal', 'true');
 
@@ -189,7 +176,8 @@ export const App: React.FC = () => {
   };
 
   // Handle Logout
-  const handleLogout = (targetView: AppView = 'merchant_login') => {
+  const handleLogout = async (targetView: AppView = 'merchant_login') => {
+    try { await api.logout(); } catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر تسجيل الخروج'); return; }
     setCurrentUser(null);
     setCurrentStore(null);
     setCurrentSubscription(null);

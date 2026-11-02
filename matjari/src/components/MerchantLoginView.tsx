@@ -77,7 +77,7 @@ export const MerchantLoginView: React.FC<MerchantLoginViewProps> = ({
       setIsLoading(true);
       setError('');
       setSuccessMsg('');
-      const res = await api.login(loginUsername.trim(), loginPassword.trim());
+      const res = await api.login(loginUsername.trim(), loginPassword);
       onLoginSuccess(res.user, res.store, res.subscription);
     } catch (err: any) {
       setError(err.message || (isArabic ? 'بيانات الدخول غير صحيحة، تأكد من بريد Google وكلمة المرور' : 'Invalid login credentials'));
@@ -113,7 +113,7 @@ export const MerchantLoginView: React.FC<MerchantLoginViewProps> = ({
         currency: 'ج.م',
         email: cleanEmail,
         username: regUsername.trim() || cleanEmail.split('@')[0],
-        password: regPassword.trim(),
+        password: regPassword,
       });
 
       setSuccessMsg(isArabic ? '🎉 تم إنشاء متجرك بنجاح (وضع المعاينة)! جاري نقلك لمعاينة متجرك...' : '🎉 Store created! Redirecting to preview mode...');

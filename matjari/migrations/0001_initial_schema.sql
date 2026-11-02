@@ -85,6 +85,5 @@ CREATE INDEX IF NOT EXISTS idx_products_store_id ON products(store_id);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_store_id ON subscriptions(store_id);
 CREATE INDEX IF NOT EXISTS idx_orders_store_id ON orders(store_id);
 
--- Super Admin Account
-INSERT OR IGNORE INTO users (id, username, password, role, is_active)
-VALUES ('usr-admin', 'admin', 'admin123', 'super_admin', 1);
+-- Provision the owner separately with a salted password hash. Never seed a
+-- publicly known administrator password.

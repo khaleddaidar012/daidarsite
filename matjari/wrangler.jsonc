@@ -11,6 +11,6 @@
     }
   ],
   "vars": {
-    "READ_ONLY_PREVIEW": "true"
+    "READ_ONLY_PREVIEW": "false"
   }
 }

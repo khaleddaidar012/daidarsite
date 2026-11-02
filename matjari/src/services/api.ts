@@ -4,6 +4,16 @@ const BASE_PREFIX = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
 const API_BASE = `${BASE_PREFIX}/api`;
 
 export const api = {
+  async session(): Promise<{user: User; store: Store | null; subscription: Subscription | null} | null> {
+    const res = await fetch(`${API_BASE}/auth/session`, { cache: 'no-store' });
+    if (res.status === 401) return null;
+    if (!res.ok) throw new Error('تعذر التحقق من تسجيل الدخول');
+    return res.json();
+  },
+  async logout(): Promise<void> {
+    const res = await fetch(`${API_BASE}/auth/logout`, {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    if (!res.ok) throw new Error('تعذر تسجيل الخروج. حاول مرة أخرى.');
+  },
   // 1. Authentication
   async login(username: string, password: string): Promise<{
     user: User;

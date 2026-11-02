@@ -51,19 +51,13 @@ export const LoginView: React.FC<LoginViewProps> = ({
     try {
       setIsLoading(true);
       setError('');
-      const res = await api.login(username.trim(), password.trim());
+      const res = await api.login(username.trim(), password);
       onLoginSuccess(res.user, res.store, res.subscription);
     } catch (err: any) {
       setError(err.message || (isArabic ? 'بيانات تسجيل الدخول غير صحيحة' : 'Invalid login credentials'));
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const fillQuickAdmin = () => {
-    setUsername('admin');
-    setPassword('admin123');
-    setError('');
   };
 
   return (
