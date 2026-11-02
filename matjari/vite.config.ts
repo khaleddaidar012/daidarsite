@@ -726,11 +726,11 @@ function cloudflareD1Plugin(): Plugin {
   };
 }
 
-export default defineConfig({
-  base: SUBPATH,
+export default defineConfig(({ command }) => ({
+  base: command === 'serve' ? SUBPATH : '/',
   plugins: [react(), cloudflareD1Plugin()],
   server: {
     port: 5173,
     host: true,
   }
-});
+}));

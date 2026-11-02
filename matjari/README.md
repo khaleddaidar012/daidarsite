@@ -44,3 +44,11 @@ npm run dev
    ```
 5. ضع رابط النشر الناتج (مثال: `https://matjari.yourdomain.com`) في متغير بيئة الموقع الرئيسي:
    `NEXT_PUBLIC_MATJARI_URL=https://matjari.yourdomain.com/`
+
+## المعاينة المستقلة
+- مشروع Pages: daidar-matjari-preview، فرع feature/matjari-hub، مجلد البناء matjari.
+- الرابط: https://daidar-matjari-preview.pages.dev/
+- قاعدة D1 مستقلة: matjari-preview. لم يتم إنشاء الحساب الافتراضي admin123 في قاعدة المعاينة.
+- READ_ONLY_PREVIEW=true يقصر API على قراءة الكتالوج فقط؛ الإدارة والطلبات والتسجيل مقفولة حتى إضافة جلسات وصلاحيات موثوقة على الخادم.
+- بناء Vite يستخدم / للنشر؛ المسار المحلي القديم يظل للتطوير فقط.
+- متغير NEXT_PUBLIC_MATJARI_URL يُضبط في بيئة Preview لمشروع daidarsite2 فقط.

@@ -1,6 +1,7 @@
 // Cloudflare Pages Function with Cloudflare D1 Binding
 export interface Env {
   DB: D1Database;
+  READ_ONLY_PREVIEW?: string;
 }
 
 export const onRequest: PagesFunction<Env> = async (context) => {
@@ -26,6 +27,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   if (method === 'OPTIONS') {
     return new Response(null, { headers });
+  }
+
+  // Public preview has no authenticated management API yet. Only catalog reads
+  // are enabled, so demo visitors cannot read customer records or mutate data.
+  if (env.READ_ONLY_PREVIEW === 'true' &&
+      (method !== 'GET' || !['stores', 'store', 'products'].includes(path))) {
+    return new Response(JSON.stringify({ success: false, error: 'هذه نسخة معاينة للعرض فقط. التسجيل وإدارة المتاجر غير متاحين حالياً.' }), { status: 403, headers });
   }
 
   try {
