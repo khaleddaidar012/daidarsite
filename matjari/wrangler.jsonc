@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "my-store",
+  "compatibility_date": "2024-11-01",
+  "pages_build_output_dir": "./dist",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "my-store-d1",
+      "database_id": "d1-my-store-prod-id"
+    }
+  ]
+}
