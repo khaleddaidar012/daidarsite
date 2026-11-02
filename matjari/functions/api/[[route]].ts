@@ -38,7 +38,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         const { username, password } = body;
         const loginId = (username || '').trim();
 
-        const user = await db.prepare('SELECT id, username, email, role, store_id, is_active FROM users WHERE (username = ? OR (email != "" AND email = ?)) AND password = ?').bind(loginId, loginId, password).first();
+        const user = await db.prepare("SELECT id, username, email, role, store_id, is_active FROM users WHERE (username = ? OR (email != '' AND email = ?)) AND password = ?").bind(loginId, loginId, password).first();
 
         if (!user) {
           return new Response(JSON.stringify({ success: false, error: 'البريد الإلكتروني / اسم المستخدم أو كلمة المرور غير صحيحة' }), { status: 401, headers });
@@ -91,7 +91,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           return new Response(JSON.stringify({ success: false, error: 'يرجى إدخال بريد إلكتروني حقيقي من Google (مثال: name@gmail.com)' }), { status: 400, headers });
         }
 
-        const existingUser = await db.prepare('SELECT id FROM users WHERE username = ? OR (email != "" AND email = ?)').bind(cleanUsername, cleanEmail).first();
+        const existingUser = await db.prepare("SELECT id FROM users WHERE username = ? OR (email != '' AND email = ?)").bind(cleanUsername, cleanEmail).first();
         if (existingUser) {
           return new Response(JSON.stringify({ success: false, error: 'البريد الإلكتروني أو اسم المستخدم هذا مسجل مسبقاً، يرجى تسجيل الدخول' }), { status: 400, headers });
         }
