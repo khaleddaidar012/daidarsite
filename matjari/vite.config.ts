@@ -71,7 +71,7 @@ function cloudflareD1Plugin(): Plugin {
               const { username, password } = body;
               const loginId = (username || '').trim();
               
-              const user = db.prepare('SELECT id, username, email, role, store_id, is_active FROM users WHERE (username = ? OR (email != "" AND email = ?)) AND password = ?').get(loginId, loginId, password) as any;
+              const user = db.prepare("SELECT id, username, email, role, store_id, is_active FROM users WHERE (username = ? OR (email != '' AND email = ?)) AND password = ?").get(loginId, loginId, password) as any;
               
               if (!user) {
                 res.statusCode = 401;
@@ -131,7 +131,7 @@ function cloudflareD1Plugin(): Plugin {
               }
 
               // Check existing username or email
-              const existingUser = db.prepare('SELECT id FROM users WHERE username = ? OR (email != "" AND email = ?)').get(cleanUsername, cleanEmail);
+              const existingUser = db.prepare("SELECT id FROM users WHERE username = ? OR (email != '' AND email = ?)").get(cleanUsername, cleanEmail);
               if (existingUser) {
                 res.statusCode = 400;
                 return res.end(JSON.stringify({ success: false, error: 'البريد الإلكتروني أو اسم المستخدم هذا مسجل مسبقاً، يرجى تسجيل الدخول' }));
