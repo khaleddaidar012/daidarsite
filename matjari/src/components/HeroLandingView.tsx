@@ -118,23 +118,6 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
 
   const currentSlide = showcaseSlides[activeSlide];
 
-  // Auto-rotating Live Platform Activities Ticker
-  const liveActivities = [
-    { text: isArabic ? 'طلب جديد مؤكد في «متجر الأناقة العصري» بقيمة ٨٥٠ ج.م' : 'New confirmed order in "Modern Elegance Store" (850 EGP)', time: isArabic ? 'منذ دقيقة' : '1m ago', icon: '🛍️' },
-    { text: isArabic ? 'إنشاء متجر سحابي جديد «عطور الشرق الفاخرة» بنجاح' : 'New cloud store "Orient Perfumes" created successfully', time: isArabic ? 'منذ ٣ دقائق' : '3m ago', icon: '✨' },
-    { text: isArabic ? 'استلام طلب مباشر عبر واتساب في «متجر الرياض تك» بقيمة ٥٤٠ ج.م' : 'New direct WhatsApp order in "Riyadh Tech" (540 EGP)', time: isArabic ? 'منذ ٦ دقائق' : '6m ago', icon: '⚡' },
-    { text: isArabic ? 'تحديث تلقائي لقواعد بيانات Cloudflare D1 في ٠.٢ ثانية' : 'Auto Cloudflare D1 database sync completed in 0.2s', time: isArabic ? 'منذ ٨ دقائق' : '8m ago', icon: '🚀' },
-  ];
-  const [activeActivityIndex, setActiveActivityIndex] = useState(0);
-
-  useEffect(() => {
-    const actTimer = setInterval(() => {
-      setActiveActivityIndex((prev) => (prev + 1) % liveActivities.length);
-    }, 3800);
-    return () => clearInterval(actTimer);
-  }, [liveActivities.length]);
-
-  const currentActivity = liveActivities[activeActivityIndex];
 
   return (
     <div className="relative min-h-screen bg-[#f7fafe] dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col justify-between selection:bg-sky-100 selection:text-sky-900 overflow-x-hidden transition-colors font-cairo">
@@ -173,7 +156,7 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
                   {t('daidar_solutions')}
                 </span>
                 <span className="text-[10px] sm:text-[11px] text-[#0084d6] dark:text-sky-400 font-bold block -mt-0.5 sm:-mt-1 truncate">
-                  {isArabic ? 'خدمة متجري (Cloudflare D1)' : 'My Store Service (Cloudflare D1)'}
+                  {isArabic ? 'متجري · متجرك الإلكتروني' : 'Matjari · Your online store'}
                 </span>
               </div>
             </div>
@@ -419,24 +402,6 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
         </div>
       </div>
 
-      {/* LIVE REAL-TIME PLATFORM TICKER */}
-      <div className="w-full bg-[#f0f7ff]/90 dark:bg-slate-900/90 border-b border-sky-100/70 dark:border-slate-800 py-2 px-4 transition-colors">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0"></span>
-            <span className="font-extrabold text-[#0084d6] dark:text-sky-400 shrink-0">
-              {isArabic ? 'نشاط المنصة المباشر:' : 'Live Activity:'}
-            </span>
-            <span className="text-slate-700 dark:text-slate-200 font-bold truncate transition-all duration-300">
-              {currentActivity.icon} {currentActivity.text}
-            </span>
-          </div>
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono shrink-0 hidden sm:inline-block">
-            {currentActivity.time}
-          </span>
-        </div>
-      </div>
-
       {/* 2. HERO SECTION */}
       <section className="relative max-w-7xl mx-auto px-4 sm:px-8 py-8 sm:py-14 w-full flex-1 flex flex-col lg:flex-row items-center justify-between gap-10 lg:gap-14 overflow-hidden">
         
@@ -498,7 +463,7 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#0084d6]"></span>
-              <span>{t('fast_d1')}</span>
+              <span>{isArabic ? 'إدارة المنتجات والأسعار بسهولة' : 'Easy product and price management'}</span>
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#0084d6]"></span>
@@ -542,7 +507,7 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
                     </h3>
                     <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 text-[9px] font-black shrink-0">
                       <CheckCircle2 className="w-2.5 h-2.5" />
-                      {isArabic ? 'موثّق' : 'Verified'}
+                      {isArabic ? 'نموذج توضيحي' : 'Store example'}
                     </span>
                   </div>
                   <span className="text-[10px] sm:text-[11px] text-[#0084d6] dark:text-sky-400 font-bold block truncate">
@@ -662,82 +627,15 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
 
       </section>
 
-      {/* 3. LIVE PLATFORM METRICS */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-8 py-6 w-full">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          
-          {/* Metric 1 */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-sky-300 dark:hover:border-sky-700 transition-all group">
-            <div className="flex items-center justify-between mb-2">
-              <span className="w-9 h-9 rounded-xl bg-[#f0f7ff] dark:bg-slate-800 text-[#0084d6] dark:text-sky-400 flex items-center justify-center font-black">
-                <StoreIcon className="w-5 h-5" />
-              </span>
-              <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                {isArabic ? 'نشط الآن' : 'Live'}
-              </span>
-            </div>
-            <h3 className="text-2xl sm:text-3xl font-black text-[#0e1f38] dark:text-white">
-              {isArabic ? '+١٥٠ متجر' : '+150 Stores'}
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-bold mt-0.5">
-              {isArabic ? 'متاجر سحابية تعمل على مدار الساعة' : 'Active 24/7 Cloud Stores'}
-            </p>
-          </div>
-
-          {/* Metric 2 */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-sky-300 dark:hover:border-sky-700 transition-all group">
-            <div className="flex items-center justify-between mb-2">
-              <span className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-black">
-                <MessageCircle className="w-5 h-5" />
-              </span>
-              <span className="text-[10px] font-black text-[#0084d6] dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 px-2 py-0.5 rounded-md">
-                WhatsApp
-              </span>
-            </div>
-            <h3 className="text-2xl sm:text-3xl font-black text-[#0e1f38] dark:text-white">
-              {isArabic ? '+١٢,٥٠٠ طلب' : '+12,500 Orders'}
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-bold mt-0.5">
-              {isArabic ? 'تم تأكيدها واستلامها عبر واتساب' : 'Confirmed WhatsApp Orders'}
-            </p>
-          </div>
-
-          {/* Metric 3 */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-sky-300 dark:hover:border-sky-700 transition-all group">
-            <div className="flex items-center justify-between mb-2">
-              <span className="w-9 h-9 rounded-xl bg-[#f0f7ff] dark:bg-slate-800 text-[#0084d6] dark:text-sky-400 flex items-center justify-center font-black">
-                <Sparkles className="w-5 h-5" />
-              </span>
-              <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md">
-                Cloudflare D1
-              </span>
-            </div>
-            <h3 className="text-2xl sm:text-3xl font-black text-[#0084d6] dark:text-sky-400 font-mono">
-              {isArabic ? '٠.٣ ثانية' : '0.3s'}
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-bold mt-0.5">
-              {isArabic ? 'سرعة استجابة فائقة لقواعد البيانات' : 'Lightning Database Speed'}
-            </p>
-          </div>
-
-          {/* Metric 4 */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-sky-300 dark:hover:border-sky-700 transition-all group">
-            <div className="flex items-center justify-between mb-2">
-              <span className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center font-black">
-                <ShieldCheck className="w-5 h-5" />
-              </span>
-              <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md">
-                Uptime
-              </span>
-            </div>
-            <h3 className="text-2xl sm:text-3xl font-black text-[#0e1f38] dark:text-white font-mono">
-              99.9%
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-bold mt-0.5">
-              {isArabic ? 'استقرار سحابي وأمان كامل للبيانات' : 'Cloud Reliability & Security'}
-            </p>
-          </div>
+      {/* Practical store features, without fabricated platform counters. */}
+      <section aria-label={isArabic ? 'مميزات متجرك الإلكتروني' : 'Your store features'} className="max-w-7xl mx-auto px-4 sm:px-8 py-8 w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            {Icon: ShoppingBag, title: isArabic ? 'منتجاتك بشكل احترافي' : 'A polished product catalog', detail: isArabic ? 'اعرض صور منتجاتك وأسعارها وتصنيفاتها في واجهة واضحة وسهلة التصفح.' : 'Show product photos, prices and categories in a clear storefront.'},
+            {Icon: MessageCircle, title: isArabic ? 'طلبات على واتساب' : 'WhatsApp orders', detail: isArabic ? 'العميل يختار منتجاته ويشارك معك تفاصيل الطلب مباشرة على واتساب.' : 'Customers choose products and send their order details to your WhatsApp.'},
+            {Icon: Sparkles, title: isArabic ? 'إدارة سهلة لمتجرك' : 'Simple store management', detail: isArabic ? 'أضف منتجاتك وعدّل الأسعار والتوفر من لوحة تحكم خاصة بمتجرك.' : 'Add products and manage prices and availability from your own dashboard.'},
+            {Icon: ExternalLink, title: isArabic ? 'رابط خاص قابل للمشاركة' : 'Your own shareable link', detail: isArabic ? 'شارك رابط متجرك على السوشيال ميديا، وخلي العملاء يتصفحوه من الموبايل.' : 'Share your store on social media and let customers browse on their phones.'},
+          ].map(({Icon,title,detail})=><article key={title} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900"><span className="mb-5 grid h-11 w-11 place-items-center rounded-2xl bg-sky-50 text-sky-600 dark:bg-sky-950 dark:text-sky-400"><Icon size={22}/></span><h3 className="text-base font-extrabold text-slate-900 dark:text-white">{title}</h3><p className="mt-2 text-sm leading-7 text-slate-500 dark:text-slate-400">{detail}</p></article>)}
         </div>
       </section>
 
@@ -826,10 +724,10 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
               ⚡
             </div>
             <h4 className="font-extrabold text-sm sm:text-base text-[#0e1f38] dark:text-white">
-              {isArabic ? 'أسرع بنية سحابية D1' : 'Fastest Cloudflare D1'}
+              {isArabic ? 'متجرك متاح أونلاين' : 'Your store, online'}
             </h4>
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
-              {isArabic ? 'تقنية سيرفرلس حديثة تعطي متجرك سرعة تحميل فائقة مهما كان عدد الزوار أو المنتجات.' : 'Modern serverless tech gives blazing speed regardless of traffic.'}
+              {isArabic ? 'متجرك ومنتجاتك في رابط واحد، يمكن للعملاء زيارته بدون تثبيت أي تطبيق.' : 'Your products in one link that customers can visit without installing an app.'}
             </p>
           </div>
 

@@ -37,6 +37,7 @@ async function test(){
  const order={store_id:a.store.id,customer_name:'عميل تجريبي',customer_phone:'01000000000',items:[{product:{id:p.product.id,price:0},quantity:2}],total_price:0};
  await data(await call('orders','POST',order));
  const orders=await data(await call('orders','GET',undefined,c1));assert.equal(orders.orders[0].total_price,100);
+ const analytics=await data(await call('admin/analytics','GET',undefined,ac));assert.equal(analytics.analytics.totalOrders,1);assert.equal(Object.values(analytics.analytics.monthMap)[0],1);
  assert.equal((await call('orders')).status,401);
  assert.equal((await data(await call('orders','GET',undefined,c2))).orders.length,0);
  assert.equal((await call('orders','POST',{...order,items:[{product:{id:p.product.id},quantity:-1}]})).status,400);

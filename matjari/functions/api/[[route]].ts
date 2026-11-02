@@ -357,7 +357,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (path === 'admin/analytics' && method === 'GET') {
       const orders = await db.prepare('SELECT COUNT(*) AS n FROM orders').first() as any;
       const products = await db.prepare('SELECT COUNT(*) AS n FROM products').first() as any;
-      const months = await db.prepare("SELECT strftime('%Y-%m',created_at) AS month,SUM(total_price) AS amount FROM orders GROUP BY month").all();
+      const months = await db.prepare("SELECT strftime('%Y-%m',created_at) AS month,COUNT(*) AS amount FROM orders GROUP BY month").all();
       return new Response(JSON.stringify({success:true,analytics:{totalOrders:orders.n,totalProducts:products.n,monthMap:Object.fromEntries((months.results||[]).map((r:any)=>[r.month,r.amount]))}}),{headers});
     }
     if (path === 'stores') {

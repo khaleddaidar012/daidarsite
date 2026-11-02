@@ -17,10 +17,6 @@ export type AppView = 'landing' | 'login' | 'merchant_login' | 'super_admin' | '
 export const App: React.FC = () => {
   const { isArabic } = useLanguage();
 
-  // Login Portal Gate: appears ONLY before the main page
-  const [hasPassedLoginPortal, setHasPassedLoginPortal] = useState<boolean>(() => {
-    return sessionStorage.getItem('has_passed_login_portal') === 'true';
-  });
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentStore, setCurrentStore] = useState<Store | null>(null);
@@ -99,7 +95,8 @@ export const App: React.FC = () => {
 
         // 0. Explicit Landing Page View (?view=landing)
         if (urlView === 'landing') {
-          setView('landing');
+          if (session?.user.role === 'super_admin') navigateTo('super_admin');
+          else setView('landing');
           setIsLoading(false);
           return;
         }
@@ -131,27 +128,28 @@ export const App: React.FC = () => {
 
         // 3. Direct Store Owner Dashboard (?view=store_owner)
         if (urlView === 'store_owner') {
-          setView('store_owner');
+          setView(session?.user.role === 'super_admin' ? 'super_admin' : session ? 'store_owner' : 'merchant_login');
           setIsLoading(false);
           return;
         }
 
         // 4. Direct Super Admin Dashboard (?view=super_admin)
         if (urlView === 'super_admin') {
-          setView('super_admin');
+          setView(session?.user.role === 'super_admin' ? 'super_admin' : 'login');
           setIsLoading(false);
           return;
         }
 
         // 5. Direct Admin Login Portal (?view=admin_login or ?view=login)
         if (urlView === 'admin_login' || urlView === 'login') {
-          setView('login');
+          setView(session?.user.role === 'super_admin' ? 'super_admin' : 'login');
           setIsLoading(false);
           return;
         }
 
         // 6. DEFAULT ENTRY: The Main Page (landing)
-        setView('landing');
+        if (session?.user.role === 'super_admin') navigateTo('super_admin');
+        else setView('landing');
       } catch (err) {
         console.error('Initialization error:', err);
         setView('landing');
@@ -168,11 +166,7 @@ export const App: React.FC = () => {
     setCurrentUser(user);
     setCurrentStore(store);
     setCurrentSubscription(subscription);
-    setHasPassedLoginPortal(true);
-    sessionStorage.setItem('has_passed_login_portal', 'true');
-
-    // Go directly to the Main Page (الصفحة الرئيسية)
-    navigateTo('landing');
+    navigateTo(user.role === 'super_admin' ? 'super_admin' : 'store_owner');
   };
 
   // Handle Logout
@@ -182,8 +176,6 @@ export const App: React.FC = () => {
     setCurrentStore(null);
     setCurrentSubscription(null);
     localStorage.removeItem('my_store_user');
-    setHasPassedLoginPortal(false);
-    sessionStorage.removeItem('has_passed_login_portal');
     navigateTo(targetView);
   };
 
@@ -259,24 +251,6 @@ export const App: React.FC = () => {
   }
 
   // ─── VIEW ROUTING ────────────────────────────────────────
-
-  // 0. LOGIN PORTAL GATE (بوابة تسجيل الدخول تظهر قبل الصفحة الرئيسية فقط)
-  if (!hasPassedLoginPortal) {
-    return (
-      <MerchantLoginView
-        onLoginSuccess={(user, store, sub) => {
-          handleLoginSuccess(user, store, sub);
-          setHasPassedLoginPortal(true);
-          sessionStorage.setItem('has_passed_login_portal', 'true');
-        }}
-        onBackToHome={() => {
-          setHasPassedLoginPortal(true);
-          sessionStorage.setItem('has_passed_login_portal', 'true');
-          navigateTo('landing');
-        }}
-      />
-    );
-  }
 
   // 1. PUBLIC STOREFRONT (Customer view for individual store)
   if (view === 'storefront' && storefrontStore) {

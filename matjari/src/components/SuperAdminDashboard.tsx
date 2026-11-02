@@ -53,7 +53,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   const [merchants, setMerchants] = useState<MerchantDetail[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'valid' | 'expired'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'valid' | 'expired' | 'pending'>('all');
   const [showAnalytics, setShowAnalytics] = useState(true);
   const [copiedStoreId, setCopiedStoreId] = useState<string | null>(null);
   const [selectedMerchantForView, setSelectedMerchantForView] = useState<MerchantDetail | null>(null);
@@ -264,6 +264,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     if (!matchesSearch) return false;
 
     if (statusFilter === 'active') return m.store.is_active === 1;
+    if (statusFilter === 'pending') return m.store.is_active === 0 && m.user.is_active === 1;
     if (statusFilter === 'valid') return m.subscription.status === 'active';
     if (statusFilter === 'expired') return m.subscription.status !== 'active';
     return true;
@@ -273,6 +274,11 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   const activeStores = merchants.filter(m => m.store.is_active === 1).length;
   const activeSubscriptions = merchants.filter(m => m.subscription.status === 'active').length;
   const expiredSubscriptions = totalStores - activeSubscriptions;
+  const pendingStores = merchants.filter(m => m.store.is_active === 0 && m.user.is_active === 1).length;
+  const openStores = (filter: typeof statusFilter) => {
+    setStatusFilter(filter);
+    document.getElementById('admin-store-management')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   // Real Monthly Bars data computed directly from Cloudflare D1 traffic_stats!
   const monthLabels = isArabic
@@ -290,7 +296,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
 
   const monthlyData = monthsToShow.map(mIdx => {
     const monthNumStr = String(mIdx + 1).padStart(2, '0');
-    const visits = platformAnalytics.monthMap[monthNumStr] || 0;
+    const visits = platformAnalytics.monthMap[`${new Date().getFullYear()}-${monthNumStr}`] || 0;
     return {
       month: monthLabels[mIdx],
       visits,
@@ -315,7 +321,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   return (
     <div className="min-h-screen bg-[#f7fafe] dark:bg-[#0b1329] text-slate-800 dark:text-slate-100 flex flex-col font-cairo transition-colors selection:bg-sky-100 selection:text-sky-900">
       
-      {/* 1. TOP NAVBAR (Matching Landing Page Aesthetic & Modern Styling) */}
+      {/* A separate workspace for platform administration. */}
       <header className="w-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-40 px-3 sm:px-6 lg:px-8 py-3 transition-colors shadow-xs">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
           
@@ -332,7 +338,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                   {t('daidar_solutions')}
                 </span>
                 <span className="text-[10px] sm:text-[11px] text-[#0084d6] dark:text-sky-400 font-bold block -mt-0.5 truncate">
-                  {t('admin_dashboard_title')}
+                  {isArabic ? 'إدارة منصة متجري' : 'Matjari Administration'}
                 </span>
               </div>
             </div>
@@ -345,7 +351,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
               </span>
               <span className="px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 font-bold text-[10px] flex items-center gap-1 border border-emerald-200/60 dark:border-emerald-800/60">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>Cloudflare D1 Online</span>
+                <span>{isArabic ? 'مساحة الإدارة' : 'Admin workspace'}</span>
               </span>
             </div>
           </div>
@@ -400,6 +406,28 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
 
       {/* 2. MAIN DASHBOARD CONTENT */}
       <main className="max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
+        <section aria-labelledby="admin-workspace-title" className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#0e1f38] via-[#142e4d] to-[#12566b] p-6 text-white shadow-xl shadow-slate-900/10 sm:p-9">
+          <div aria-hidden="true" className="pointer-events-none absolute -end-16 -top-24 h-80 w-80 rounded-full border-[40px] border-white/5" />
+          <div className="relative grid gap-8 lg:grid-cols-[1.2fr_1fr] lg:items-center">
+            <div>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold text-cyan-200"><Shield size={14}/>{isArabic ? 'لوحة إدارة المنصة' : 'Platform administration'}</span>
+              <h1 id="admin-workspace-title" className="mt-5 text-3xl font-black leading-tight sm:text-4xl">{isArabic ? 'كل متاجرك، تحت سيطرتك.' : 'Your platform. One clear view.'}</h1>
+              <p className="mt-3 max-w-lg text-sm leading-7 text-slate-300">{isArabic ? 'راجع طلبات التفعيل، تابع الاشتراكات، وأدر حسابات التجار من مكان واحد.' : 'Review activation requests, follow subscriptions, and manage merchant accounts in one place.'}</p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <button type="button" onClick={()=>setIsCreateModalOpen(true)} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-extrabold text-slate-900 hover:bg-cyan-50"><Plus size={17}/>{isArabic ? 'إضافة متجر جديد' : 'Add a store'}</button>
+                <button type="button" onClick={()=>void loadMerchants()} disabled={isLoading} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/20 px-4 py-2.5 text-sm font-bold text-white hover:bg-white/10 disabled:opacity-50"><RefreshCw size={16} className={isLoading?'animate-spin':''}/>{isArabic ? 'تحديث البيانات' : 'Refresh data'}</button>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button type="button" onClick={()=>openStores('pending')} className="rounded-2xl border border-amber-200/20 bg-amber-200/10 p-5 text-start transition hover:bg-amber-200/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">
+                <Clock size={20} className="mb-3 text-amber-200"/><span className="block text-sm font-bold text-amber-100">{isArabic ? 'بانتظار التفعيل' : 'Awaiting activation'}</span><strong className="mt-2 block text-4xl font-black">{isLoading?'—':pendingStores.toLocaleString(isArabic?'ar-EG':'en-US')}</strong><span className="mt-3 block text-xs text-slate-300">{isArabic ? 'مراجعة المتاجر الجديدة ←' : 'Review new stores →'}</span>
+              </button>
+              <button type="button" onClick={()=>openStores('expired')} className="rounded-2xl border border-white/15 bg-white/5 p-5 text-start transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">
+                <Calendar size={20} className="mb-3 text-cyan-200"/><span className="block text-sm font-bold text-slate-200">{isArabic ? 'اشتراكات تحتاج مراجعة' : 'Subscriptions to review'}</span><strong className="mt-2 block text-4xl font-black">{isLoading?'—':expiredSubscriptions.toLocaleString(isArabic?'ar-EG':'en-US')}</strong><span className="mt-3 block text-xs text-slate-300">{isArabic ? 'متابعة التجديدات ←' : 'Review renewals →'}</span>
+              </button>
+            </div>
+          </div>
+        </section>
         
         {/* Toast / Notification Banner */}
         {message && (
@@ -564,10 +592,10 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
               </div>
               <div>
                 <h3 className="font-extrabold text-[#0e1f38] dark:text-white text-xs sm:text-sm">
-                  {t('network_performance')}
+                  {isArabic ? 'نشاط المتاجر والطلبات' : 'Stores and orders activity'}
                 </h3>
                 <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                  {t('network_activity_desc')}
+                  {isArabic ? 'ملخص البيانات المسجلة على المنصة' : 'An overview of recorded platform data'}
                 </p>
               </div>
             </div>
@@ -615,8 +643,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                     <Sparkles className="w-4 h-4" />
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block">{isArabic ? 'سرعة التخزين والاستجابة' : 'Cloudflare D1 Response'}</span>
-                    <span className="text-lg font-black text-[#00b4d8]">12 ms (Edge Fast)</span>
+                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block">{isArabic ? 'متاجر بانتظار التفعيل' : 'Pending activation'}</span>
+                    <span className="text-lg font-black text-[#00b4d8]">{pendingStores.toLocaleString(isArabic?'ar-EG':'en-US')}</span>
                   </div>
                 </div>
               </div>
@@ -625,10 +653,10 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
               <div className="p-4 rounded-2xl bg-slate-50/70 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-black text-[#0e1f38] dark:text-slate-200">
-                    {t('monthly_perf')} (Cloudflare D1 Analytics)
+                    {isArabic ? 'الطلبات المسجلة شهرياً' : 'Recorded orders by month'}
                   </span>
                   <span className="text-[10px] font-bold text-[#0084d6] dark:text-sky-400 bg-sky-100/70 dark:bg-sky-950/70 px-2.5 py-0.5 rounded-full">
-                    {isArabic ? 'تحديث لحظي' : 'Real-time'}
+                    {isArabic ? 'بيانات فعلية' : 'Recorded data'}
                   </span>
                 </div>
 
@@ -637,7 +665,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                     <div key={idx} className="flex-1 h-full flex flex-col justify-end items-center gap-1 group relative">
                       {/* Tooltip on Hover */}
                       <div className="absolute -top-7 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[10px] font-bold py-0.5 px-1.5 rounded-md pointer-events-none whitespace-nowrap z-20 shadow-xs">
-                        {bar.visits} {isArabic ? 'زيارة' : 'visits'}
+                        {bar.visits} {isArabic ? 'طلب' : 'orders'}
                       </div>
                       <div
                         style={{ height: `${bar.heightPct}%` }}
@@ -656,7 +684,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         </div>
 
         {/* 5. MERCHANTS MANAGEMENT CARD & FILTER TABS */}
-        <div className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-2xl shadow-sky-500/5 space-y-4">
+        <div id="admin-store-management" className="scroll-mt-28 bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-2xl shadow-sky-500/5 space-y-4">
           
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <div>
@@ -755,6 +783,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
               }`}
             >
               {t('filter_need_renewal')} ({expiredSubscriptions})
+            </button>
+            <button type="button" onClick={()=>setStatusFilter('pending')} aria-pressed={statusFilter==='pending'} className={`rounded-full border px-4 py-2 text-xs font-extrabold whitespace-nowrap ${statusFilter==='pending'?'border-amber-600 bg-amber-600 text-white':'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200'}`}>
+              {isArabic ? 'بانتظار التفعيل' : 'Awaiting activation'} ({pendingStores})
             </button>
           </div>
 
