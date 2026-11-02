@@ -29,14 +29,12 @@ import MotaryCleanBackground from './MotaryCleanBackground';
 interface MerchantLoginViewProps {
   onLoginSuccess: (user: User, store: Store | null, subscription: Subscription | null) => void;
   onBackToHome: () => void;
-  onGoToAdminLogin?: () => void;
   initialMode?: 'login' | 'register';
 }
 
 export const MerchantLoginView: React.FC<MerchantLoginViewProps> = ({
   onLoginSuccess,
   onBackToHome,
-  onGoToAdminLogin,
   initialMode = 'login',
 }) => {
   const { t, isArabic, toggleLang } = useLanguage();
@@ -526,19 +524,6 @@ export const MerchantLoginView: React.FC<MerchantLoginViewProps> = ({
                 <span>☁️ سحابة Cloudflare D1</span>
               </div>
             </form>
-          )}
-
-          {/* Super Admin Access Link & Button */}
-          {onGoToAdminLogin && (
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 text-center">
-              <button
-                type="button"
-                onClick={onGoToAdminLogin}
-                className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 hover:underline cursor-pointer"
-              >
-                {isArabic ? 'بوابة الأدمن الرئيسي' : 'Admin Portal'}
-              </button>
-            </div>
           )}
 
           {/* Direct Skip to Main Page (Once passed, never forced to login again) */}

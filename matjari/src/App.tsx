@@ -274,7 +274,6 @@ export const App: React.FC = () => {
           sessionStorage.setItem('has_passed_login_portal', 'true');
           navigateTo('landing');
         }}
-        onGoToAdminLogin={() => navigateTo('login')}
       />
     );
   }
@@ -344,7 +343,6 @@ export const App: React.FC = () => {
       <MerchantLoginView
         onLoginSuccess={handleLoginSuccess}
         onBackToHome={() => navigateTo('landing')}
-        onGoToAdminLogin={() => navigateTo('login')}
       />
     );
   }
