@@ -1,287 +1,47 @@
-import React, { useState, useEffect } from 'react';
-import { Store, Product, Subscription, User } from '../types';
-import { api } from '../services/api';
-import {
-  ExternalLink,
-  Copy,
-  Check,
-  LogOut,
-  Globe,
-  Sparkles,
-  Home,
-  Menu,
-  Activity,
-} from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
-import { Sidebar, TabType } from './Sidebar';
-import { GeneralInfoView } from './GeneralInfoView';
-import { ProductsView } from './ProductsView';
-import { PaymentMethodsView } from './PaymentMethodsView';
-import { SettingsView } from './SettingsView';
-
-interface StoreOwnerDashboardProps {
-  user: User;
-  initialStore: Store | null;
-  subscription: Subscription | null;
-  onLogout: () => void;
-  onPreviewStore: (storeId: string) => void;
-  onBackToHome?: () => void;
-}
-
-export const StoreOwnerDashboard: React.FC<StoreOwnerDashboardProps> = ({
-  user,
-  initialStore,
-  subscription,
-  onLogout,
-  onPreviewStore,
-  onBackToHome,
-}) => {
-  const { t, isArabic, toggleLanguage } = useLanguage();
-
-  const [store, setStore] = useState<Store | null>(initialStore);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [currentTab, setCurrentTab] = useState<TabType>('general');
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isCopied, setIsCopied] = useState(false);
-
-  const loadData = async () => {
-    if (!store?.id) return;
-    try {
-      setIsLoading(true);
-      const [fetchedProducts, fetchedStore] = await Promise.all([
-        api.getProducts(store.id),
-        api.getStore(store.id),
-      ]);
-      setProducts(fetchedProducts);
-      if (fetchedStore) {
-        setStore(fetchedStore);
-      }
-    } catch (err) {
-      console.error('Failed loading dashboard data:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, [store?.id]);
-
-  // Construct absolute store link
-  const storeUrl = `${window.location.origin}${window.location.pathname}?view=storefront&store_id=${store?.id}`;
-
-  const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(storeUrl);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 3000);
-    } catch {
-      const ta = document.createElement('textarea');
-      ta.value = storeUrl;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 3000);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-[#f8fafc] dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
-      {/* 1. SIDEBAR (Fixed on desktop, drawer on mobile) */}
-      <Sidebar
-        currentTab={currentTab}
-        onSelectTab={(tab) => setCurrentTab(tab)}
-        isOpenMobile={isMobileSidebarOpen}
-        onCloseMobile={() => setIsMobileSidebarOpen(false)}
-        productCount={products.length}
-      />
-
-      {/* 2. MAIN LAYOUT WRAPPER (Shifted on desktop to accommodate sidebar) */}
-      <div className={`flex-1 flex flex-col transition-all duration-300 ${isArabic ? 'lg:mr-72' : 'lg:ml-72'}`}>
-        
-        {/* TOP NAVBAR / HEADER */}
-        <header className="sticky top-0 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 px-4 sm:px-6 lg:px-8 py-3.5 transition-colors">
-          <div className="flex items-center justify-between gap-3">
-            
-            {/* Left/Start Side: Hamburger (Mobile) + Store Identity */}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setIsMobileSidebarOpen(true)}
-                className="lg:hidden p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors"
-                aria-label="Open Navigation Menu"
-              >
-                <Menu className="w-5 h-5" />
-              </button>
-
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-[#0084d6] text-white flex items-center justify-center font-black text-base shadow-md shadow-sky-600/25 shrink-0 overflow-hidden">
-                  {store?.logo_data ? (
-                    <img src={store.logo_data} alt={store.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <span>{store?.name?.charAt(0) || 'م'}</span>
-                  )}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-sm sm:text-base font-black text-[#0e1f38] dark:text-white leading-tight truncate max-w-[140px] sm:max-w-[240px]">
-                      {store?.name || (isArabic ? 'لوحة تحكم التاجر' : 'Vendor Dashboard')}
-                    </h1>
-                    <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-black text-[#0084d6] dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 border border-sky-200/80 dark:border-sky-800 px-2 py-0.5 rounded-full">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      D1 Live
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-400 font-medium truncate max-w-[160px] sm:max-w-[260px]">
-                    {isArabic ? 'التاجر:' : 'Merchant:'} <span className="font-mono font-bold text-[#0084d6] dark:text-sky-400">{user.username}</span>
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Right/End Side: Action Buttons & Controls */}
-            <div className="flex items-center gap-1.5 sm:gap-2.5">
-              
-              {/* Preview Live Store */}
-              <button
-                onClick={() => {
-                  if (store?.id) onPreviewStore(store.id);
-                }}
-                className="px-3 sm:px-4 py-2 rounded-2xl bg-[#0084d6] hover:bg-[#0074bd] text-white font-black text-xs flex items-center gap-1.5 shadow-md shadow-sky-600/25 active:scale-95 transition-all cursor-pointer"
-                title={isArabic ? 'معاينة المتجر المباشر' : 'Preview Store'}
-              >
-                <span className="hidden sm:inline">{t('preview_store')}</span>
-                <span className="sm:hidden">{isArabic ? 'معاينة' : 'Preview'}</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </button>
-
-              {/* Copy Direct Store Link */}
-              <button
-                onClick={handleCopyLink}
-                className={`px-3 sm:px-4 py-2 rounded-2xl font-black text-xs flex items-center gap-1.5 shadow-xs active:scale-95 transition-all cursor-pointer ${
-                  isCopied
-                    ? 'bg-emerald-600 text-white shadow-emerald-500/25'
-                    : 'bg-[#0e1f38] hover:bg-[#152a4a] text-white'
-                }`}
-                title={isArabic ? 'نسخ رابط المتجر' : 'Copy store link'}
-              >
-                {isCopied ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5 text-[#00b4d8]" />}
-                <span className="hidden md:inline">{isCopied ? t('link_copied') : t('copy_store_link')}</span>
-              </button>
-
-              {/* Home Navigation */}
-              {onBackToHome && (
-                <button
-                  onClick={onBackToHome}
-                  className="p-2 sm:px-3 sm:py-2 rounded-2xl bg-[#e6f4fe] dark:bg-sky-950/70 hover:bg-sky-100 dark:hover:bg-sky-900/50 text-[#0084d6] dark:text-sky-300 font-black text-xs flex items-center gap-1.5 border border-sky-200/80 dark:border-sky-800 transition-all cursor-pointer"
-                  title={isArabic ? 'العودة للرئيسية' : 'Back to Home'}
-                >
-                  <Home className="w-4 h-4 text-[#0084d6]" />
-                  <span className="hidden md:inline">{isArabic ? 'الرئيسية' : 'Home'}</span>
-                </button>
-              )}
-
-              {/* Language Toggle */}
-              <button
-                onClick={toggleLanguage}
-                className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors flex items-center gap-1"
-              >
-                <Globe className="w-3.5 h-3.5 text-[#0084d6]" />
-                <span className="hidden sm:inline">{t('lang_switch')}</span>
-              </button>
-
-              {/* Logout Button */}
-              <button
-                onClick={onLogout}
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#fff1f2] hover:bg-[#ffe4e6] dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-[#e11d48] dark:text-rose-400 border border-[#fecdd3] dark:border-rose-900/70 flex items-center justify-center transition-all hover:scale-105 active:scale-95 shadow-2xs cursor-pointer shrink-0"
-                title={t('logout')}
-                aria-label="Logout"
-              >
-                <LogOut className="w-4 h-4 text-[#e11d48] dark:text-rose-400" />
-              </button>
-            </div>
-          </div>
-        </header>
-
-        {/* SUBSCRIPTION PLAN STATUS BAR */}
-        <div className="bg-[#e6f4fe] dark:bg-sky-950/60 border-b border-sky-200/80 dark:border-sky-900 px-4 sm:px-6 lg:px-8 py-2 text-xs text-sky-900 dark:text-sky-200 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-3.5 h-3.5 text-[#0084d6] shrink-0" />
-            <span>
-              {t('your_plan')} <strong className="font-extrabold">{subscription?.plan_name || t('annual_plan')}</strong>
-            </span>
-            <span className="text-slate-400">|</span>
-            <span>
-              {t('expiry_date')} <strong className="font-mono">{subscription?.end_date || (isArabic ? 'غير محدد' : 'N/A')}</strong>
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 text-[11px] text-[#0084d6] dark:text-sky-400 font-bold">
-            <span>{t('whatsapp_for_orders')} {store?.whatsapp_number}</span>
-          </div>
-        </div>
-
-        {/* INACTIVE STORE WARNING / PREVIEW-ONLY BANNER */}
-        {store?.is_active === 0 && (
-          <div className="bg-gradient-to-r from-amber-500/15 via-amber-500/20 to-amber-500/15 border-b border-amber-300 dark:border-amber-800 px-4 sm:px-6 lg:px-8 py-3.5 text-amber-950 dark:text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-fadeIn">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black shrink-0 shadow-xs">
-                ⚠️
-              </div>
-              <div>
-                <span className="font-black text-xs sm:text-sm block">
-                  {isArabic ? 'متجرك قيد المراجعة وبانتظار التفعيل من قبل الإدارة' : 'Store Pending Activation by Admin'}
-                </span>
-                <span className="text-[11px] text-amber-850 dark:text-amber-300 font-medium block">
-                  {isArabic
-                    ? 'تم إنشاء متجرك بنجاح وهو حالياً في وضع «المعاينة فقط». يمكنك تصفح المتجر ومعاينته، ولا يمكن إضافة المنتجات أو استقبال الطلبات لحين قيام الأدمن بالتفعيل.'
-                    : 'Your store is created in Preview-Only mode. You can preview the store, while editing and live orders are unlocked once activated by Admin.'}
-                </span>
-              </div>
-            </div>
-            <button
-              onClick={() => store?.id && onPreviewStore(store.id)}
-              className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-black text-xs flex items-center gap-1.5 shadow-md shadow-amber-600/20 transition-all shrink-0 cursor-pointer"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span>{isArabic ? 'معاينة المتجر الآن' : 'Preview Store'}</span>
-            </button>
-          </div>
-        )}
-
-        {/* MAIN DYNAMIC CONTENT AREA */}
-        <main className="p-4 sm:p-6 lg:p-8 flex-1 max-w-7xl w-full mx-auto">
-          {currentTab === 'general' && (
-            <GeneralInfoView
-              store={store}
-              onNavigateToProducts={() => setCurrentTab('products')}
-              onNavigateToStore={() => onPreviewStore(store?.id || '')}
-            />
-          )}
-
-          {currentTab === 'products' && (
-            <ProductsView
-              products={products}
-              store={store}
-              onRefresh={loadData}
-            />
-          )}
-
-          {currentTab === 'payments' && (
-            <PaymentMethodsView
-              onGoToWhatsAppCheckout={() => onPreviewStore(store?.id || '')}
-            />
-          )}
-
-          {currentTab === 'settings' && (
-            <SettingsView
-              store={store}
-              onRefresh={loadData}
-            />
-          )}
-        </main>
-      </div>
-    </div>
-  );
+import React,{useCallback,useEffect,useState} from 'react';
+import {Store,Product,Subscription,User} from '../types';
+import {api} from '../services/api';
+import {ProductsView} from './ProductsView';
+import {SettingsView} from './SettingsView';
+import {useLanguage} from '../context/LanguageContext';
+import EcosystemPanel from '../../../shared/EcosystemPanel';
+import {Package,ShoppingBag,Settings,ExternalLink,Copy,Check,LogOut,RefreshCw,MessageCircle,Home,CreditCard} from 'lucide-react';
+interface Props{user:User;initialStore:Store|null;subscription:Subscription|null;onLogout:()=>void;onPreviewStore:(id:string)=>void;onBackToHome?:()=>void}
+type Tab='overview'|'products'|'orders'|'settings'|'subscription';
+export const StoreOwnerDashboard:React.FC<Props>=({user,initialStore,subscription:initialSubscription,onLogout,onPreviewStore})=>{
+ const {isArabic:ar}=useLanguage();
+ const [store,setStore]=useState(initialStore),[subscription,setSubscription]=useState(initialSubscription),[products,setProducts]=useState<Product[]>([]),[orders,setOrders]=useState<any[]>([]),[tab,setTab]=useState<Tab>('overview'),[loading,setLoading]=useState(true),[error,setError]=useState(''),[copied,setCopied]=useState(false),[saving,setSaving]=useState(false);
+ const text=(a:string,b:string)=>ar?a:b;
+ const load=useCallback(async()=>{setLoading(true);setError('');try{const s=await api.session();if(!s)throw Error(ar?'انتهت الجلسة. سجل دخولك مرة أخرى.':'Your session expired. Sign in again.');setStore(s.store);setSubscription(s.subscription);if(s.store){const [p,o]=await Promise.all([api.getProducts(s.store.id),api.getOrders(s.store.id)]);setProducts(p);setOrders(o)}else{setProducts([]);setOrders([])}}catch(e){setError(e instanceof Error?e.message:'Error')}finally{setLoading(false)}},[ar,user.id]);
+ useEffect(()=>{void load()},[load]);
+ const expired=!!subscription&&Date.parse(subscription.end_date+'T23:59:59.999Z')<Date.now();
+ const active=!!store?.is_active&&!!subscription&&subscription.status==='active'&&!expired;
+ const status=!store?text('لا يوجد متجر بعد','No store yet'):!store.is_active?text('بانتظار التفعيل','Awaiting activation'):expired?text('الاشتراك منتهي','Subscription expired'):!active?text('الاشتراك غير فعال','Inactive subscription'):text('متجرك فعال','Store active');
+ const storeUrl=store?`${window.location.origin}/?view=storefront&store_id=${encodeURIComponent(store.id)}`:'';
+ const support='https://wa.me/201061532875?text='+encodeURIComponent('مرحباً، أحتاج مساعدة بخصوص متجر '+(store?.name||user.username)+(store?' ('+store.id+')':''));
+ const tabs:{id:Tab;label:string;Icon:typeof Home}[]=[{id:'overview',label:text('متجري','Overview'),Icon:Home},{id:'products',label:text('المنتجات','Products'),Icon:Package},{id:'orders',label:text('الطلبات','Orders'),Icon:ShoppingBag},{id:'settings',label:text('بيانات المتجر','Store details'),Icon:Settings},{id:'subscription',label:text('الاشتراك والدعم','Subscription & support'),Icon:CreditCard}];
+ async function copy(){try{await navigator.clipboard.writeText(storeUrl);setCopied(true);window.setTimeout(()=>setCopied(false),2000)}catch{setError(text('تعذر النسخ. انسخ الرابط الظاهر يدوياً.','Could not copy. Copy the displayed link manually.'))}}
+ async function create(e:React.FormEvent<HTMLFormElement>){e.preventDefault();const b=new FormData(e.currentTarget);setSaving(true);setError('');try{const r=await fetch('/api/auth/create-store',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.fromEntries(b))});const d=await r.json();if(!r.ok)throw Error(d.error);await load()}catch(e){setError(e instanceof Error?e.message:'Error')}finally{setSaving(false)}}
+ return <div dir={ar?'rtl':'ltr'} className="min-h-screen bg-slate-50 text-slate-900">
+  <header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6"><div><p className="text-xs font-bold text-sky-600">{text('مساحة صاحب المتجر','Merchant workspace')}</p><h1 className="mt-1 max-w-lg break-words text-xl font-black">{store?.name||text('أهلاً بك في متجري','Welcome to Matjari')}</h1><p className="mt-1 text-xs text-slate-500">{user.username} · {status}</p></div><div className="flex items-center gap-2"><button type="button" onClick={()=>void load()} disabled={loading} aria-label={text('تحديث البيانات','Refresh data')} className="rounded-xl border p-3 disabled:opacity-50"><RefreshCw size={17} className={loading?'animate-spin':''}/></button><button type="button" onClick={onLogout} className="flex items-center gap-2 rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-700"><LogOut size={16}/>{text('خروج','Sign out')}</button></div></div></header>
+  <main className="mx-auto max-w-6xl space-y-5 px-4 py-6 sm:px-6">
+   <EcosystemPanel system="store" ar={ar}/>
+   {error&&<div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><span>{error}</span><button type="button" onClick={()=>void load()} className="font-bold underline">{text('إعادة المحاولة','Retry')}</button><a href="/?view=merchant_login" className="underline">{text('تسجيل الدخول','Sign in')}</a></div>}
+   {loading&&<p role="status" className="rounded-xl bg-white p-5 text-sm text-slate-500">{text('جارٍ تحميل بيانات متجرك…','Loading your store…')}</p>}
+   {!loading&&!store&&!error&&<section className="mx-auto max-w-lg rounded-2xl border bg-white p-6"><h2 className="text-lg font-black">{text('أنشئ متجرك المرتبط بحسابك','Create your store')}</h2><p className="mt-2 text-sm leading-7 text-slate-500">{text('حسابك جاهز. أضف بيانات متجرك ليراجعها فريق الإدارة.','Your account is ready. Submit your store details for activation.')}</p><form onSubmit={create} className="mt-5 space-y-4"><label className="block text-sm font-bold">{text('اسم المتجر','Store name')}<input name="name" required maxLength={160} className="mt-2 w-full rounded-xl border p-3"/></label><label className="block text-sm font-bold">{text('نوع النشاط','Business activity')}<input name="activity_type" maxLength={100} className="mt-2 w-full rounded-xl border p-3"/></label><label className="block text-sm font-bold">{text('رقم واتساب','WhatsApp number')}<input name="whatsapp_number" required dir="ltr" type="tel" pattern="\+?[0-9]{8,15}" className="mt-2 w-full rounded-xl border p-3"/></label><button disabled={saving} className="w-full rounded-xl bg-sky-600 p-3 font-bold text-white disabled:opacity-50">{saving?text('جارٍ الحفظ…','Saving…'):text('إرسال للمراجعة','Submit store')}</button></form></section>}
+   {store&&<>
+    <nav aria-label={text('أقسام المتجر','Store sections')} className="flex flex-wrap gap-2 rounded-2xl border bg-white p-2">{tabs.map(({id,label,Icon})=><button key={id} type="button" onClick={()=>setTab(id)} aria-current={tab===id?'page':undefined} className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold ${tab===id?'bg-slate-900 text-white':'text-slate-600 hover:bg-slate-50'}`}><Icon size={17}/>{label}</button>)}</nav>
+    {!active&&<div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-900"><strong>{status}</strong><p>{!store.is_active?text('تقدر تعاين متجرك ومراجعة بياناته. إضافة المنتجات واستقبال الطلبات تبدأ بعد تفعيل الإدارة.','Preview your store while activation is pending.'):text('بياناتك وطلباتك محفوظة. تواصل معنا لتجديد الاشتراك وفتح التعديل.','Your data remains available. Contact support to renew and resume editing.')}</p><a href={support} target="_blank" rel="noreferrer" className="font-bold underline">{text('التواصل مع الدعم','Contact support')}</a></div>}
+    {tab==='overview'&&<>
+     <div className="grid gap-4 sm:grid-cols-3">{[{title:text('المنتجات','Products'),value:products.length,go:'products'},{title:text('الطلبات المسجلة','Recorded orders'),value:orders.length,go:'orders'},{title:text('الاشتراك','Subscription'),value:subscription?.plan_name||text('غير محدد','Not set'),go:'subscription'}].map(c=><button key={c.title} type="button" onClick={()=>setTab(c.go as Tab)} className="rounded-2xl border bg-white p-5 text-start shadow-sm"><span className="text-sm text-slate-500">{c.title}</span><strong className="mt-3 block break-words text-xl font-black">{loading?'—':typeof c.value==='number'?c.value.toLocaleString(ar?'ar-EG':'en-US'):c.value}</strong></button>)}</div>
+     <section className="grid gap-5 rounded-2xl border bg-white p-6 md:grid-cols-[1fr_auto]"><div><h2 className="font-black">{text('رابط متجرك','Your store link')}</h2><p dir="ltr" className="mt-3 break-all text-sm text-slate-500">{storeUrl}</p><p className="mt-2 text-xs text-slate-500">{text('المتجر الفعّال يمكن للعملاء زيارته بدون تسجيل دخول.','Active stores can be visited without a customer account.')}</p></div><div className="flex flex-wrap items-center gap-2"><button type="button" onClick={()=>onPreviewStore(store.id)} className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold text-white"><ExternalLink size={16}/>{text('معاينة المتجر','Preview store')}</button><button type="button" onClick={()=>void copy()} className="inline-flex items-center gap-2 rounded-xl border px-4 py-3 text-xs font-bold">{copied?<Check size={16}/>:<Copy size={16}/ >}{copied?text('تم النسخ','Copied'):text('نسخ الرابط','Copy link')}</button></div></section>
+     <div className="grid gap-4 sm:grid-cols-2"><button type="button" onClick={()=>setTab('products')} className="rounded-2xl border bg-white p-6 text-start"><Package size={22} className="mb-3 text-sky-600"/><h2 className="font-black">{text('إدارة المنتجات والأسعار','Manage products and prices')}</h2><p className="mt-2 text-sm leading-7 text-slate-500">{text('صور المنتجات وتصنيفاتها والأسعار وحالة التوفر.','Product images, categories, prices and availability.')}</p></button><button type="button" onClick={()=>setTab('orders')} className="rounded-2xl border bg-white p-6 text-start"><ShoppingBag size={22} className="mb-3 text-sky-600"/><h2 className="font-black">{text('متابعة طلباتك','Your orders')}</h2><p className="mt-2 text-sm leading-7 text-slate-500">{text('شاهد الطلبات المسجلة وبيانات التواصل الخاصة بعملائك.','Recorded orders and customer contact details.')}</p></button></div>
+    </>}
+    {tab==='products'&&(active?<ProductsView products={products} store={store} onRefresh={load}/>:<p className="rounded-xl border bg-white p-5 text-sm">{text('إدارة المنتجات متاحة بعد تفعيل المتجر والاشتراك.','Product editing requires an active store and subscription.')}</p>)}
+    {tab==='settings'&&(active?<SettingsView store={store} onRefresh={load}/>:<section className="rounded-xl border bg-white p-5"><h2 className="font-bold">{text('بيانات المتجر','Store details')}</h2><p className="mt-3 break-words text-sm text-slate-600">{store.name} · {store.activity_type} · <span dir="ltr">{store.whatsapp_number}</span></p></section>)}
+    {tab==='orders'&&<section className="rounded-2xl border bg-white p-5"><h2 className="mb-4 font-black">{text('الطلبات الخاصة بمتجرك','Your store orders')}</h2>{!orders.length?<p className="py-8 text-center text-sm text-slate-500">{text('لا توجد طلبات مسجلة بعد.','No recorded orders yet.')}</p>:<div className="space-y-3">{orders.map(o=><article key={o.id} className="flex flex-wrap justify-between gap-3 rounded-xl border p-4"><div><h3 className="text-sm font-bold">{o.customer_name}</h3><a dir="ltr" href={'tel:'+o.customer_phone} className="mt-1 block text-sm text-sky-700">{o.customer_phone}</a><p className="mt-1 break-words text-xs text-slate-500">{o.customer_address}</p></div><div className="text-sm"><strong>{Number(o.total_price).toLocaleString(ar?'ar-EG':'en-US')} {store.currency}</strong><p className="mt-2 text-xs text-slate-500">{text('طلب واتساب مسجل؛ ليس تأكيد دفع','Recorded WhatsApp order; payment not verified')}</p></div></article>)}</div>}</section>}
+    {tab==='subscription'&&<section className="grid gap-5 md:grid-cols-2"><div className="rounded-2xl border bg-white p-6"><h2 className="font-black">{text('اشتراك المتجر','Store subscription')}</h2><dl className="mt-5 space-y-3 text-sm"><div className="flex justify-between gap-3"><dt className="text-slate-500">{text('الخطة','Plan')}</dt><dd>{subscription?.plan_name||'—'}</dd></div><div className="flex justify-between gap-3"><dt className="text-slate-500">{text('الحالة','Status')}</dt><dd>{status}</dd></div><div className="flex justify-between gap-3"><dt className="text-slate-500">{text('البداية','Starts')}</dt><dd dir="ltr">{subscription?.start_date||'—'}</dd></div><div className="flex justify-between gap-3"><dt className="text-slate-500">{text('الانتهاء','Expires')}</dt><dd dir="ltr">{subscription?.end_date||'—'}</dd></div></dl></div><div className="rounded-2xl border bg-white p-6"><MessageCircle size={24} className="text-sky-600"/><h2 className="mt-4 font-black">{text('مساعدة وتجديد الاشتراك','Support & renewal')}</h2><p className="mt-3 text-sm leading-7 text-slate-500">{text('تواصل مع فريق دعيدر لتفعيل المتجر أو تجديد اشتراكك أو حل أي مشكلة.','Contact Daidar to activate your store, renew your plan, or get help.')}</p><a href={support} target="_blank" rel="noreferrer" className="mt-5 inline-flex rounded-xl bg-sky-600 px-4 py-3 text-sm font-bold text-white">{text('التواصل عبر واتساب','Contact via WhatsApp')}</a></div></section>}
+   </>}
+  </main>
+ </div>;
 };

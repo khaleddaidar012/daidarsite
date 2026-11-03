@@ -22,6 +22,7 @@ await bundle({
   outdir: "dist",
   outExtension: { ".js": ".cjs" },
   external: ["electron"],
+  define: { 'process.env.DAIDAR_ECOSYSTEM_ORIGIN': JSON.stringify(process.env.DAIDAR_ECOSYSTEM_ORIGIN || 'https://daidarsoluations.com') },
 });
 await bundle({
   entryPoints: ["src/shared/features.ts"],

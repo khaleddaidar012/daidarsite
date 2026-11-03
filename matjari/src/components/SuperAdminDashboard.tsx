@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { MerchantDetail } from '../types';
 import { api } from '../services/api';
+import EcosystemAdmin from '../../../shared/EcosystemAdmin';
+import EcosystemPanel from '../../../shared/EcosystemPanel';
 import {
   Store as StoreIcon,
   Plus,
@@ -406,6 +408,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
 
       {/* 2. MAIN DASHBOARD CONTENT */}
       <main className="max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
+        <EcosystemPanel system="store" ar={isArabic}/>
+        <EcosystemAdmin ar={isArabic}/>
         <section aria-labelledby="admin-workspace-title" className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#0e1f38] via-[#142e4d] to-[#12566b] p-6 text-white shadow-xl shadow-slate-900/10 sm:p-9">
           <div aria-hidden="true" className="pointer-events-none absolute -end-16 -top-24 h-80 w-80 rounded-full border-[40px] border-white/5" />
           <div className="relative grid gap-8 lg:grid-cols-[1.2fr_1fr] lg:items-center">

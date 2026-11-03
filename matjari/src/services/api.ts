@@ -15,7 +15,7 @@ export const api = {
     if (!res.ok) throw new Error('تعذر تسجيل الخروج. حاول مرة أخرى.');
   },
   // 1. Authentication
-  async login(username: string, password: string): Promise<{
+  async login(username: string, password: string, linkIdentity=false): Promise<{
     user: User;
     store: Store | null;
     subscription: Subscription | null;
@@ -23,7 +23,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, link_identity:linkIdentity }),
     });
     const data = await res.json();
     if (!res.ok || !data.success) {
@@ -212,7 +212,7 @@ export const api = {
   async getOrders(storeId?: string): Promise<any[]> {
     const query = storeId ? `?store_id=${encodeURIComponent(storeId)}` : '';
     const res = await fetch(`${API_BASE}/orders${query}`);
-    if (!res.ok) return [];
+    if (!res.ok) throw new Error(res.status===401?'انتهت الجلسة. سجل دخولك مرة أخرى.':'تعذر تحميل الطلبات. حاول مرة أخرى.');
     const data = await res.json();
     return data.orders || [];
   },

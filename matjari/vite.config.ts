@@ -727,6 +727,7 @@ function cloudflareD1Plugin(): Plugin {
 }
 
 export default defineConfig(({ command }) => ({
+  resolve: { dedupe: ['react', 'react-dom'] },
   base: command === 'serve' ? SUBPATH : '/',
   plugins: [react(), cloudflareD1Plugin()],
   server: {

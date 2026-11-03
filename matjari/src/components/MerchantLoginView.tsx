@@ -39,6 +39,9 @@ export const MerchantLoginView: React.FC<MerchantLoginViewProps> = ({
 }) => {
   const { t, isArabic, toggleLang } = useLanguage();
   const { isDark, toggleTheme } = useTheme();
+  const [linkIdentity,setLinkIdentity]=useState(false);
+  const [unified,setUnified]=useState(false);
+  React.useEffect(()=>{fetch('/api/ecosystem/config').then(r=>{if(r.ok)setUnified(true)}).catch(()=>{})},[]);
 
   // Mode: 'login' (عندي حساب) vs 'register' (لسا هعمل حساب جديد)
   const [authMode, setAuthMode] = useState<'login' | 'register'>(initialMode);
@@ -75,7 +78,7 @@ export const MerchantLoginView: React.FC<MerchantLoginViewProps> = ({
       setIsLoading(true);
       setError('');
       setSuccessMsg('');
-      const res = await api.login(loginUsername.trim(), loginPassword);
+      const res = await api.login(loginUsername.trim(), loginPassword, linkIdentity);
       onLoginSuccess(res.user, res.store, res.subscription);
     } catch (err: any) {
       setError(err.message || (isArabic ? 'بيانات الدخول غير صحيحة، تأكد من بريد Google وكلمة المرور' : 'Invalid login credentials'));
@@ -311,6 +314,7 @@ export const MerchantLoginView: React.FC<MerchantLoginViewProps> = ({
           {/* ───────────────────────────────────────────────────────────── */}
           {authMode === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4 animate-fadeIn">
+              {unified&&<><a href="/api/ecosystem/login" className="block rounded-xl border border-sky-200 bg-sky-50 p-3 text-center text-sm font-bold text-sky-700">{isArabic?'الدخول بحساب دعيدر الموحد':'Daidar account sign-in'}</a><label className="flex items-start gap-2 text-xs leading-6 text-slate-600"><input type="checkbox" checked={linkIdentity} onChange={e=>setLinkIdentity(e.target.checked)}/>{isArabic?'ربط هذا الحساب القديم بهويتي الموحدة الحالية بعد التحقق من كلمة المرور':'Link this existing account to my current Daidar identity after verifying its password'}</label></>}
               <div>
                 <label className="block text-xs font-extrabold text-[#0e1f38] dark:text-white mb-1.5">
                   {isArabic ? 'البريد الإلكتروني (Google Gmail) أو اسم المستخدم *' : 'Google Email (Gmail) or Username *'}

@@ -1,6 +1,8 @@
 import { currentActor, publicUser, newSession, passwordHash, passwordMatches, digest, token, cookie, rateLimit } from '../../lib/auth';
+import { ecoLogout, type EcoEnv } from '../../../shared/ecosystem';
+import { syncStoreResource } from '../../lib/ecosystem';
 // Cloudflare Pages Function with Cloudflare D1 Binding
-export interface Env {
+export interface Env extends EcoEnv {
   DB: D1Database;
   READ_ONLY_PREVIEW?: string;
 }
@@ -47,7 +49,20 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (method !== 'DELETE' && !request.headers.get('Content-Type')?.startsWith('application/json')) return fail('يلزم إرسال JSON', 415);
       if (Number(request.headers.get('Content-Length') || 0) > 2097152) return fail('حجم البيانات كبير جداً', 413);
     }
-    const actor = await currentActor(db, request);
+    const actor = await currentActor(db, request, env);
+    if(path==='auth/create-store'&&method==='POST'){
+      if(!actor)return fail('سجل الدخول أولاً',401);
+      if(actor.store_id||actor.role!=='merchant')return fail('الحساب لديه متجر بالفعل',409);
+      const b=await request.json() as any;
+      if(typeof b.name!=='string'||!b.name.trim()||b.name.length>160||typeof b.whatsapp_number!=='string'||!/^\+?[0-9]{8,15}$/.test(b.whatsapp_number))return fail('أدخل اسم المتجر ورقم واتساب صحيح',400);
+      const id='store-'+crypto.randomUUID();
+      await db.batch([
+        db.prepare("INSERT INTO stores(id,name,activity_type,whatsapp_number,is_active) SELECT ?,?,?,?,0 WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND store_id IS NULL)").bind(id,b.name.trim(),String(b.activity_type||'عام').slice(0,100),b.whatsapp_number,actor.id),
+        db.prepare('UPDATE users SET store_id=? WHERE id=? AND store_id IS NULL').bind(id,actor.id),
+        db.prepare("INSERT INTO subscriptions(id,store_id,plan_name,status,price) SELECT ?,?,'بانتظار التفعيل','active',0 WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND store_id=?)").bind(crypto.randomUUID(),id,actor.id,id)
+      ]);
+      return new Response(JSON.stringify({success:true}),{headers});
+    }
     if (path === 'auth/session' && method === 'GET') {
       if (!actor) return fail('يرجى تسجيل الدخول', 401);
       const store = actor.store_id ? await db.prepare('SELECT * FROM stores WHERE id=?').bind(actor.store_id).first() : null;
@@ -56,7 +71,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
     if (path === 'auth/logout' && method === 'POST') {
       await db.prepare('DELETE FROM auth_sessions WHERE token_hash=?').bind(await digest(token(request))).run();
-      return new Response(JSON.stringify({ success: true }), { headers: { ...headers, 'Set-Cookie': cookie('', 0) } });
+      const out=new Headers(headers);out.append('Set-Cookie',cookie('',0));if(env.ECOSYSTEM_DB)out.append('Set-Cookie',await ecoLogout(request,env));
+      return new Response(JSON.stringify({ success: true }), { headers:out });
     }
     const adminPath = path.startsWith('admin/') || path === 'd1-status';
     const privatePath = adminPath || ['stats','reset-stats','simulate-visit','simulate-order'].includes(path) ||
@@ -80,6 +96,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       url.searchParams.set('store_id', storeId);
       const store = await db.prepare('SELECT is_active FROM stores WHERE id=?').bind(storeId).first() as any;
       if (!store?.is_active && !['orders','stats'].includes(path)) return fail('متجرك بانتظار التفعيل من الإدارة');
+      if(!['GET','HEAD'].includes(method)){
+        const sub=await db.prepare('SELECT status,end_date FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(storeId).first() as any;
+        if(!sub||sub.status!=='active'||Date.parse(sub.end_date+'T23:59:59.999Z')<Date.now())return fail('الاشتراك غير فعال. تواصل مع الدعم للتجديد.');
+      }
     }
     if (path === 'store' && method === 'GET' && url.searchParams.get('id')) {
       const id = url.searchParams.get('id');
@@ -137,7 +157,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           user: publicUser(user),
           store,
           subscription,
-        }), { headers: { ...headers, 'Set-Cookie': await newSession(db, user) } });
+        }), { headers: { ...headers, 'Set-Cookie': await newSession(db, user, env, request, body.link_identity===true) } });
       }
     }
 
@@ -203,7 +223,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           user: createdUser,
           store: createdStore,
           subscription: createdSub,
-        }), { headers: { ...headers, 'Set-Cookie': await newSession(db, { ...createdUser as any, password: hashedPassword }) } });
+        }), { headers: { ...headers, 'Set-Cookie': await newSession(db, { ...createdUser as any, password: hashedPassword }, env, request) } });
       }
     }
 
@@ -312,6 +332,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         await db.prepare('UPDATE stores SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(nextState, storeId).run();
         await db.prepare('UPDATE users SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE store_id = ?').bind(nextState, storeId).run();
         if (!nextState) await db.prepare('DELETE FROM auth_sessions WHERE user_id IN (SELECT id FROM users WHERE store_id=?)').bind(storeId).run();
+        await syncStoreResource(env,storeId);
 
         return new Response(JSON.stringify({ success: true, is_active: nextState }), { headers });
       }
@@ -349,6 +370,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         }
 
         const updatedSub = await db.prepare('SELECT * FROM subscriptions WHERE store_id = ? ORDER BY created_at DESC LIMIT 1').bind(storeId).first();
+        await syncStoreResource(env,storeId);
         return new Response(JSON.stringify({ success: true, subscription: updatedSub }), { headers });
       }
     }

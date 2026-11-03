@@ -1,3 +1,4 @@
+import { ecoUser, ecoLocalId, ecoLogin, type EcoEnv } from '../../shared/ecosystem';
 type DB = { prepare(sql: string): any; batch(statements: any[]): Promise<unknown> };
 export type Actor = { id: string; username: string; email: string; role: string; store_id: string | null; is_active: number; password: string };
 export const cookieName = '__Host-matjari_session';
@@ -28,14 +29,16 @@ export function publicUser(user: Actor) {
   const { id, username, email, role, store_id, is_active } = user;
   return { id, username, email, role, store_id, is_active };
 }
-export async function currentActor(db: DB, request: Request): Promise<Actor | null> {
+export async function currentActor(db: DB, request: Request, env?: EcoEnv): Promise<Actor | null> {
+  if(env?.ECOSYSTEM_DB){const identity=await ecoUser(request,env);if(!identity)return null;const id=await ecoLocalId(env,'store',identity.id);if(!id)return null;return db.prepare('SELECT * FROM users WHERE id=? AND is_active=1').bind(id).first()}
   const value = token(request);
   if (!/^[a-f0-9-]{72}$/.test(value)) return null;
   return db.prepare(`SELECT u.* FROM users u JOIN auth_sessions s ON s.user_id=u.id
     WHERE s.token_hash=? AND s.expires_at>? AND s.credential=u.password AND u.is_active=1`)
     .bind(await digest(value), Date.now()).first();
 }
-export async function newSession(db: DB, user: Actor) {
+export async function newSession(db: DB, user: Actor, env?: EcoEnv, request?: Request, link=false) {
+  if(env?.ECOSYSTEM_DB&&request){const session=await ecoLogin(env,'store',{id:user.id,email:user.email||user.username,name:user.username},request,link);await db.prepare('DELETE FROM auth_sessions WHERE user_id=?').bind(user.id).run();return session!}
   const value = crypto.randomUUID() + crypto.randomUUID();
   await db.prepare('DELETE FROM auth_sessions WHERE expires_at<=?').bind(Date.now()).run();
   await db.prepare('INSERT INTO auth_sessions(token_hash,user_id,credential,expires_at) VALUES(?,?,?,?)')

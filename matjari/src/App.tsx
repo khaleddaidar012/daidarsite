@@ -87,6 +87,7 @@ export const App: React.FC = () => {
         // Restore identity only from the server's HttpOnly session cookie.
         localStorage.removeItem('my_store_user');
         const session = await api.session();
+        if(session&&params.get('ecosystem_resume')){window.location.assign('/api/ecosystem/continue');return}
         if (session) {
           setCurrentUser(session.user);
           setCurrentStore(session.store);
@@ -166,6 +167,7 @@ export const App: React.FC = () => {
     setCurrentUser(user);
     setCurrentStore(store);
     setCurrentSubscription(subscription);
+    if(new URLSearchParams(window.location.search).has('ecosystem_resume')){window.location.assign('/api/ecosystem/continue');return}
     navigateTo(user.role === 'super_admin' ? 'super_admin' : 'store_owner');
   };
 

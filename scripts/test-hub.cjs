@@ -8,7 +8,7 @@ function load(file, dependencies = {}) {
   if (file === 'functions/api/hub/[[path]].ts') dependencies['../../../src/lib/hub-basic'] = load('src/lib/hub-basic.ts')
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
   const module = { exports: {} }
-  new Function('require', 'module', 'exports', code)(name => dependencies[name] || require(name), module, module.exports)
+  new Function('require', 'module', 'exports', code)(name => dependencies[name] || (name.startsWith('.') && fs.existsSync(require('node:path').resolve(require('node:path').dirname(file),name)+'.ts') ? load(require('node:path').resolve(require('node:path').dirname(file),name)+'.ts') : require(name)), module, module.exports)
   return module.exports
 }
 const sqlite = new DatabaseSync(':memory:')

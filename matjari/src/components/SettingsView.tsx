@@ -11,11 +11,11 @@ interface SettingsViewProps {
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ store, onRefresh }) => {
   const { t, isArabic } = useLanguage();
-  const [name, setName] = useState(store?.name || (isArabic ? 'دعيدر للحلول البرمجية — متجري' : 'Daidar Solutions — My Store'));
-  const [activityType, setActivityType] = useState(store?.activity_type || (isArabic ? 'حلول رقمية وتطوير المتاجر والأنظمة البرمجية' : 'Digital Solutions & Store Development'));
-  const [whatsapp, setWhatsapp] = useState(store?.whatsapp_number || '201061532875');
+  const [name, setName] = useState(store?.name || '');
+  const [activityType, setActivityType] = useState(store?.activity_type || '');
+  const [whatsapp, setWhatsapp] = useState(store?.whatsapp_number || '');
   const [currency, setCurrency] = useState(store?.currency || (isArabic ? 'ج.م' : '$'));
-  const [bio, setBio] = useState(store?.bio || 'نطوّر مواقع ومتاجر وأنظمة مخصصة تساعدك تنظّم شغلك وتوسّع نشاطك بأعلى كفاءة وسرعة وأمان.');
+  const [bio, setBio] = useState(store?.bio || '');
   const [facebookUrl, setFacebookUrl] = useState(store?.facebook_url || 'https://www.facebook.com/daidarsoluations/');
   
   const [isSaving, setIsSaving] = useState(false);

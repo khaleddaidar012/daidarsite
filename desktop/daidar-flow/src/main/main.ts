@@ -1,4 +1,5 @@
 import { approvedBrandUrl } from "../shared/brand";
+import { EcosystemAccount } from './ecosystem';
 import { features } from "../shared/features";
 import { LicenseService } from "./licensing/service";
 import { protectedStore } from "./licensing/storage";
@@ -18,6 +19,7 @@ import {
   dialog,
   shell,
   clipboard,
+  safeStorage,
 } from "electron";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -213,6 +215,11 @@ app
         return false;
       }
     });
+    const ecosystemAccount=new EcosystemAccount({directory:app.getPath('userData'),origin:process.env.DAIDAR_ECOSYSTEM_ORIGIN||'https://daidarsoluations.com',encrypt(value){if(!safeStorage.isEncryptionAvailable())throw Error('التخزين الآمن غير متاح');return safeStorage.encryptString(value)},decrypt(value){if(!safeStorage.isEncryptionAvailable())throw Error('التخزين الآمن غير متاح');return safeStorage.decryptString(value)},open:async url=>{await shell.openExternal(url)}});
+    ipcMain.handle('ecosystem:status',event=>{trusted(event);return ecosystemAccount.status()});
+    ipcMain.handle('ecosystem:start',async event=>{trusted(event);const license=await licensing.status();return ecosystemAccount.start(license.deviceId||'')});
+    ipcMain.handle('ecosystem:complete',event=>{trusted(event);return ecosystemAccount.complete()});
+    ipcMain.handle('ecosystem:logout',event=>{trusted(event);return ecosystemAccount.logout()});
     ipcMain.handle("feature:open", (event, id: unknown) => {
       trusted(event);
       return licensing.openFeature(id);
