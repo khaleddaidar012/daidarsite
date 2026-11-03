@@ -10,7 +10,7 @@ The pilot runs on `feature/matjari-hub` only. Production Hub and its database ar
 - `shared/EcosystemPanel.tsx` and `shared/EcosystemAdmin.tsx`: account navigation and platform administration.
 - `desktop/daidar-flow/src/main/ecosystem.ts`: encrypted desktop account connection; does not grant paid features.
 
-Accounts are enrolled on credential-proven login. An identical email never merges accounts. Linking a legacy account requires its password and an explicit selection while signed into the target central identity. Only the configured existing Store owner ID receives platform administration; email matching cannot grant it. Source roles remain source scoped.
+Accounts are enrolled on credential-proven login. An identical email never merges accounts. Linking a legacy account requires its password and an explicit selection while signed into the target central identity. With both identities proven, its system links, source roles, subscriptions and Google subjects move together; previous sessions are revoked and the old identity remains as an inactive historical record. Different local accounts in the same system block the merge for manual ownership review. Only the configured existing Store owner ID receives platform administration; email matching cannot grant it. Source roles remain source scoped.
 
 ## Preview configuration
 
@@ -22,7 +22,7 @@ Both runtimes bind the same `ECOSYSTEM_DB`, the isolated Hub database as `ECOSYS
 
 Set `ECOSYSTEM_CLIENT`, `ECOSYSTEM_HUB_ORIGIN`, `ECOSYSTEM_STORE_ORIGIN`; Store additionally sets `ECOSYSTEM_OWNER_LOCAL_ID` to its pre-existing owner local ID. Hub build sets `NEXT_PUBLIC_ECOSYSTEM_ENABLED=1` and `NEXT_PUBLIC_MATJARI_URL` to the Store origin. Secrets are never committed.
 
-Google runs through Hub Preview with `HUB_GOOGLE_CLIENT_ID` and encrypted `HUB_GOOGLE_CLIENT_SECRET`. Authorized JavaScript origin is the Hub origin without a trailing slash; authorized redirect is that origin plus `/api/ecosystem/google/callback`. Real Google callback verification requires a user-mediated Google sign-in; a successful authorization redirect alone is not an end-to-end sign-in.
+Google runs through Hub Preview with `HUB_GOOGLE_CLIENT_ID` and encrypted `HUB_GOOGLE_CLIENT_SECRET`. Authorized JavaScript origin is the Hub origin without a trailing slash; authorized redirect is that origin plus `/api/ecosystem/google/callback`. The user completed real Google sign-in on 2026-11-03. Its separate identity encountered an existing SSO-only Hub account from Store; Hub now explains the required credential-proven account linking instead of displaying a generic sign-in form repeatedly.
 
 ## Data migration and rollback
 

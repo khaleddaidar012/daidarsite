@@ -1,6 +1,6 @@
 import { BASIC_ACTIVITIES, BASIC_MONTHLY_PRICE, normalizeTransferPhone, validTransferPhone } from '../../../src/lib/hub-basic'
 import { hash, json, sameOrigin, type Env } from '../../lib/store'
-import { ecoLogin, ecoLogout, ecoRevokeLocal } from '../../../shared/ecosystem'
+import { ecoLogin, ecoLogout, ecoRevokeLocal, ecoUser } from '../../../shared/ecosystem'
 import { hubEcoUser } from '../../lib/ecosystem'
 
 const encoder = new TextEncoder()
@@ -66,7 +66,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       const userId = crypto.randomUUID()
       const passHash = await passwordHash(password, salt)
       await env.DB.prepare('INSERT INTO hub_users(id,email,name,password_hash,created_at) VALUES(?,?,?,?,?)').bind(userId, email, name, `${salt}:${passHash}`, now).run()
-      return sessionResponse(request, env, userId, now)
+      return await sessionResponse(request, env, userId, now)
     }
     if (path === 'login' && request.method === 'POST') {
       const body = await readBody(request)
@@ -79,7 +79,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       if ((attempts?.attempts || 0) > 8) return json({ error: 'محاولات كثيرة. حاول بعد 15 دقيقة.' }, 429)
       const user = await env.DB.prepare('SELECT id,password_hash,active FROM hub_users WHERE email=? COLLATE NOCASE').bind(email).first<{ id: string; password_hash: string | null; active: number }>()
       if (!user?.active || !user.password_hash || !await verify(user.password_hash, str(body.password, 256, false))) return json({ error: 'البريد أو كلمة المرور غير صحيحة.' }, 401)
-      return sessionResponse(request, env, user.id, now, body.link_identity===true)
+      return await sessionResponse(request, env, user.id, now, body.link_identity===true)
     }
     if (path === 'password-reset' && request.method === 'POST') {
       if (!env.RESEND_API_KEY || !env.RESEND_FROM_EMAIL) return json({ error: 'استعادة كلمة المرور غير مفعلة بعد. يلزم إعداد بريد الإرسال في Cloudflare.' }, 503)
@@ -114,7 +114,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
     }
     if (path === 'session' && request.method === 'GET') {
       const user = await currentUser(request, env)
-      return user ? json({ user }) : json({ user: null })
+      return user ? json({ user }) : json({ user: null, linkRequired: env.ECOSYSTEM_DB ? !!await ecoUser(request,env) : false })
     }
     if (path === 'logout' && request.method === 'POST') {
       if(env.ECOSYSTEM_DB)return json({success:true},200,{'Set-Cookie':await ecoLogout(request,env)})
@@ -263,6 +263,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
     }
     return json({ error: 'المسار غير موجود.' }, 404)
   } catch (error) {
+    if(error instanceof Error && 'status' in error && typeof error.status==='number' && [400,401,403,409,429,503].includes(error.status))return json({error:error.message},error.status)
     if (String(error).includes('hub_users.email') || (error instanceof Error && error.message === 'EMAIL_TAKEN')) return json({ error: 'هذا البريد مسجل بالفعل.' }, 409)
     console.error('[hub-api]', error)
     return json({ error: 'تعذر إكمال الطلب الآن.' }, 500)

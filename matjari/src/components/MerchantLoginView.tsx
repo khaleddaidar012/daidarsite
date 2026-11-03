@@ -314,7 +314,7 @@ export const MerchantLoginView: React.FC<MerchantLoginViewProps> = ({
           {/* ───────────────────────────────────────────────────────────── */}
           {authMode === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4 animate-fadeIn">
-              {unified&&<><a href="/api/ecosystem/login" className="block rounded-xl border border-sky-200 bg-sky-50 p-3 text-center text-sm font-bold text-sky-700">{isArabic?'الدخول بحساب دعيدر الموحد':'Daidar account sign-in'}</a><label className="flex items-start gap-2 text-xs leading-6 text-slate-600"><input type="checkbox" checked={linkIdentity} onChange={e=>setLinkIdentity(e.target.checked)}/>{isArabic?'ربط هذا الحساب القديم بهويتي الموحدة الحالية بعد التحقق من كلمة المرور':'Link this existing account to my current Daidar identity after verifying its password'}</label></>}
+              {unified&&<><a href="/api/ecosystem/login" className="block rounded-xl border border-sky-200 bg-sky-50 p-3 text-center text-sm font-bold text-sky-700">{isArabic?'الدخول بحساب دعيدر الموحد':'Daidar account sign-in'}</a><label className="flex items-start gap-2 text-xs leading-6 text-slate-600"><input type="checkbox" checked={linkIdentity} onChange={e=>setLinkIdentity(e.target.checked)}/>{isArabic?'ربط حساب دعيدر القديم وأنظمته بحسابي الحالي بعد التحقق من كلمة المرور':'Connect my existing Daidar account and its systems after verifying its password'}</label></>}
               <div>
                 <label className="block text-xs font-extrabold text-[#0e1f38] dark:text-white mb-1.5">
                   {isArabic ? 'البريد الإلكتروني (Google Gmail) أو اسم المستخدم *' : 'Google Email (Gmail) or Username *'}

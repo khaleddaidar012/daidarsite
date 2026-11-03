@@ -64,6 +64,34 @@ async function test(){
   const bad=await ec('hub','google'),badUrl=new URL(bad.headers.get('location'));jwt=await new jose.SignJWT({nonce:'wrong',email:'owner@example.test',email_verified:true}).setProtectedHeader({alg:'RS256',kid:'test-key'}).setIssuer('https://accounts.google.com').setAudience('google-test').setSubject('attacker').setIssuedAt().setExpirationTime('5m').sign(privateKey);
   assert.equal((await ec('hub','google/callback?code=test&state='+badUrl.searchParams.get('state'),cookie(bad))).status,401);
  }finally{global.fetch=originalFetch}
+ // A Google-only identity must explicitly prove its existing Store account.
+ // Its SSO-only Hub link then follows the merge instead of stranding Hub at login.
+ const legacy=await data(await store.onRequest({request:request('store','/api/auth/register','POST',{store_name:'ربط الأنظمة',activity_type:'عام',whatsapp_number:'01000000001',email:'merge@example.test',username:'merge-source',password:'merge password 123'}),env:storeEnv}));
+ const legacyLogin=await store.onRequest({request:request('store','/api/auth/login','POST',{username:'merge-source',password:'merge password 123'}),env:storeEnv}),legacyCookie=cookie(legacyLogin);
+ const legacyIdentity=(await data(await ec('store','session',legacyCookie))).user;
+ const legacyHubId=await hubAdapter.ensureLocal({...legacyIdentity,email:'merge@example.test',family:''});
+ await eco.ecoPublish(hubEnv,'flow',legacyIdentity.id,'legacy-flow','active','Flow',Date.now(),Date.now()+600000);
+ center.sqlite.prepare('INSERT INTO ec_google(subject,user_id) VALUES(?,?)').run('legacy-merge-subject',legacyIdentity.id);
+ const googleId=crypto.randomUUID(),family=crypto.randomUUID(),secret=eco.ecoRandom(),googleCookie='__Host-daidar_ecosystem='+secret;
+ center.sqlite.prepare('INSERT INTO ec_users(id,email,name,created_at) VALUES(?,?,?,?)').run(googleId,'merge@example.test','Google identity',Date.now());
+ center.sqlite.prepare('INSERT INTO ec_families(id,user_id,expires_at) VALUES(?,?,?)').run(family,googleId,Date.now()+600000);
+ center.sqlite.prepare('INSERT INTO ec_sessions(token,family_id,expires_at) VALUES(?,?,?)').run(await eco.ecoHash(secret),family,Date.now()+600000);
+ assert.equal((await data(await hub.onRequest({request:request('hub','/api/hub/session','GET',undefined,googleCookie),env:hubEnv}))).linkRequired,true);
+ assert.equal(await eco.ecoLocalId(hubEnv,'hub',googleId),null);
+ const merged=await store.onRequest({request:request('store','/api/auth/login','POST',{username:'merge-source',password:'merge password 123',link_identity:true},googleCookie),env:storeEnv});await data(merged);
+ assert.equal(await eco.ecoLocalId(hubEnv,'hub',googleId),legacyHubId);
+ assert.equal(await eco.ecoLocalId(storeEnv,'store',googleId),legacy.user.id);
+ assert.equal(center.sqlite.prepare('SELECT user_id FROM ec_entitlements WHERE resource_id=?').get('legacy-flow').user_id,googleId);
+ assert.equal(center.sqlite.prepare('SELECT user_id FROM ec_google WHERE subject=?').get('legacy-merge-subject').user_id,googleId);
+ assert.equal(center.sqlite.prepare('SELECT active FROM ec_users WHERE id=?').get(legacyIdentity.id).active,0);
+ assert.equal((await data(await hub.onRequest({request:request('hub','/api/hub/session','GET',undefined,googleCookie),env:hubEnv}))).user.id,legacyHubId);
+ assert.equal((await data(await ec('store','session',legacyCookie))).user,null);
+ assert.equal(storeDB.sqlite.prepare('SELECT COUNT(*) AS n FROM stores WHERE id=?').get(legacy.store.id).n,1);
+ const conflicting=await hub.onRequest({request:request('hub','/api/hub/signup','POST',{name:'Different Hub account',email:'conflict@example.test',password:'conflict password 123'}),env:hubEnv});await data(conflicting);
+ const before=center.sqlite.prepare('SELECT COUNT(*) AS n FROM ec_links').get().n;
+ assert.equal((await hub.onRequest({request:request('hub','/api/hub/login','POST',{email:'conflict@example.test',password:'conflict password 123',link_identity:true},googleCookie),env:hubEnv})).status,409);
+ assert.equal(center.sqlite.prepare('SELECT COUNT(*) AS n FROM ec_links').get().n,before);
+ assert.ok((await data(await ec('hub','session',cookie(conflicting)))).user);
  // Family logout immediately invalidates Flow tokens as well as web sessions.
  await data(await ec('store','logout',ownerCookie,'POST',{}));
  const revoked=await eco.ecosystem(new Request('https://hub.example/api/ecosystem/device/session',{headers:{Authorization:'Bearer '+grant.access_token}}),hubEnv,hubAdapter);assert.equal(revoked.status,401);

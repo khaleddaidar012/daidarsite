@@ -45,13 +45,17 @@ export async function ecoBind(e:EcoEnv,system:string,local:LocalIdentity,identit
   const db=e.ECOSYSTEM_DB!;let link=await db.prepare('SELECT user_id FROM ec_links WHERE system=? AND local_id=?').bind(system,local.id).first();
   if(link&&identityId&&link.user_id!==identityId){
     if(!explicit)reject('الحساب مرتبط بهوية أخرى. استخدم ربط الحساب بعد إثبات الدخول.',409);
-    const collision=await db.prepare('SELECT local_id FROM ec_links WHERE system=? AND user_id=?').bind(system,identityId).first();
-    if(collision&&collision.local_id!==local.id)reject('لديك حساب آخر مرتبط بهذا النظام. يلزم مراجعة نقل الملكية.',409);
+    const collision=await db.prepare('SELECT a.system FROM ec_links a JOIN ec_links b ON a.system=b.system WHERE a.user_id=? AND b.user_id=? AND a.local_id!=b.local_id LIMIT 1').bind(link.user_id,identityId).first();
+    if(collision)reject('لديك حسابان مختلفان في نفس النظام. يلزم مراجعة نقل الملكية قبل الربط.',409);
+    // Both identities are proven: the current session and the legacy account's password.
+    // Move its existing system links together so an SSO-only Hub account is not stranded.
     await db.batch([
       db.prepare('UPDATE ec_families SET revoked=1 WHERE user_id=?').bind(link.user_id),
-      db.prepare('UPDATE ec_links SET user_id=? WHERE system=? AND local_id=?').bind(identityId,system,local.id),
-      db.prepare('UPDATE ec_roles SET user_id=? WHERE system=? AND local_id=?').bind(identityId,system,local.id),
-      db.prepare('UPDATE ec_entitlements SET user_id=? WHERE system=? AND user_id=?').bind(identityId,system,link.user_id)
+      db.prepare('UPDATE ec_links SET user_id=? WHERE user_id=?').bind(identityId,link.user_id),
+      db.prepare('UPDATE ec_roles SET user_id=? WHERE user_id=?').bind(identityId,link.user_id),
+      db.prepare('UPDATE ec_entitlements SET user_id=? WHERE user_id=?').bind(identityId,link.user_id),
+      db.prepare('UPDATE ec_google SET user_id=? WHERE user_id=?').bind(identityId,link.user_id),
+      db.prepare('UPDATE ec_users SET active=0 WHERE id=?').bind(link.user_id)
     ]);await ecoAudit(e,identityId,'link-reassigned-with-local-proof',system+':'+local.id);return identityId;
   }
   if(link)return link.user_id as string;
