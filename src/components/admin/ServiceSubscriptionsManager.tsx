@@ -5,12 +5,12 @@ type Row={id:string;customer_name:string;phone:string;hours:number;start_hour:nu
 const statuses:Record<string,string>={active:'نشط',scheduled:'مجدول',expired:'منتهي',cancelled:'موقوف'}
 const field='mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-slate-900'
 const time=(hour:number)=>hour===24?'١٢ منتصف الليل':`${(hour-12).toLocaleString('ar-EG')} مساءً`
-export default function ServiceSubscriptionsManager(){
+export default function ServiceSubscriptionsManager({apiBase='/api/admin'}:{apiBase?:string}={}){
  const [rows,setRows]=useState<Row[]>([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[limited,setLimited]=useState(false)
  const [form,setForm]=useState({customer_name:'',phone:'',hours:1,start_hour:18,start_date:'',months:1,payment_method:'instapay',note:'',amount_received:'',payment_received:false})
  const [operation,setOperation]=useState('')
  const price=systemManagementPlans.find(p=>p.hours===form.hours)!.price,total=price*form.months
- async function api(method='GET',body?:unknown){const r=await fetch('/api/admin/service-subscriptions',{method,cache:'no-store',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const d=await r.json();if(!r.ok)throw Error(d.error||'تعذر تنفيذ الطلب');return d}
+ async function api(method='GET',body?:unknown){const r=await fetch(apiBase+'/service-subscriptions',{method,cache:'no-store',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const d=await r.json();if(!r.ok)throw Error(d.error||'تعذر تنفيذ الطلب');return d}
  async function load(){const data=await api();setRows(data.subscriptions);setLimited(data.limited)}
  useEffect(()=>{setOperation(crypto.randomUUID());setForm(f=>({...f,start_date:new Date().toLocaleDateString('en-CA',{timeZone:'Africa/Cairo'})}));load().catch(e=>setError(e.message)).finally(()=>setLoading(false))},[])
  async function save(e:FormEvent){e.preventDefault();setError('');setNotice('');setBusy(true);try{await api('POST',{...form,operation_key:operation,amount_received_piasters:Math.round(Number(form.amount_received)*100)});setOperation(crypto.randomUUID());setForm(f=>({...f,customer_name:'',phone:'',note:'',payment_received:false,amount_received:''}));await load();setNotice('تم تسجيل اشتراك إدارة السيستم بنجاح')}catch(e){setError((e as Error).message)}finally{setBusy(false)}}

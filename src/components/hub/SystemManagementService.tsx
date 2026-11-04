@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { ArrowLeft, ArrowRight, Check, ChevronRight, Clock3, Copy, CreditCard, Database, MessageCircle } from 'lucide-react'
 
 import { systemManagementPlans as plans, servicePaymentNumbers as paymentNumbers, serviceWhatsAppMessage } from '@/lib/system-management'
@@ -8,7 +8,9 @@ type Method = keyof typeof paymentNumbers
 type Payment = { hours: number; start: number; method: Method; readyAt: number }
 const storageKey = 'daidar-system-management-payment-v1'
 
-export default function SystemManagementService({ ar, onBack }: { ar: boolean; onBack: () => void }) {
+export default function SystemManagementService({ ar, onBack, onRequest }: { ar: boolean; onBack: () => void; onRequest?:(details:{operation_id:string;kind:string;hours:number;start:number;method:Method})=>Promise<void> }) {
+  const operation=useRef('');
+  const [saving,setSaving]=useState(false),[requestError,setRequestError]=useState('');
   const [step, setStep] = useState<'service' | 'hours' | 'time' | 'payment'>('service')
   const [hours, setHours] = useState(1)
   const [start, setStart] = useState(18)
@@ -38,11 +40,15 @@ export default function SystemManagementService({ ar, onBack }: { ar: boolean; o
   const ready = !!payment && now > 0 && remaining === 0
   const primary = 'inline-flex items-center justify-center gap-2 rounded-xl bg-sky-700 px-6 py-3 font-bold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-slate-700'
   const panel = 'rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-8'
-  function revise() { setPayment(null); setStep('time'); setCopied(false); try { sessionStorage.removeItem(storageKey) } catch {} }
-  function checkout() {
+  function revise() { operation.current='';setPayment(null); setStep('time'); setCopied(false); try { sessionStorage.removeItem(storageKey) } catch {} }
+  async function checkout() {
+    if(saving)return;setSaving(true);setRequestError('');
+    try{
+    if(onRequest){operation.current||=crypto.randomUUID();await onRequest({operation_id:operation.current,kind:'system-management',hours,start,method})}
     const next: Payment = { hours, start, method, readyAt: Date.now() + 120000 }
     setPayment(next); setNow(Date.now()); setStep('payment'); setCopied(false)
     try { sessionStorage.setItem(storageKey, JSON.stringify(next)) } catch {}
+    }catch(e){setRequestError((e as Error).message)}finally{setSaving(false)}
   }
   function whatsapp() {
     if (!ready || !payment) return
@@ -50,6 +56,8 @@ export default function SystemManagementService({ ar, onBack }: { ar: boolean; o
     window.location.href = `https://wa.me/201092912431?text=${encodeURIComponent(text)}`
   }
   return <section className="py-8">
+    {requestError&&<p role="alert" className="rounded-xl bg-rose-50 p-4 text-rose-800">{requestError}</p>}
+    {saving&&<p role="status">{ar?'جارٍ حفظ طلبك…':'Saving your request…'}</p>}
     <button onClick={() => { if(step==='payment')revise();else if(step==='time')setStep('hours');else if(step==='hours')setStep('service');else onBack() }} className="mb-7 inline-flex items-center gap-2 text-sm font-bold text-sky-700 dark:text-sky-300"><ChevronRight size={18} className={ar ? '' : 'rotate-180'} />{step==='service'?(ar?'الأنظمة والخدمات':'Systems and services'):(ar?'رجوع للخطوة السابقة':'Back to previous step')}</button>
     <div className="mb-8"><p className="text-sm font-bold text-sky-700 dark:text-sky-300">{ar ? 'خدمات إدارة بيانات وأنظمة إلكترونية' : 'Data and digital system management'}</p><h1 className="mt-3 text-3xl font-black sm:text-4xl">{ar ? 'السيستم بتاعك شغال بتكلفة أقل.' : 'Keep your system running for less.'}</h1></div>
     {step === 'service' ? <article className={`${panel} max-w-2xl`}><span className="inline-flex rounded-2xl bg-sky-50 p-4 text-sky-600 dark:bg-sky-950"><Database size={30} /></span><h2 className="mt-6 text-2xl font-extrabold">{ar ? 'خدمة إدارة السيستم' : 'System management service'}</h2><p className="mt-3 leading-8 text-slate-500 dark:text-slate-400">{ar ? 'اختار عدد ساعات يومية لإدارة بياناتك ومتابعة السيستم، وحدد الوقت المناسب لشغلك.' : 'Choose daily hours to manage your data and system, at a time that suits your business.'}</p><p className="mt-5 font-bold text-sky-800 dark:text-sky-300">{ar ? 'باقات تبدأ من ٨٠٠ جنيه شهريًا' : 'Plans from EGP 800 per month'}</p><button className={`${primary} mt-7`} onClick={() => setStep('hours')}>{ar ? 'اختار الخدمة' : 'Choose service'}<Arrow size={18} /></button></article> : <>

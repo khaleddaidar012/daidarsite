@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MerchantDetail } from '../types';
-import { api } from '../services/api';
+import { api as defaultApi, createStoreApi } from '../services/api';
 import EcosystemAdmin from '../../../shared/EcosystemAdmin';
 import EcosystemPanel from '../../../shared/EcosystemPanel';
 import {
@@ -39,6 +39,9 @@ import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 
 interface SuperAdminDashboardProps {
+  embedded?: boolean;
+  storeBaseUrl?: string;
+  apiClient?: ReturnType<typeof createStoreApi>;
   onLogout: () => void;
   onPreviewStore: (storeId: string) => void;
   onExploreStores?: () => void;
@@ -48,7 +51,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   onLogout,
   onPreviewStore,
   onExploreStores,
+  embedded=false, apiClient,storeBaseUrl,
 }) => {
+  const api=apiClient||defaultApi;
   const { t, isArabic, toggleLanguage } = useLanguage();
   const { isDark, toggleTheme } = useTheme();
 
@@ -87,9 +92,10 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   const [newDuration, setNewDuration] = useState(12);
   const [newPrice, setNewPrice] = useState(1200);
 
-  const logoSrc = isDark
-    ? `${import.meta.env.BASE_URL}logo-dark.png`
-    : `${import.meta.env.BASE_URL}logo.png`;
+  const logoBase=typeof window==='undefined'?'/':new URL('.',window.location.href).pathname;
+  const logoSrc = embedded?'/icon.png':isDark
+    ? `${logoBase}logo-dark.png`
+    : `${logoBase}logo.png`;
 
   const loadMerchants = async () => {
     try {
@@ -113,7 +119,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   }, []);
 
   const handleCopyStoreLink = async (storeId: string) => {
-    const url = `${window.location.origin}${window.location.pathname}?view=storefront&store_id=${storeId}`;
+    const url = `${storeBaseUrl||window.location.origin+window.location.pathname}?view=storefront&store_id=${encodeURIComponent(storeId)}`;
     try {
       await navigator.clipboard.writeText(url);
     } catch {
@@ -324,7 +330,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     <div className="min-h-screen bg-[#f7fafe] dark:bg-[#0b1329] text-slate-800 dark:text-slate-100 flex flex-col font-cairo transition-colors selection:bg-sky-100 selection:text-sky-900">
       
       {/* A separate workspace for platform administration. */}
-      <header className="w-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-40 px-3 sm:px-6 lg:px-8 py-3 transition-colors shadow-xs">
+      <header hidden={embedded} className="w-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-40 px-3 sm:px-6 lg:px-8 py-3 transition-colors shadow-xs">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
           
           {/* Logo & Platform Info */}
@@ -408,8 +414,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
 
       {/* 2. MAIN DASHBOARD CONTENT */}
       <main className="max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
-        <EcosystemPanel system="store" ar={isArabic}/>
-        <EcosystemAdmin ar={isArabic}/>
+        {!embedded&&<EcosystemPanel system="store" ar={isArabic}/>}
+        {!embedded&&<EcosystemAdmin ar={isArabic}/>}
         <section aria-labelledby="admin-workspace-title" className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#0e1f38] via-[#142e4d] to-[#12566b] p-6 text-white shadow-xl shadow-slate-900/10 sm:p-9">
           <div aria-hidden="true" className="pointer-events-none absolute -end-16 -top-24 h-80 w-80 rounded-full border-[40px] border-white/5" />
           <div className="relative grid gap-8 lg:grid-cols-[1.2fr_1fr] lg:items-center">
@@ -963,6 +969,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
 
                             {/* Delete Store Action (Red Pill with Trash2) */}
                             <button
+                              style={embedded?{display:'none'}:undefined}
                               onClick={() => handleDeleteStore(m)}
                               disabled={actionLoading}
                               className="p-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/80 border border-rose-200 dark:border-rose-900 transition-all cursor-pointer active:scale-95 disabled:opacity-50"

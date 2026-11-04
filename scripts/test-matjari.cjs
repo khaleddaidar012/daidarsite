@@ -42,6 +42,9 @@ async function test(){
  assert.equal((await data(await call('orders','GET',undefined,c2))).orders.length,0);
  assert.equal((await call('orders','POST',{...order,items:[{product:{id:p.product.id},quantity:-1}]})).status,400);
  assert.equal((await call('orders','POST',{...order,store_id:b.store.id})).status,404);
+ const originalSub=sqlite.prepare('SELECT start_date,end_date FROM subscriptions WHERE store_id=?').get(a.store.id);
+ for(const [start,end] of [['2099-01-01','2099-12-31'],['2020-01-01','2020-12-31'],['invalid','invalid']]){sqlite.prepare('UPDATE subscriptions SET start_date=?,end_date=? WHERE store_id=?').run(start,end,a.store.id);assert.equal((await call('orders','POST',order)).status,403);assert.equal((await call('products','POST',{store_id:a.store.id,name:'ممنوع',price:50},c1)).status,403);}
+ sqlite.prepare('UPDATE subscriptions SET start_date=?,end_date=? WHERE store_id=?').run(originalSub.start_date,originalSub.end_date,a.store.id);
  const before=sqlite.prepare('SELECT COUNT(*) AS n FROM stores').get().n;const originalBatch=DB.batch;DB.batch=async()=>{throw new Error('Injected storage failure')};
  assert.equal((await call('auth/register','POST',reg('failed'))).status,500);DB.batch=originalBatch;assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM stores').get().n,before);
  await data(await call('auth/logout','POST',{},c1));assert.equal((await call('auth/session','GET',undefined,c1)).status,401);

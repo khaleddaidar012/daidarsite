@@ -3,6 +3,7 @@
 import SystemManagementService from './SystemManagementService'
 import BasicOrderFlow from './BasicOrderFlow'
 import EcosystemPanel from '../../../shared/EcosystemPanel'
+import {safeHubReturn} from '../../../shared/hub-navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Activity, ArrowLeft, ArrowRight, BadgeCheck, Blocks, Check, ChevronLeft, ChevronRight, CircleUserRound, Clock3, CreditCard, Globe2, KeyRound, Layers3, LogIn, LogOut, Mail, Monitor, Package, RotateCcw, ShieldCheck, Sparkles, Store, ShoppingCart, Utensils, Shirt, Refrigerator, Scale, CalendarDays } from 'lucide-react'
 
@@ -21,7 +22,7 @@ const messages = {
 const activityIcons: Record<string, typeof Store> = { general: Store, supermarket: Package, restaurant: Utensils, clothing: Shirt, electronics: Refrigerator }
 const steps = ['system', 'activity', 'addons', 'devices', 'summary'] as const
 
-export default function HubPortal({ locale }: { locale: Locale }) {
+export default function HubPortal({ locale,entry,embedded=false }: { locale: Locale; entry?:'login'|'systems'; embedded?:boolean }) {
   const ar = locale === 'ar'
   const t = messages[locale]
   const [user, setUser] = useState<HubUser | null>(null)
@@ -43,7 +44,7 @@ export default function HubPortal({ locale }: { locale: Locale }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [view, setView] = useState<'home' | 'systems' | 'services'>('home')
+  const [view, setView] = useState<'home' | 'systems' | 'services'>(entry?'systems':'home')
   const [showAccount, setShowAccount] = useState(false)
   const [needsIdentityLink, setNeedsIdentityLink] = useState(false)
   const [showLegacyLogin, setShowLegacyLogin] = useState(false)
@@ -59,6 +60,7 @@ export default function HubPortal({ locale }: { locale: Locale }) {
     const data = await api('session')
     setUser(data.user)
     setNeedsIdentityLink(!!data.linkRequired)
+    if(data.user&&entry==='login'&&!new URLSearchParams(location.search).has('ecosystem_link')&&!new URLSearchParams(location.search).has('ecosystem_resume')){location.assign(safeHubReturn(new URLSearchParams(location.search).get('return_to'))||`/${locale}/hub/dashboard`);return}
     if(data.user&&new URLSearchParams(window.location.search).has('ecosystem_resume')){window.location.assign('/api/ecosystem/continue');return}
     if (!data.user) { setCatalog(null); setOrders([]); setSubscriptions([]); setReleases([]); return }
     const c = await api('catalog')
@@ -71,9 +73,10 @@ export default function HubPortal({ locale }: { locale: Locale }) {
     setFocusOrder((current: Order | null) => current || mapped.find((o: Order) => ['awaiting_transfer','under_review','needs_info'].includes(o.status)) || null)
     setSubscriptions(account.subscriptions)
     setReleases(account.releases || [])
-  }, [api])
+  }, [api,entry,locale])
 
   useEffect(() => {
+    if(new URLSearchParams(location.search).get('mode')==='signup')setMode('signup')
     if(new URLSearchParams(window.location.search).has('ecosystem_resume')||new URLSearchParams(window.location.search).has('ecosystem_link')){setView('systems');setShowAccount(true)}
     const token = new URLSearchParams(window.location.search).get('token')
     if (token) { setView('systems'); setResetToken(token); setMode('set-password') }
@@ -167,11 +170,12 @@ export default function HubPortal({ locale }: { locale: Locale }) {
   }
   const DirectionIcon = ar ? ArrowLeft : ArrowRight
   const card = 'rounded-2xl border border-slate-200 bg-white shadow-sm transition dark:border-slate-700 dark:bg-slate-900'
+  if(entry==='login')return <AuthPanel {...{ar,t,mode,setMode,submitAuth,busy,error,notice,card,locale}} />
 
   return <div dir={ar ? 'rtl' : 'ltr'} className="min-h-screen bg-[#f4f9fd] px-4 py-6 text-slate-900 dark:bg-[#081424] dark:text-white sm:px-6 sm:py-8">
     <div className="mx-auto max-w-6xl">
-      <div className="mb-5"><EcosystemPanel system="hub" ar={ar}/></div>
-      <header className="mb-5 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-5 dark:border-slate-800">
+      {!embedded&&<div className="mb-5"><EcosystemPanel system="hub" ar={ar}/></div>}
+      <header hidden={embedded} className="mb-5 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-5 dark:border-slate-800">
         <div className="flex items-center gap-3 font-extrabold text-[#102d4e] dark:text-white"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-sky-500 text-white"><Blocks /></span><span className="text-xl">{t.hub}<small className="block text-[10px] tracking-[0.2em] font-medium text-slate-500">DAIDAR HUB</small></span></div>
         <div className="flex flex-wrap items-center gap-2">
           <a
@@ -192,7 +196,7 @@ export default function HubPortal({ locale }: { locale: Locale }) {
       </header>
 
       {view === 'home' ? <HubDiscovery ar={ar} user={user} order={focusOrder} onChoose={() => { setFocusOrder(null); setView('systems'); setShowAccount(false); setStep('system') }} onAccount={() => { setView('systems'); setShowAccount(focusOrder?.snapshot.plan !== 'basic') }} onServices={() => setView('services')} /> : view === 'services' ? <SystemManagementService ar={ar} onBack={() => setView('home')} /> : <>
-      <button onClick={() => { setView('home'); setShowAccount(false) }} className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-sky-700 dark:text-sky-300"><ChevronRight size={18} className={ar ? '' : 'rotate-180'} />{ar ? 'الأنظمة والخدمات' : 'Systems and services'}</button>
+      <button onClick={() => { if(embedded){location.assign(`/${locale}/hub/services`);return}; setView('home'); setShowAccount(false) }} className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-sky-700 dark:text-sky-300"><ChevronRight size={18} className={ar ? '' : 'rotate-180'} />{ar ? 'الأنظمة والخدمات' : 'Systems and services'}</button>
       <div className="grid gap-7 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,.65fr)]">
         <section className="space-y-5">
           {!user ? <>{needsIdentityLink&&<section className={card+' p-6'}><h2 className="text-xl font-black">{ar?'تم الدخول — استكمل ربط حسابك القديم':'Signed in — connect your existing account'}</h2><p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-300">{ar?'حساب Google متصل بالفعل. يوجد حساب هب سابق مرتبط بحساب دعيدر آخر، لذلك لن نطلب منك تسجيل Google مرة أخرى. افتح حساب متجري القديم، وحدد «ربط الحساب»، ثم أدخل بياناته مرة واحدة لضم أنظمته إلى حسابك الحالي.':'Your Google account is connected. An existing Hub account belongs to another Daidar identity. Open your existing Store account, select account linking, and verify its credentials once to connect its systems.'}</p><a href={new URL('/api/ecosystem/login?via=hub',process.env.NEXT_PUBLIC_MATJARI_URL||'https://daidar-matjari-preview.pages.dev/').toString()} className="mt-5 inline-flex rounded-xl bg-sky-600 px-5 py-3 text-sm font-bold text-white">{ar?'ربط حساب متجري القديم':'Connect my existing Store account'}</a><button type="button" onClick={()=>setShowLegacyLogin(v=>!v)} className="mt-4 block text-sm text-sky-700 underline">{ar?'لدي حساب هب بكلمة مرور':'I have a Hub account with a password'}</button></section>}{(!needsIdentityLink||showLegacyLogin)&&<AuthPanel {...{ ar, t, mode, setMode, submitAuth, busy, error, notice, card, locale }} />}</> : showAccount ? <AccountPanel {...{ ar, t, card, orders, subscriptions, releases, onOpenOrder: (order:Order) => { setFocusOrder({ ...order, orderNumber:order.orderNumber || (order as any).order_number }); setShowAccount(false) }, onRenew: (id:string) => { const sub=subscriptions.find((x:Subscription)=>x.id===id); setRenewSubscriptionId(id); if(sub){setActivityId((sub.snapshot as any).activityId||'');setAddons(((sub.snapshot as any).addons||[]).map((x:any)=>x.id))}; setShowAccount(false); setStep('system') } }} /> : <>
@@ -247,7 +251,7 @@ function AuthPanel({ ar, t, mode, setMode, submitAuth, busy, error, notice, card
   return <section className={`${card} p-5 sm:p-7`}>
     <div className="mb-5 min-h-12 overflow-hidden rounded-xl bg-sky-50 px-4 py-3 dark:bg-sky-950/40"><div key={tag} className="flex animate-hub-swap items-center gap-3 font-bold text-[#0c3156] dark:text-sky-200"><span className="grid h-8 w-8 place-items-center rounded-lg bg-sky-100 text-sky-600 dark:bg-sky-900">{tag ? <Activity size={18} /> : <Blocks size={18} />}</span>{tag ? t.organize : t.systems}</div></div>
     <h2 className="text-2xl font-black">{mode === 'login' ? t.login : mode === 'signup' ? t.signup : mode === 'set-password' ? (ar ? 'اختيار كلمة مرور جديدة' : 'Choose a new password') : t.reset}</h2><p className="mt-1 text-sm text-slate-500">{t.accountHint}</p>
-    <a href={`/api/hub/google?locale=${locale}`} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 font-bold dark:border-slate-700"><span className="font-black text-lg">G</span>{t.signupGoogle}</a>
+    <a href={process.env.NEXT_PUBLIC_ECOSYSTEM_ENABLED==='1'?`/api/ecosystem/google?return_to=${encodeURIComponent(safeHubReturn(typeof window!=='undefined'?new URLSearchParams(location.search).get('return_to'):null)||`/${locale}/hub/dashboard`)}`:`/api/hub/google?locale=${locale}`} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 font-bold dark:border-slate-700"><span className="font-black text-lg">G</span>{t.signupGoogle}</a>
     <form className="mt-5 space-y-3" onSubmit={submitAuth}>{mode === "login" && <label className="flex items-start gap-2 text-xs leading-6 text-slate-500"><input type="checkbox" name="link_identity"/>{ar?"ربط حساب دعيدر القديم وأنظمته بحسابي الحالي بعد إثبات كلمة المرور":"Connect my existing Daidar account and its systems after verifying its password"}</label>}{mode === 'signup' && <Field label={t.name} name="name" icon={<CircleUserRound size={17} />} required minLength={2} />}{mode === 'reset' && <p className="text-sm text-slate-500">{t.resetSent}</p>}{mode !== 'set-password' && <Field label={t.email} name="email" type="email" icon={<Mail size={17} />} required />}{mode !== 'reset' && <Field label={mode === 'set-password' ? (ar ? 'كلمة المرور الجديدة' : 'New password') : t.password} name="password" type="password" icon={<KeyRound size={17} />} required minLength={12} autoComplete={mode === 'signup' || mode === 'set-password' ? 'new-password' : 'current-password'} placeholder={t.passwordHint} />}<div className="min-h-5">{error && <span className="text-sm text-red-600">{error}</span>}{notice && <span className="text-sm text-emerald-700">{notice}</span>}</div><button disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-3 font-bold text-white disabled:opacity-60">{busy ? t.saving : mode === 'reset' ? t.send : mode === 'set-password' ? t.continue : t.continue}<LogIn size={17} /></button></form>
     <div className="mt-4 flex flex-wrap justify-between gap-2 text-sm">{mode === 'login' && <button onClick={() => { setMode('reset') }} className="text-sky-700 underline dark:text-sky-300">{t.resetLink}</button>}{(mode === 'login' || mode === 'signup') && <button onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} className="text-sky-700 underline dark:text-sky-300">{mode === 'login' ? t.noAccount : t.hasAccount} {mode === 'login' ? t.signup : t.login}</button>}{(mode === 'reset' || mode === 'set-password') && <button onClick={() => setMode('login')} className="text-sky-700 underline dark:text-sky-300">{t.back}</button>}</div>
   </section>

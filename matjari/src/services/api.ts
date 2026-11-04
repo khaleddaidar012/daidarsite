@@ -1,9 +1,8 @@
 import { Store, Product, TrafficStats, CustomerOrder, User, Subscription, MerchantDetail } from '../types';
 
-const BASE_PREFIX = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
-const API_BASE = `${BASE_PREFIX}/api`;
 
-export const api = {
+
+export function createStoreApi(API_BASE='/api') { return {
   async session(): Promise<{user: User; store: Store | null; subscription: Subscription | null} | null> {
     const res = await fetch(`${API_BASE}/auth/session`, { cache: 'no-store' });
     if (res.status === 401) return null;
@@ -133,14 +132,10 @@ export const api = {
   },
 
   async getAdminAnalytics(): Promise<{ totalOrders: number; totalProducts: number; monthMap: Record<string, number> }> {
-    try {
       const res = await fetch(`${API_BASE}/admin/analytics`);
-      if (!res.ok) return { totalOrders: 0, totalProducts: 0, monthMap: {} };
       const data = await res.json();
-      return data.analytics || { totalOrders: 0, totalProducts: 0, monthMap: {} };
-    } catch {
-      return { totalOrders: 0, totalProducts: 0, monthMap: {} };
-    }
+      if (!res.ok || !data.analytics) throw new Error(data.error || 'تعذر تحميل مؤشرات المتاجر');
+      return data.analytics;
   },
 
   // 3. Store info & settings
@@ -286,4 +281,5 @@ export const api = {
     const res = await fetch(`${API_BASE}/d1-status`);
     return res.json();
   }
-};
+}; }
+export const api=createStoreApi();

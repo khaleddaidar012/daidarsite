@@ -67,7 +67,7 @@ export const Footer: React.FC<FooterProps> = ({
         {/* Cloudflare D1 Architecture Indicator */}
         <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-[11px] font-bold">
           <Database className="w-3.5 h-3.5 text-[#0084d6] dark:text-sky-400" />
-          <span>Cloudflare D1 Exclusive Storage</span>
+          <span>{isArabic?'متجرك ومنتجاتك في مكان واحد':'Your store and products in one place'}</span>
         </div>
       </div>
     </footer>
