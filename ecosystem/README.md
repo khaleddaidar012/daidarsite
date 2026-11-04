@@ -1,6 +1,6 @@
 # Daidar Ecosystem — preview rollout
 
-The pilot runs on `feature/matjari-hub` only. Production Hub and its database are not part of this rollout.
+The pilot was developed on `feature/matjari-hub`. The user authorized publishing its source to `main` on 2026-11-04. Runtime SSO remains gated by the environment's `ECOSYSTEM_DB` binding; publishing source does not promote the preview identity database into production. Production identity configuration and migration remain separate from this code release.
 
 ## Architecture
 
