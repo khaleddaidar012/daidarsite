@@ -11,13 +11,13 @@
     },
     {
       "binding": "ECOSYSTEM_DB",
-      "database_name": "daidar-ecosystem-preview",
-      "database_id": "40ff08bd-37fe-45a3-83eb-74ce2fbf5f53"
+      "database_name": "daidar-ecosystem-production",
+      "database_id": "62ddc93b-cfa9-4fa2-90d5-eba271895359"
     },
     {
       "binding": "ECOSYSTEM_HUB_DB",
-      "database_name": "daidar-hub-ecosystem-preview",
-      "database_id": "f98ebd79-00d3-4fc7-a7ff-8200905b05f1"
+      "database_name": "daidar-admin",
+      "database_id": "4f962096-a4cb-4bc3-8da6-3efaf80f8c6f"
     },
     {
       "binding": "ECOSYSTEM_STORE_DB",
@@ -29,7 +29,39 @@
     "READ_ONLY_PREVIEW": "false",
     "ECOSYSTEM_CLIENT": "store",
     "ECOSYSTEM_OWNER_LOCAL_ID": "owner-khaled",
-    "ECOSYSTEM_HUB_ORIGIN": "https://feature-matjari-hub.daidarsite2.pages.dev",
+    "ECOSYSTEM_HUB_ORIGIN": "https://daidarsoluations.com",
     "ECOSYSTEM_STORE_ORIGIN": "https://daidar-matjari-preview.pages.dev"
+  },
+  "env": {
+    "preview": {
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "daidar-store-isolated-preview",
+          "database_id": "ab131379-37ed-460e-846b-5484b339be6c"
+        },
+        {
+          "binding": "ECOSYSTEM_DB",
+          "database_name": "daidar-ecosystem-preview",
+          "database_id": "40ff08bd-37fe-45a3-83eb-74ce2fbf5f53"
+        },
+        {
+          "binding": "ECOSYSTEM_HUB_DB",
+          "database_name": "daidar-hub-ecosystem-preview",
+          "database_id": "f98ebd79-00d3-4fc7-a7ff-8200905b05f1"
+        },
+        {
+          "binding": "ECOSYSTEM_STORE_DB",
+          "database_name": "daidar-store-isolated-preview",
+          "database_id": "ab131379-37ed-460e-846b-5484b339be6c"
+        }
+      ],
+      "vars": {
+        "READ_ONLY_PREVIEW": "true",
+        "ECOSYSTEM_CLIENT": "store",
+        "ECOSYSTEM_HUB_ORIGIN": "https://feature-matjari-hub.daidarsite2.pages.dev",
+        "ECOSYSTEM_STORE_ORIGIN": "https://feature-matjari-hub.daidar-matjari-preview.pages.dev"
+      }
+    }
   }
 }

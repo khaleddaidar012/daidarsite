@@ -102,6 +102,15 @@ export async function adminHub(request: Request, env: Env, path: string, actor =
     if (!order) return json({ error: 'الطلب غير موجود.' }, 404)
     if (!['under_review', 'needs_info', 'awaiting_transfer'].includes(order.status)) return json({ error: 'تم اتخاذ إجراء على الطلب مسبقًا.' }, 409)
     const snapshot = parse(order.snapshot)
+    if(['consultation','system-management'].includes(String(snapshot.kind))){
+      const next=action==='approve'?'approved':action==='reject'?'rejected':action==='request-info'?'needs_info':null;
+      if(!next)return json({error:'إجراء غير صالح'},422);
+      await db.batch([
+        db.prepare("UPDATE hub_orders SET status=?,reviewed_at=?,updated_at=?,admin_note=? WHERE id=? AND status IN ('under_review','needs_info')").bind(next,now,now,reason,id),
+        db.prepare('INSERT INTO hub_audit(id,actor,action,entity_id,data,created_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),actor,'service_request_'+action,id,JSON.stringify({requestOnly:true,paymentConfirmed:false}),now)
+      ]);
+      return json({success:true,status:next,requestOnly:true});
+    }
     if (action === 'approve') {
       if (snapshot.paymentMode === 'demo') return json({ error: 'هذا طلب تجريبي؛ لا يمكن اعتماده كدفعة حقيقية.' }, 409)
       const release = await db.prepare('SELECT id FROM hub_releases WHERE published=1 ORDER BY created_at DESC LIMIT 1').first()

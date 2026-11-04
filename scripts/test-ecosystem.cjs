@@ -2,7 +2,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const cache=new Map();let joseOverride;
 function load(file){file=path.resolve(file);if(cache.has(file))return cache.get(file);const m={exports:{}};cache.set(file,m.exports);new Function('require','module','exports',ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(n=>n==='jose'&&joseOverride?joseOverride:n.startsWith('.')?load(path.resolve(path.dirname(file),n)+'.ts'):require(n),m,m.exports);cache.set(file,m.exports);return m.exports}
 function db(files){const sqlite=new DatabaseSync(':memory:');sqlite.exec('PRAGMA foreign_keys=ON');for(const file of files)sqlite.exec(fs.readFileSync(file,'utf8'));return{sqlite,prepare(sql){let args=[];return{bind(...v){args=v;return this},async first(){return sqlite.prepare(sql).get(...args)||null},async all(){return{results:sqlite.prepare(sql).all(...args)}},async run(){return sqlite.prepare(sql).run(...args)}}},async batch(items){sqlite.exec('BEGIN');try{const out=[];for(const i of items)out.push(await i.run());sqlite.exec('COMMIT');return out}catch(e){sqlite.exec('ROLLBACK');throw e}}}}
-const center=db(['ecosystem/migrations/0001_identity.sql']),hubDB=db(['migrations/0001_admin.sql','migrations/0003_hub.sql']),storeDB=db(['matjari/migrations/0001_initial_schema.sql','matjari/migrations/0002_auth_sessions.sql']);
+const center=db(['ecosystem/migrations/0001_identity.sql']),hubDB=db(['migrations/0001_admin.sql','migrations/0003_hub.sql','migrations/0012_system_management_subscriptions.sql']),storeDB=db(['matjari/migrations/0001_initial_schema.sql','matjari/migrations/0002_auth_sessions.sql']);
 const common={ECOSYSTEM_DB:center,ECOSYSTEM_STORE_DB:storeDB,ECOSYSTEM_HUB_DB:hubDB,ECOSYSTEM_HUB_ORIGIN:'https://hub.example',ECOSYSTEM_STORE_ORIGIN:'https://store.example',HUB_GOOGLE_CLIENT_ID:'google-test',HUB_GOOGLE_CLIENT_SECRET:'unused-test-secret'};
 const hubEnv={...common,DB:hubDB},storeEnv={...common,DB:storeDB,ECOSYSTEM_OWNER_LOCAL_ID:'owner'};
 const eco=load('shared/ecosystem.ts'),auth=load('matjari/lib/auth.ts'),hub=load('functions/api/hub/[[path]].ts'),store=load('matjari/functions/api/[[route]].ts'),hubAdapter=load('functions/lib/ecosystem.ts').hubAdapter(hubEnv),storeAdapter=load('matjari/lib/ecosystem.ts').storeAdapter(storeEnv);
@@ -61,6 +61,11 @@ async function test(){
   jwt=await new jose.SignJWT({nonce:gUrl.searchParams.get('nonce'),email:'google@example.test',email_verified:true}).setProtectedHeader({alg:'RS256',kid:'test-key'}).setIssuer('https://accounts.google.com').setAudience('google-test').setSubject('verified-google-sub').setIssuedAt().setExpirationTime('5m').sign(privateKey);
   const gc=await ec('hub','google/callback?code=test&state='+state,cookie(google));assert.equal(gc.status,303);const gu=(await data(await ec('hub','session',cookie(gc)))).user;assert(gu);assert.equal(gu.platform_admin,false);
   assert.equal((await ec('hub','google/callback?code=test&state='+state,cookie(google))).status,401);
+  hubEnv.ECOSYSTEM_GOOGLE_CALLBACK_PATH='/api/hub/google/callback';
+  const compatibility=await ec('hub','google'),compatUrl=new URL(compatibility.headers.get('location'));assert.equal(compatUrl.searchParams.get('redirect_uri'),'https://hub.example/api/hub/google/callback');
+  jwt=await new jose.SignJWT({nonce:compatUrl.searchParams.get('nonce'),email:'google@example.test',email_verified:true}).setProtectedHeader({alg:'RS256',kid:'test-key'}).setIssuer('https://accounts.google.com').setAudience('google-test').setSubject('verified-google-sub').setIssuedAt().setExpirationTime('5m').sign(privateKey);
+  const compatibilityResult=await hub.onRequest({request:request('hub','/api/hub/google/callback?code=test&state='+compatUrl.searchParams.get('state'),'GET',undefined,cookie(compatibility)),env:hubEnv});assert.equal(compatibilityResult.status,303);assert((await data(await ec('hub','session',cookie(compatibilityResult)))).user);
+  delete hubEnv.ECOSYSTEM_GOOGLE_CALLBACK_PATH;
   const bad=await ec('hub','google'),badUrl=new URL(bad.headers.get('location'));jwt=await new jose.SignJWT({nonce:'wrong',email:'owner@example.test',email_verified:true}).setProtectedHeader({alg:'RS256',kid:'test-key'}).setIssuer('https://accounts.google.com').setAudience('google-test').setSubject('attacker').setIssuedAt().setExpirationTime('5m').sign(privateKey);
   assert.equal((await ec('hub','google/callback?code=test&state='+badUrl.searchParams.get('state'),cookie(bad))).status,401);
  }finally{global.fetch=originalFetch}
@@ -92,6 +97,42 @@ async function test(){
  assert.equal((await hub.onRequest({request:request('hub','/api/hub/login','POST',{email:'conflict@example.test',password:'conflict password 123',link_identity:true},googleCookie),env:hubEnv})).status,409);
  assert.equal(center.sqlite.prepare('SELECT COUNT(*) AS n FROM ec_links').get().n,before);
  assert.ok((await data(await ec('hub','session',cookie(conflicting)))).user);
+ // Unified customer data, safe destinations and the real administrative bridge.
+ const rootRoute=load('functions/api/ecosystem/[[path]].ts'),navigation=load('shared/hub-navigation.ts'),customerModel=load('shared/ecosystem-customer.ts');
+ const root=(p,c='',method='GET',body)=>rootRoute.onRequest({request:request('hub','/api/ecosystem/'+p,method,body,c),env:hubEnv});
+ assert.equal(navigation.safeHubReturn('/ar/hub/subscriptions'),'/ar/hub/subscriptions');
+ for(const bad of ['https://evil.example','//evil.example','/ar/hub/%2f%2fevil','/ar/hub/../admin','/ar/hub/dashboard#x'])assert.equal(navigation.safeHubReturn(bad),null);
+ assert.equal(customerModel.serviceState('active',Date.now()+100000,Date.now()+200000),'pending');
+ assert.equal(customerModel.serviceState('active',null,Date.now()-1),'expired');
+ assert.equal(customerModel.serviceState('trial',Date.now()-1000,Date.now()+1000),'trial');
+ assert.equal(customerModel.serviceState('active',NaN,null),'pending');
+ assert.equal((await root('admin/workspace')).status,401);
+ assert.equal((await root('admin/workspace',googleCookie)).status,403);
+ const workspace=await data(await root('admin/workspace',hubCookie));assert.equal(workspace.counts.stores,storeDB.sqlite.prepare('SELECT COUNT(*) AS n FROM stores').get().n);
+ assert.equal((await root('admin/store/admin/merchants',googleCookie)).status,403);
+ const storesAdmin=await data(await root('admin/store/admin/merchants',hubCookie));assert.ok(!JSON.stringify(storesAdmin).includes('pbkdf2'));
+ const csrf=new Request('https://hub.example/api/ecosystem/admin/store/admin/merchants',{method:'POST',headers:{Cookie:hubCookie,Origin:'https://evil.example','Content-Type':'application/json'},body:'{}'});assert.equal((await rootRoute.onRequest({request:csrf,env:hubEnv})).status,403);
+ assert.equal((await root('admin/store/auth/login',hubCookie,'POST',{username:'owner'})).status,404);
+ assert.equal((await root('admin/store/admin/merchants',hubCookie,'DELETE',{})).status,405);
+ const mine=await data(await root('customer',googleCookie));assert.ok(mine.services.some(s=>s.id===legacy.store.id));assert.ok(!mine.services.some(s=>s.id===merchant.store.id));
+ assert.equal((await root('requests','','POST',{kind:'consultation',operation_id:crypto.randomUUID()})).status,401);
+ assert.equal((await root('requests',googleCookie,'POST',{kind:'crm',operation_id:crypto.randomUUID()})).status,422);
+ const serviceRequest={kind:'system-management',operation_id:crypto.randomUUID(),hours:2,start:18,method:'instapay',total:1,note:'fixture request'};
+ const savedRequest=await data(await root('requests',googleCookie,'POST',serviceRequest));await data(await root('requests',googleCookie,'POST',serviceRequest));
+ assert.equal(hubDB.sqlite.prepare('SELECT COUNT(*) AS n FROM hub_orders WHERE id=?').get(savedRequest.id).n,1);
+ assert.equal(JSON.parse(hubDB.sqlite.prepare('SELECT snapshot FROM hub_orders WHERE id=?').get(savedRequest.id).snapshot).total,120000);
+ assert.equal((await root('requests',googleCookie,'POST',{...serviceRequest,hours:3})).status,409);
+ const beforeSubscriptions=hubDB.sqlite.prepare('SELECT COUNT(*) AS n FROM hub_subscriptions').get().n;
+ await data(await root('admin/hub/hub-orders',hubCookie,'POST',{id:savedRequest.id,action:'approve'}));
+ assert.equal(hubDB.sqlite.prepare('SELECT COUNT(*) AS n FROM hub_subscriptions').get().n,beforeSubscriptions);
+ assert.equal((await data(await root('customer',googleCookie))).orders.find(o=>o.id===savedRequest.id).status,'approved');
+ const today=new Date().toISOString().slice(0,10);
+ const service=await data(await root('admin/hub/service-subscriptions',hubCookie,'POST',{operation_key:crypto.randomUUID(),customer_name:'Local fixture',phone:'01000000003',hours:1,start_hour:18,start_date:today,months:1,payment_method:'instapay',note:'private staff note',payment_received:true,amount_received_piasters:80000}));
+ await data(await root('admin/service-links',hubCookie,'POST',{customer_id:googleId,resource_id:service.id}));
+ const linkedService=(await data(await root('customer',googleCookie))).services.find(s=>s.id===service.id);assert.ok(linkedService);assert.equal(linkedService.payment_status,'confirmed');assert.equal(linkedService.note,undefined);
+ assert.equal((await root('admin/service-links',hubCookie,'POST',{customer_id:storeIdentity.id,resource_id:service.id})).status,409);
+ const ret=await ec('hub','login?via=store&return_to='+encodeURIComponent('/en/hub/subscriptions'));const authzRet=await ec('store','authorize'+new URL(ret.headers.get('location')).search,ownerCookie);const returned=await ec('hub','callback'+new URL(authzRet.headers.get('location')).search,cookie(ret));assert.equal(returned.headers.get('location'),'https://hub.example/en/hub/subscriptions');
+ console.log('Workspace tests passed: source-backed counts, customer isolation, guarded administration and delegation, CSRF, safe return, request retries/prices, no automatic paid activation, and explicit service ownership.');
  // Family logout immediately invalidates Flow tokens as well as web sessions.
  await data(await ec('store','logout',ownerCookie,'POST',{}));
  const revoked=await eco.ecosystem(new Request('https://hub.example/api/ecosystem/device/session',{headers:{Authorization:'Bearer '+grant.access_token}}),hubEnv,hubAdapter);assert.equal(revoked.status,401);

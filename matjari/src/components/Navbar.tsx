@@ -61,7 +61,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="text-slate-300 dark:text-slate-700">•</span>
                 <span className="inline-flex items-center gap-1 text-[10px] text-[#0084d6] dark:text-sky-400 font-medium shrink-0">
                   <Database className="w-2.5 h-2.5" />
-                  Cloudflare D1
+                  {isArabic?'إدارة متجرك':'Store management'}
                 </span>
               </p>
             </div>

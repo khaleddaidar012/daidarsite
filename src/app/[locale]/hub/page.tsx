@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import HubPortal from '@/components/hub/HubPortal'
+import HubWorkspace from '@/components/ecosystem/HubWorkspace'
 
 type Props = { params: Promise<{ locale: string }> }
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -9,5 +9,5 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 export default async function HubPage({ params }: Props) {
   const { locale } = await params
-  return <HubPortal locale={locale === 'en' ? 'en' : 'ar'} />
+  return <HubWorkspace locale={locale === 'en' ? 'en' : 'ar'} />
 }

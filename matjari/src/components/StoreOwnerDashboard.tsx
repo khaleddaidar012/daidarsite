@@ -15,7 +15,7 @@ export const StoreOwnerDashboard:React.FC<Props>=({user,initialStore,subscriptio
  const load=useCallback(async()=>{setLoading(true);setError('');try{const s=await api.session();if(!s)throw Error(ar?'انتهت الجلسة. سجل دخولك مرة أخرى.':'Your session expired. Sign in again.');setStore(s.store);setSubscription(s.subscription);if(s.store){const [p,o]=await Promise.all([api.getProducts(s.store.id),api.getOrders(s.store.id)]);setProducts(p);setOrders(o)}else{setProducts([]);setOrders([])}}catch(e){setError(e instanceof Error?e.message:'Error')}finally{setLoading(false)}},[ar,user.id]);
  useEffect(()=>{void load()},[load]);
  const expired=!!subscription&&Date.parse(subscription.end_date+'T23:59:59.999Z')<Date.now();
- const active=!!store?.is_active&&!!subscription&&subscription.status==='active'&&!expired;
+ const active=!!store?.is_active&&!!subscription&&['active','trial'].includes(subscription.status)&&Date.parse(subscription.start_date+'T00:00:00Z')<=Date.now()&&!expired;
  const status=!store?text('لا يوجد متجر بعد','No store yet'):!store.is_active?text('بانتظار التفعيل','Awaiting activation'):expired?text('الاشتراك منتهي','Subscription expired'):!active?text('الاشتراك غير فعال','Inactive subscription'):text('متجرك فعال','Store active');
  const storeUrl=store?`${window.location.origin}/?view=storefront&store_id=${encodeURIComponent(store.id)}`:'';
  const support='https://wa.me/201061532875?text='+encodeURIComponent('مرحباً، أحتاج مساعدة بخصوص متجر '+(store?.name||user.username)+(store?' ('+store.id+')':''));

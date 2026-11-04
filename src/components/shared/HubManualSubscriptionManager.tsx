@@ -7,7 +7,7 @@ type Catalog = { products: { id: string; nameAr: string }[]; activities: { id: s
 type Subscription = { id: string; product_id: string; status: string; snapshot: { activityId?: string; addons?: { id: string }[]; period?: string }; expires_at: number | null }
 type Customer = { id: string; name: string; email: string; subscriptions: Subscription[] }
 
-export default function HubManualSubscriptionManager({ scope }: { scope: Scope }) {
+export default function HubManualSubscriptionManager({ scope, apiBase }: { scope: Scope; apiBase?:string }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null)
   const [customers, setCustomers] = useState<Customer[]>([])
   const [search, setSearch] = useState('')
@@ -23,7 +23,7 @@ export default function HubManualSubscriptionManager({ scope }: { scope: Scope }
   const [notice, setNotice] = useState('')
 
   const api = async (path: string, method = 'GET', body?: unknown) => {
-    const res = await fetch(`/api/${scope}/${path}`, { method, cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+    const res = await fetch(`${apiBase||`/api/${scope}`}/${path}`, { method, cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
     const data = await res.json().catch(() => ({ error: 'تعذر الاتصال بالخدمة' }))
     if (!res.ok) throw new Error(data.error || 'تعذر تنفيذ الطلب')
     return data

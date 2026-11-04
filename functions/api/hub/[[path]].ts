@@ -1,7 +1,7 @@
 import { BASIC_ACTIVITIES, BASIC_MONTHLY_PRICE, normalizeTransferPhone, validTransferPhone } from '../../../src/lib/hub-basic'
 import { hash, json, sameOrigin, type Env } from '../../lib/store'
-import { ecoLogin, ecoLogout, ecoRevokeLocal, ecoUser } from '../../../shared/ecosystem'
-import { hubEcoUser } from '../../lib/ecosystem'
+import { ecoLogin, ecoLogout, ecoRead, ecoRevokeLocal, ecoUser, ecosystem } from '../../../shared/ecosystem'
+import { hubAdapter, hubEcoUser } from '../../lib/ecosystem'
 
 const encoder = new TextEncoder()
 const DAY = 86400000
@@ -25,6 +25,12 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       return new Response(null, { status: 302, headers })
     }
     if (path === 'google/callback' && request.method === 'GET') {
+      // Reuse the already registered production callback without changing Google credentials.
+      // A central OAuth state must always use the OIDC/PKCE verifier, never the legacy flow.
+      if(env.ECOSYSTEM_DB&&ecoRead(request,'__Host-eco_google')){
+        const target=new URL(request.url);target.pathname='/api/ecosystem/google/callback';
+        return ecosystem(new Request(target,request),env,hubAdapter(env));
+      }
       const query = new URL(request.url).searchParams
       const state = query.get('state') || ''
       const expected = cookie(request, 'daidar_hub_oauth')
@@ -42,12 +48,20 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       let account = await env.DB.prepare('SELECT id FROM hub_users WHERE google_subject=?').bind(profile.sub).first<{ id: string }>()
       if (!account) {
         const matching = await env.DB.prepare('SELECT id,google_subject,active FROM hub_users WHERE email=? COLLATE NOCASE').bind(profile.email).first<{ id: string; google_subject: string | null; active: number }>()
+        if(env.ECOSYSTEM_DB&&matching)return Response.redirect(fail.toString(),303)
         if (matching?.google_subject || matching?.active === 0) return Response.redirect(fail.toString(), 303)
         const id = matching?.id || crypto.randomUUID()
         await env.DB.prepare(matching ? 'UPDATE hub_users SET google_subject=? WHERE id=?' : 'INSERT INTO hub_users(id,email,name,google_subject,created_at) VALUES(?,?,?,?,?)').bind(...(matching ? [profile.sub, id] : [id, profile.email.toLowerCase(), (profile.name || profile.email).slice(0,120), profile.sub, Date.now()])).run()
         account = { id }
       }
       const token = crypto.randomUUID() + crypto.randomUUID()
+      if(env.ECOSYSTEM_DB){
+        const session=await sessionResponse(request,env,account.id,now);
+        const headers=new Headers(session.headers);
+        headers.set('Location',new URL(`/${cookie(request,'daidar_hub_locale')==='en'?'en':'ar'}/hub/dashboard`,request.url).toString());
+        headers.append('Set-Cookie',`daidar_hub_oauth=; Path=/api/hub/google; HttpOnly; SameSite=Lax; Max-Age=0${secure(request)}`);
+        return new Response(null,{status:session.ok?303:session.status,headers});
+      }
       await env.DB.prepare('INSERT INTO hub_sessions(token,user_id,expires_at) VALUES(?,?,?)').bind(await hash(token), account.id, Date.now() + 30 * DAY).run()
       const home = new URL(`/${cookie(request, 'daidar_hub_locale') === 'en' ? 'en' : 'ar'}/hub`, request.url)
       const headers = new Headers({ Location: home.toString(), 'Cache-Control': 'no-store' })

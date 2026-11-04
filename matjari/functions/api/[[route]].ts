@@ -1,14 +1,16 @@
-import { currentActor, publicUser, newSession, passwordHash, passwordMatches, digest, token, cookie, rateLimit } from '../../lib/auth';
-import { ecoLogout, type EcoEnv } from '../../../shared/ecosystem';
+import { currentActor, publicUser, newSession, passwordHash, passwordMatches, digest, token, cookie, rateLimit, type Actor } from '../../lib/auth';
+import { ecoLogout, type EcoEnv, type EcoDB } from '../../../shared/ecosystem';
 import { syncStoreResource } from '../../lib/ecosystem';
 // Cloudflare Pages Function with Cloudflare D1 Binding
 export interface Env extends EcoEnv {
-  DB: D1Database;
+  DB: EcoDB;
   READ_ONLY_PREVIEW?: string;
 }
 
-export const onRequest: PagesFunction<Env> = async (context) => {
-  const { request, env } = context;
+export const onRequest = ({request,env}:{request:Request;env:Env}) => handleStoreRequest(request,env);
+
+// Server-only delegation. The public HTTP entry point never accepts an actor.
+export async function handleStoreRequest(request:Request, env:Env, delegatedActor?:Actor) {
   const url = new URL(request.url);
   
   // Clean path
@@ -49,7 +51,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (method !== 'DELETE' && !request.headers.get('Content-Type')?.startsWith('application/json')) return fail('يلزم إرسال JSON', 415);
       if (Number(request.headers.get('Content-Length') || 0) > 2097152) return fail('حجم البيانات كبير جداً', 413);
     }
-    const actor = await currentActor(db, request, env);
+    const actor = delegatedActor || await currentActor(db, request, env);
     if(path==='auth/create-store'&&method==='POST'){
       if(!actor)return fail('سجل الدخول أولاً',401);
       if(actor.store_id||actor.role!=='merchant')return fail('الحساب لديه متجر بالفعل',409);
@@ -97,8 +99,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const store = await db.prepare('SELECT is_active FROM stores WHERE id=?').bind(storeId).first() as any;
       if (!store?.is_active && !['orders','stats'].includes(path)) return fail('متجرك بانتظار التفعيل من الإدارة');
       if(!['GET','HEAD'].includes(method)){
-        const sub=await db.prepare('SELECT status,end_date FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(storeId).first() as any;
-        if(!sub||sub.status!=='active'||Date.parse(sub.end_date+'T23:59:59.999Z')<Date.now())return fail('الاشتراك غير فعال. تواصل مع الدعم للتجديد.');
+        const sub=await db.prepare('SELECT status,start_date,end_date FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(storeId).first() as any;
+        if(!usableSubscription(sub))return fail('الاشتراك غير فعال. تواصل مع الدعم للتجديد.');
       }
     }
     if (path === 'store' && method === 'GET' && url.searchParams.get('id')) {
@@ -499,6 +501,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         const { store_id = 'store-elegance', customer_name, customer_phone, customer_address = '', items, total_price } = body;
         const store = await db.prepare('SELECT id FROM stores WHERE id=? AND is_active=1').bind(store_id).first();
         if (!store) return fail('المتجر غير متاح',404);
+        const subscription=await db.prepare('SELECT status,start_date,end_date FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(store_id).first();
+        if(!usableSubscription(subscription))return fail('المتجر لا يستقبل طلبات حاليًا',403);
         if (typeof customer_name !== 'string' || !customer_name.trim() || customer_name.length>160 || typeof customer_phone !== 'string' || !customer_phone || customer_phone.length>30 || String(customer_address).length>1000 || !Array.isArray(items) || !items.length || items.length>50) return fail('راجع بيانات الطلب',400);
         let calculatedTotal = 0;
         const verifiedItems = [];
@@ -526,3 +530,5 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return new Response(JSON.stringify({ success: false, error: status === 429 ? error.message : status === 409 ? 'البيانات مسجلة بالفعل' : status === 400 ? 'راجع البيانات المرسلة' : 'تعذر تنفيذ الطلب. حاول مرة أخرى.' }), { status, headers });
   }
 };
+
+function usableSubscription(sub:any){if(!sub||!['active','trial'].includes(sub.status))return false;const start=Date.parse(sub.start_date+'T00:00:00Z'),end=Date.parse(sub.end_date+'T23:59:59.999Z');return Number.isFinite(start)&&Number.isFinite(end)&&start<=Date.now()&&end>=Date.now()}
