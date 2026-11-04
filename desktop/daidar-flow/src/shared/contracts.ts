@@ -2,6 +2,7 @@ import type { BrandLink } from "./brand";
 import type { Feature, FeatureId } from "./features";
 import type { ActivationResult, LicenseView } from "./licensing";
 import type { InventoryBridge } from "./inventory";
+import type { EcosystemAccountView, EcosystemStart } from './ecosystem';
 export interface AppInfo {
   name: string;
   version: string;
@@ -10,6 +11,10 @@ export interface AppInfo {
   features: readonly Feature[];
 }
 export interface DesktopBridge {
+  getEcosystemAccount():Promise<EcosystemAccountView>;
+  startEcosystemLogin():Promise<EcosystemStart>;
+  completeEcosystemLogin():Promise<EcosystemAccountView>;
+  logoutEcosystem():Promise<boolean>;
   inventory: InventoryBridge;
   getLicense(): Promise<LicenseView>;
   activateLicense(code: string): Promise<ActivationResult>;

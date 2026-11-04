@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "daidar-matjari-preview",
+  "compatibility_date": "2026-11-02",
+  "pages_build_output_dir": "./dist",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "matjari-preview",
+      "database_id": "d3f574fd-c79f-428c-a52a-c35ef4dfd758"
+    },
+    {
+      "binding": "ECOSYSTEM_DB",
+      "database_name": "daidar-ecosystem-preview",
+      "database_id": "40ff08bd-37fe-45a3-83eb-74ce2fbf5f53"
+    },
+    {
+      "binding": "ECOSYSTEM_HUB_DB",
+      "database_name": "daidar-hub-ecosystem-preview",
+      "database_id": "f98ebd79-00d3-4fc7-a7ff-8200905b05f1"
+    },
+    {
+      "binding": "ECOSYSTEM_STORE_DB",
+      "database_name": "matjari-preview",
+      "database_id": "d3f574fd-c79f-428c-a52a-c35ef4dfd758"
+    }
+  ],
+  "vars": {
+    "READ_ONLY_PREVIEW": "false",
+    "ECOSYSTEM_CLIENT": "store",
+    "ECOSYSTEM_OWNER_LOCAL_ID": "owner-khaled",
+    "ECOSYSTEM_HUB_ORIGIN": "https://feature-matjari-hub.daidarsite2.pages.dev",
+    "ECOSYSTEM_STORE_ORIGIN": "https://daidar-matjari-preview.pages.dev"
+  }
+}

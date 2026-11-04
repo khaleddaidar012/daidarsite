@@ -8,6 +8,10 @@ const inventory: InventoryBridge = {
   remove: (input) => ipcRenderer.invoke("inventory:remove", input),
 };
 const bridge: DesktopBridge = {
+  getEcosystemAccount:()=>ipcRenderer.invoke('ecosystem:status'),
+  startEcosystemLogin:()=>ipcRenderer.invoke('ecosystem:start'),
+  completeEcosystemLogin:()=>ipcRenderer.invoke('ecosystem:complete'),
+  logoutEcosystem:()=>ipcRenderer.invoke('ecosystem:logout'),
   inventory: Object.freeze(inventory),
   getLicense: () => ipcRenderer.invoke("license:status"),
   activateLicense: (code) => ipcRenderer.invoke("license:activate", code),

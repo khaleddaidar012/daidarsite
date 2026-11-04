@@ -1,5 +1,7 @@
 import { BASIC_ACTIVITIES, BASIC_MONTHLY_PRICE, normalizeTransferPhone, validTransferPhone } from '../../../src/lib/hub-basic'
 import { hash, json, sameOrigin, type Env } from '../../lib/store'
+import { ecoLogin, ecoLogout, ecoRevokeLocal, ecoUser } from '../../../shared/ecosystem'
+import { hubEcoUser } from '../../lib/ecosystem'
 
 const encoder = new TextEncoder()
 const DAY = 86400000
@@ -11,6 +13,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
   try {
     if (request.method !== 'GET' && !sameOrigin(request)) return json({ error: 'طلب غير مسموح' }, 403)
     if (path === 'google' && request.method === 'GET') {
+      if(env.ECOSYSTEM_DB)return Response.redirect(new URL('/api/ecosystem/google',request.url).toString(),303)
       if (!env.HUB_GOOGLE_CLIENT_ID || !env.HUB_GOOGLE_CLIENT_SECRET) return json({ error: 'تسجيل Google غير مفعّل. أضف مفاتيح OAuth في Cloudflare.' }, 503)
       const state = crypto.randomUUID() + crypto.randomUUID()
       const callback = `${new URL(request.url).origin}/api/hub/google/callback`
@@ -59,11 +62,11 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       const name = str(body.name, 120)
       const password = str(body.password, 256, false)
       if (!/^\S+@\S+\.\S+$/.test(email) || name.length < 2 || password.length < 12) return json({ error: 'أدخل اسمًا وبريدًا صحيحين وكلمة مرور من 12 حرفًا على الأقل.' }, 422)
-      const salt = crypto.randomUUID() + crypto.randomUUID()
+      const salt = (env.ECOSYSTEM_DB?'v2$':'') + crypto.randomUUID() + crypto.randomUUID()
       const userId = crypto.randomUUID()
       const passHash = await passwordHash(password, salt)
       await env.DB.prepare('INSERT INTO hub_users(id,email,name,password_hash,created_at) VALUES(?,?,?,?,?)').bind(userId, email, name, `${salt}:${passHash}`, now).run()
-      return sessionResponse(request, env, userId, now)
+      return await sessionResponse(request, env, userId, now)
     }
     if (path === 'login' && request.method === 'POST') {
       const body = await readBody(request)
@@ -76,7 +79,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       if ((attempts?.attempts || 0) > 8) return json({ error: 'محاولات كثيرة. حاول بعد 15 دقيقة.' }, 429)
       const user = await env.DB.prepare('SELECT id,password_hash,active FROM hub_users WHERE email=? COLLATE NOCASE').bind(email).first<{ id: string; password_hash: string | null; active: number }>()
       if (!user?.active || !user.password_hash || !await verify(user.password_hash, str(body.password, 256, false))) return json({ error: 'البريد أو كلمة المرور غير صحيحة.' }, 401)
-      return sessionResponse(request, env, user.id, now)
+      return await sessionResponse(request, env, user.id, now, body.link_identity===true)
     }
     if (path === 'password-reset' && request.method === 'POST') {
       if (!env.RESEND_API_KEY || !env.RESEND_FROM_EMAIL) return json({ error: 'استعادة كلمة المرور غير مفعلة بعد. يلزم إعداد بريد الإرسال في Cloudflare.' }, 503)
@@ -100,19 +103,21 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       if (password.length < 12) return json({ error: 'كلمة المرور يجب أن تكون 12 حرفًا على الأقل.' }, 422)
       const row = await env.DB.prepare('SELECT user_id FROM hub_password_resets WHERE token=? AND expires_at>? AND used_at IS NULL').bind(await hash(token), now).first<{ user_id: string }>()
       if (!row) return json({ error: 'رابط الاستعادة منتهي أو مستخدم.' }, 410)
-      const salt = crypto.randomUUID() + crypto.randomUUID()
+      const salt = (env.ECOSYSTEM_DB?'v2$':'') + crypto.randomUUID() + crypto.randomUUID()
       await env.DB.batch([
         env.DB.prepare('UPDATE hub_users SET password_hash=? WHERE id=?').bind(`${salt}:${await passwordHash(password, salt)}`, row.user_id),
         env.DB.prepare('UPDATE hub_password_resets SET used_at=? WHERE token=?').bind(now, await hash(token)),
         env.DB.prepare('DELETE FROM hub_sessions WHERE user_id=?').bind(row.user_id),
       ])
+      await ecoRevokeLocal(env,'hub',row.user_id)
       return json({ success: true })
     }
     if (path === 'session' && request.method === 'GET') {
       const user = await currentUser(request, env)
-      return user ? json({ user }) : json({ user: null })
+      return user ? json({ user }) : json({ user: null, linkRequired: env.ECOSYSTEM_DB ? !!await ecoUser(request,env) : false })
     }
     if (path === 'logout' && request.method === 'POST') {
+      if(env.ECOSYSTEM_DB)return json({success:true},200,{'Set-Cookie':await ecoLogout(request,env)})
       const token = cookie(request, 'daidar_hub_session')
       if (token) await env.DB.prepare('DELETE FROM hub_sessions WHERE token=?').bind(await hash(token)).run()
       return json({ success: true }, 200, { 'Set-Cookie': `daidar_hub_session=; Path=/api/hub; HttpOnly; SameSite=Lax; Max-Age=0${secure(request)}` })
@@ -258,6 +263,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
     }
     return json({ error: 'المسار غير موجود.' }, 404)
   } catch (error) {
+    if(error instanceof Error && 'status' in error && typeof error.status==='number' && [400,401,403,409,429,503].includes(error.status))return json({error:error.message},error.status)
     if (String(error).includes('hub_users.email') || (error instanceof Error && error.message === 'EMAIL_TAKEN')) return json({ error: 'هذا البريد مسجل بالفعل.' }, 409)
     console.error('[hub-api]', error)
     return json({ error: 'تعذر إكمال الطلب الآن.' }, 500)
@@ -297,12 +303,14 @@ function moduleSeeds(): HubModule[] {
 }
 function cookie(request: Request, name: string) { return request.headers.get('Cookie')?.split(';').map(x => x.trim()).find(x => x.startsWith(`${name}=`))?.slice(name.length + 1) || '' }
 async function currentUser(request: Request, env: Env) {
+  if(env.ECOSYSTEM_DB)return hubEcoUser(request,env)
   const token = cookie(request, 'daidar_hub_session')
   if (!token) return null
   const row = await env.DB!.prepare('SELECT u.id,u.email,u.name FROM hub_sessions s JOIN hub_users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>? AND u.active=1').bind(await hash(token), Date.now()).first<{ id: string; email: string; name: string }>()
   return row
 }
-async function sessionResponse(request: Request, env: Env, userId: string, now: number) {
+async function sessionResponse(request: Request, env: Env, userId: string, now: number, linkIdentity=false) {
+  if(env.ECOSYSTEM_DB){const user=await env.DB!.prepare('SELECT id,email,name FROM hub_users WHERE id=? AND active=1').bind(userId).first<{id:string;email:string;name:string}>();if(!user)return json({error:'الحساب غير متاح'},401);const session=await ecoLogin(env,'hub',user,request,linkIdentity);await env.DB!.prepare('DELETE FROM hub_sessions WHERE user_id=?').bind(user.id).run();return json({success:true},200,{'Set-Cookie':session!})}
   const token = crypto.randomUUID() + crypto.randomUUID()
   await env.DB!.prepare('INSERT INTO hub_sessions(token,user_id,expires_at) VALUES(?,?,?)').bind(await hash(token), userId, now + 30 * DAY).run()
   return json({ success: true }, 200, { 'Set-Cookie': `daidar_hub_session=${token}; Path=/api/hub; HttpOnly; SameSite=Lax; Max-Age=2592000${secure(request)}` })
@@ -310,7 +318,7 @@ async function sessionResponse(request: Request, env: Env, userId: string, now: 
 function secure(request: Request) { return new URL(request.url).protocol === 'https:' ? '; Secure' : '' }
 async function readBody(request: Request): Promise<Record<string, unknown>> { const raw = await request.text(); if (raw.length > 20000) throw new Error('body too large'); const parsed = JSON.parse(raw); if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid body'); return parsed }
 function str(value: unknown, max: number, trim = true) { if (typeof value !== 'string' || value.length > max) return ''; return trim ? value.trim() : value }
-async function passwordHash(password: string, salt: string) { const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']); const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: encoder.encode(salt), iterations: 180000, hash: 'SHA-256' }, key, 256); return Array.from(new Uint8Array(bits), b => b.toString(16).padStart(2,'0')).join('') }
+async function passwordHash(password: string, salt: string) { const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']); const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: encoder.encode(salt), iterations: salt.startsWith('v2$') ? 100000 : 180000, hash: 'SHA-256' }, key, 256); return Array.from(new Uint8Array(bits), b => b.toString(16).padStart(2,'0')).join('') }
 function canonical(value: unknown): string { if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`; if (value && typeof value === 'object') return `{${Object.entries(value as Record<string, unknown>).sort(([a],[b]) => a.localeCompare(b)).map(([k,v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(',')}}`; return JSON.stringify(value) }
 function billingExpiry(start: number, period: unknown) { const date = new Date(start); const day = date.getUTCDate(); date.setUTCDate(1); date.setUTCMonth(date.getUTCMonth() + (period === 'yearly' ? 12 : 1)); const lastDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth()+1, 0)).getUTCDate(); date.setUTCDate(Math.min(day,lastDay)); return date.getTime() }
 async function verify(stored: string, password: string) { const [salt, expected] = stored.split(':'); if (!salt || !/^[a-f\d]{64}$/i.test(expected || '') || !password) return false; const actual = await passwordHash(password,salt); let diff=0; for(let i=0;i<64;i++) diff |= actual.charCodeAt(i) ^ expected.charCodeAt(i); return diff===0 }

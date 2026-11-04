@@ -1,0 +1,16 @@
+CREATE TABLE IF NOT EXISTS ec_users(id TEXT PRIMARY KEY,email TEXT NOT NULL,name TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1,created_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS ec_links(system TEXT NOT NULL,local_id TEXT NOT NULL,user_id TEXT NOT NULL REFERENCES ec_users(id),PRIMARY KEY(system,local_id),UNIQUE(system,user_id));
+CREATE TABLE IF NOT EXISTS ec_roles(system TEXT NOT NULL,local_id TEXT NOT NULL,user_id TEXT NOT NULL REFERENCES ec_users(id),role TEXT NOT NULL,PRIMARY KEY(system,local_id,role));
+CREATE TABLE IF NOT EXISTS ec_google(subject TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES ec_users(id));
+CREATE TABLE IF NOT EXISTS ec_families(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES ec_users(id),revoked INTEGER NOT NULL DEFAULT 0,expires_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS ec_sessions(token TEXT PRIMARY KEY,family_id TEXT NOT NULL REFERENCES ec_families(id),expires_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS ec_codes(code TEXT PRIMARY KEY,family_id TEXT NOT NULL REFERENCES ec_families(id),client TEXT NOT NULL,challenge TEXT NOT NULL,expires_at INTEGER NOT NULL,used INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS ec_oauth(state TEXT PRIMARY KEY,nonce TEXT NOT NULL,verifier TEXT NOT NULL,user_id TEXT,expires_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS ec_entitlements(system TEXT NOT NULL,resource_id TEXT NOT NULL,user_id TEXT NOT NULL REFERENCES ec_users(id),status TEXT NOT NULL,starts_at INTEGER,expires_at INTEGER,plan TEXT NOT NULL,updated_at INTEGER NOT NULL,PRIMARY KEY(system,resource_id));
+CREATE TABLE IF NOT EXISTS ec_audit(id TEXT PRIMARY KEY,actor TEXT NOT NULL,action TEXT NOT NULL,entity TEXT NOT NULL,created_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS ec_device_codes(token TEXT PRIMARY KEY,user_code TEXT NOT NULL UNIQUE,device_id TEXT NOT NULL,family_id TEXT,expires_at INTEGER NOT NULL,used INTEGER NOT NULL DEFAULT 0,last_poll INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS ec_rate_limits(key TEXT PRIMARY KEY,hits INTEGER NOT NULL,expires_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS ec_operations(id TEXT PRIMARY KEY,payload TEXT NOT NULL,target TEXT NOT NULL,complete INTEGER NOT NULL DEFAULT 0);
+CREATE INDEX IF NOT EXISTS ec_sessions_family ON ec_sessions(family_id);
+CREATE INDEX IF NOT EXISTS ec_links_user ON ec_links(user_id);
+CREATE INDEX IF NOT EXISTS ec_entitlements_user ON ec_entitlements(user_id,system);

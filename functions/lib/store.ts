@@ -6,6 +6,13 @@ export interface Statement {
 }
 export interface Database { prepare(sql: string): Statement; batch(statements: Statement[]): Promise<unknown> }
 export interface Env {
+  ECOSYSTEM_DB?: Database
+  ECOSYSTEM_STORE_DB?: Database
+  ECOSYSTEM_HUB_DB?: Database
+  ECOSYSTEM_CLIENT?: string
+  ECOSYSTEM_HUB_ORIGIN?: string
+  ECOSYSTEM_STORE_ORIGIN?: string
+  ECOSYSTEM_OWNER_LOCAL_ID?: string
   PASSWORD_VAULT_KEY?: string
   DB?: Database
   ADMIN_EMAIL?: string

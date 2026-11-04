@@ -23,6 +23,7 @@ import type { AppInfo } from "../shared/contracts";
 import type { LicenseView } from "../shared/licensing";
 import { ActivationPanel, countdown, statusLabels } from "./ActivationPanel";
 import Inventory from "./Inventory";
+import EcosystemPanel from './EcosystemPanel';
 const icons: Record<string, typeof Package> = {
   Package,
   ShoppingCart,
@@ -180,6 +181,7 @@ export default function App() {
       </header>
       <main className="dashboard">
         <div className="dashboard-inner">
+          <EcosystemPanel/>
           {(licenseRefreshError ||
             [
               "expiring",
