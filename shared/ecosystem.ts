@@ -170,6 +170,9 @@ export async function ecosystem(request:Request,e:EcoEnv,adapter:EcoAdapter):Pro
       if(pending.user_id&&(!user||user.id!==pending.user_id))reject('أعد تسجيل الدخول قبل ربط Google',401);
       if(linked&&pending.user_id&&linked.user_id!==pending.user_id)reject('حساب Google مرتبط بهوية أخرى',409);
       let id=linked?.user_id||pending.user_id;
+      // A verified legacy Google subject is proof of that local account, not an email match.
+      // The current central session and signed Google response prove both sides of this link.
+      if(pending.user_id&&!linked){const legacy=await adapter.googleLocal?.(payload.sub);if(legacy)id=await ecoBind(e,client,legacy,pending.user_id,true)}
       if(!id){const legacy=await adapter.googleLocal?.(payload.sub);if(legacy)id=await ecoBind(e,client,legacy);else{id=crypto.randomUUID();await db.prepare('INSERT INTO ec_users(id,email,name,created_at) VALUES(?,?,?,?)').bind(id,payload.email,String(payload.name||payload.email).slice(0,120),Date.now()).run()}}
       if(!linked)await db.prepare('INSERT INTO ec_google(subject,user_id) VALUES(?,?)').bind(payload.sub,id).run();
       const profile={id,email:payload.email,name:String(payload.name||payload.email),family:'',platform_admin:false};

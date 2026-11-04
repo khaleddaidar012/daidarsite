@@ -42,5 +42,5 @@ export async function customerOverview(env:EcoEnv,user:Identity){
     const start=Date.parse(row.start_date+'T00:00:00Z'),end=Date.parse(row.end_date+'T23:59:59.999Z');
     services.push({id:row.id,system:'service-management',title:'إدارة السيستم',plan:row.hours+' ساعة يومياً',status:serviceState(row.cancelled?'cancelled':'active',start,end),start,end,can_access:false,payment_status:'confirmed'});
   }
-  return {user:{id:user.id,name:user.name,email:user.email,platform_admin:!!user.platform_admin},services,orders,unavailable};
+  return {user:{id:user.id,name:user.name,email:user.email,platform_admin:!!user.platform_admin},services,orders,unavailable,hub_link_required:!links.some((link:any)=>link.system==='hub')};
 }
