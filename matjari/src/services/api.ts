@@ -154,6 +154,18 @@ export function createStoreApi(API_BASE='/api/store') { return {
     return data.store;
   },
 
+  async createStore(storeData: { name: string; activity_type?: string; whatsapp_number: string }): Promise<void> {
+    const res = await fetch(`${API_BASE}/auth/create-store`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(storeData),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'تعذر إنشاء المتجر. تحقق من الاتصال وحاول مرة أخرى.');
+    }
+  },
+
   async saveStore(storeData: Partial<Store>): Promise<Store> {
     const res = await fetch(`${API_BASE}/store`, {
       method: 'POST',
