@@ -4,7 +4,7 @@ type D1 = { prepare(sql: string): Statement; batch(items: Statement[]): Promise<
 type WorkerEnv = { DB: D1; VAPID_PRIVATE_JWK: string; VAPID_SUBJECT: string }
 type CheckRow = { shift_id: string; employee_id: string; state: 'waiting' | 'prompted' | 'retry_wait'; prompt_stage: number; last_confirmed_at: number; prompt_sent_at: number | null; next_check_at: number; name: string }
 type SubscriptionRow = { endpoint: string; p256dh: string; auth: string }
-type EmployeeRow = { monthly_salary_piasters: number; max_daily_hours: number; max_monthly_hours: number; view_due: number; weekly_days_off: string }
+type EmployeeRow = { monthly_salary_piasters: number; max_daily_hours: number; max_monthly_hours: number; view_due: number; weekly_days_off: string; work_schedule_locked: number; work_schedule_effective_day: string; created_at: number }
 const enc = new TextEncoder()
 const b64u = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
 const fromB64u = (value: string) => Uint8Array.from(atob(value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - value.length % 4) % 4)), c => c.charCodeAt(0))
@@ -71,7 +71,7 @@ async function sendPush(subscription: SubscriptionRow, payload: unknown, env: Wo
   }
 }
 async function accrued(employeeId: string, shiftId: string, env: WorkerEnv, now: number) {
-  const employee = await env.DB.prepare('SELECT monthly_salary_piasters,max_daily_hours,max_monthly_hours,view_due,weekly_days_off FROM employees WHERE id=?').bind(employeeId).first<EmployeeRow>()
+  const employee = await env.DB.prepare('SELECT monthly_salary_piasters,max_daily_hours,max_monthly_hours,view_due,weekly_days_off,work_schedule_locked,work_schedule_effective_day,created_at FROM employees WHERE id=?').bind(employeeId).first<EmployeeRow>()
   if (!employee) return { hours: 0, max: 104, due: null }
   const maxDaily = employee.max_daily_hours || 4, maxMonthly = employee.max_monthly_hours || 104
   const month = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit' }).format(new Date(now))
@@ -90,7 +90,19 @@ async function accrued(employeeId: string, shiftId: string, env: WorkerEnv, now:
   const leaves = await env.DB.prepare("SELECT day FROM employee_requests WHERE employee_id=? AND type='leave' AND status='approved' AND day>=? AND day<=?").bind(employeeId, firstDay, lastDay).all<{day:string}>()
   const leaveHours = leaves.results.filter(leave => !daysOff.includes(new Date(`${leave.day}T00:00:00Z`).getUTCDay())).length * maxDaily
   const hours = Math.min(maxMonthly, actualHours + leaveHours)
-  const due = employee.view_due ? Math.round(Math.min(employee.monthly_salary_piasters, employee.monthly_salary_piasters / maxMonthly * hours) / 100) : null
+  let due: number | null = employee.view_due ? Math.round(Math.min(employee.monthly_salary_piasters, employee.monthly_salary_piasters / maxMonthly * hours) / 100) : null
+  if (employee.view_due && employee.work_schedule_locked === 1 && /^\d{4}-\d{2}-\d{2}$/.test(employee.work_schedule_effective_day || '')) {
+    const startDay = employee.work_schedule_effective_day > new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date(employee.created_at)) ? employee.work_schedule_effective_day : new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date(employee.created_at))
+    const daysInMonth = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate()
+    let scheduledDays = 0, elapsedWorkdays = 0
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = `${month}-${String(day).padStart(2, '0')}`
+      if (daysOff.includes(new Date(`${date}T00:00:00Z`).getUTCDay())) continue
+      scheduledDays++
+      if (date >= startDay && date < today) elapsedWorkdays++
+    }
+    due = scheduledDays ? Math.round(employee.monthly_salary_piasters * elapsedWorkdays / scheduledDays / 100) : 0
+  }
   return { hours: Number(hours.toFixed(2)), max: maxMonthly, due }
 }
 async function notify(check: CheckRow, stage: number, env: WorkerEnv, now: number) {

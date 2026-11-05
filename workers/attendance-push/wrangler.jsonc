@@ -8,7 +8,8 @@
     {
       "binding": "DB",
       "database_name": "daidar-admin",
-      "database_id": "4f962096-a4cb-4bc3-8da6-3efaf80f8c6f"
+      "database_id": "4f962096-a4cb-4bc3-8da6-3efaf80f8c6f",
+      "migrations_dir": "../../migrations"
     }
   ],
   "vars": {

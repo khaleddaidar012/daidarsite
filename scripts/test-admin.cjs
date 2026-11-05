@@ -141,6 +141,8 @@ async function test() {
   sqlite.exec(fs.readFileSync('migrations/0018_password_vault_projects_permissions.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0019_employee_ecosystem_permissions.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0016_employee_web_push.sql', 'utf8'))
+  sqlite.exec(fs.readFileSync('migrations/0020_employee_work_schedules.sql', 'utf8'))
+  sqlite.exec(fs.readFileSync('migrations/0021_employee_shift_change_requests.sql', 'utf8'))
   for (const path of ['employees', 'attendance', 'employee-requests']) assert.equal((await call(path)).status, 401)
   const employeePassword = 'employee-test-password'
   const schedule = []
@@ -176,6 +178,24 @@ async function test() {
   assert.deepEqual(employeeList[0].weekly_days_off, [5])
   assert.equal(employeeList[0].view_absences, 1)
   assert.equal(employeeList[0].view_due, 0)
+  assert.equal(employeeList[0].work_schedule_locked, false)
+  assert.deepEqual(employeeList[0].weekly_work_windows, {})
+  const khaledWorkWindows = { 0: [{ start: '19:00', end: '23:00' }], 1: [{ start: '19:00', end: '23:00' }], 2: [{ start: '19:00', end: '23:00' }], 3: [{ start: '19:00', end: '23:00' }], 6: [{ start: '12:30', end: '16:00' }, { start: '19:00', end: '23:00' }] }
+  assert.equal(employeeLib.validWorkWindows(khaledWorkWindows), true)
+  assert.equal(employeeLib.validWorkWindows({ 6: [{ start: '12:30', end: '16:00' }, { start: '15:00', end: '19:00' }] }), false)
+  const saturdayAfternoon = Date.parse('2026-11-07T10:30:00.000Z')
+  const saturdayEvening = Date.parse('2026-11-07T17:00:00.000Z')
+  const saturdayEnd = Date.parse('2026-11-07T14:00:00.000Z')
+  const lockedSchedule = { work_schedule_locked: 1, weekly_work_windows: JSON.stringify(khaledWorkWindows) }
+  assert.equal(employeeLib.checkInSchedule(lockedSchedule, saturdayAfternoon).allowed, true)
+  assert.equal(employeeLib.checkInSchedule(lockedSchedule, saturdayEvening).allowed, true)
+  assert.equal(employeeLib.checkInSchedule(lockedSchedule, saturdayEnd).allowed, false)
+  const novemberAccrual = employeeLib.calculatePayroll([{ id:'schedule-payroll',name:'موظف',job_title:'موظف',email:'schedule@example.com',active:1,password_hash:'',created_at:Date.parse('2026-01-01T00:00:00Z'),monthly_salary_piasters:300000,weekly_days_off:'[4,5]',max_daily_hours:7.5,max_monthly_hours:104,work_schedule_locked:1,work_schedule_effective_day:'2026-11-01' }],[],[],'2026-11',Date.parse('2026-11-05T12:00:00Z'))[0]
+  assert.equal(novemberAccrual.scheduled_days, 22)
+  assert.equal(novemberAccrual.elapsed_workdays, 4)
+  assert.equal(novemberAccrual.due_piasters, 54500)
+  assert.equal(novemberAccrual.deduction_piasters, 0)
+  assert.equal((await call('employees', 'POST', { id: employeeList[0].id, name: employeeList[0].name, job_title: employeeList[0].job_title, email: employeeList[0].email, weekly_work_windows: {}, work_schedule_locked: true }, cookie)).status, 200)
   assert.equal((await call('employees', 'POST', { ...employeeForm, id: employeeList[0].id, password: '', monthly_salary_piasters: -1 }, cookie)).status, 422)
   const payrollMonth = employeeLib.cairoDay().slice(0, 7)
   assert.equal((await call('payroll', 'POST', { employee_id: employeeList[0].id, month: payrollMonth, due_piasters: 288550 }, cookie)).status, 422)
@@ -190,6 +210,24 @@ async function test() {
   response = await employeeCall('login', 'POST', { email: employeeForm.email, password: employeePassword })
   assert.equal(response.status, 200)
   const employeeCookie = response.headers.get('set-cookie').split(';')[0]
+  assert.equal((await employeeCall('check-in', 'POST', {}, employeeCookie)).status, 403)
+  const employeeSchedule = { ...khaledWorkWindows, 6: [{ start:'12:30',end:'16:00' },{ start:'19:00',end:'23:00' }] }
+  const employeeId = employeeList[0].id
+  assert.equal((await call('employees', 'POST', { id: employeeId, name: employeeList[0].name, job_title: employeeList[0].job_title, email: employeeList[0].email, weekly_days_off:[4,5],weekly_work_windows:employeeSchedule,work_schedule_locked:true,work_schedule_effective_day:'2026-11-01',max_daily_hours:7.5,view_due:1 }, cookie)).status, 200)
+  const futureWorkdays=[]
+  const nextDate=new Date(employeeLib.cairoDay()+'T00:00:00Z')
+  for(let offset=0;offset<20&&futureWorkdays.length<3;offset++){nextDate.setUTCDate(nextDate.getUTCDate()+1);const day=nextDate.toISOString().slice(0,10);if(employeeSchedule[String(nextDate.getUTCDay())])futureWorkdays.push(day)}
+  const shiftRequest=(day)=>employeeCall('requests','POST',{type:'shift_change',day,start_time:'00:30',end_time:'01:30',reason:'ظرف طارئ'},employeeCookie)
+  assert.equal((await shiftRequest(futureWorkdays[0])).status,200)
+  assert.equal((await shiftRequest(futureWorkdays[1])).status,200)
+  assert.equal((await shiftRequest(futureWorkdays[2])).status,200)
+  assert.equal((await shiftRequest(futureWorkdays[2])).status,429)
+  const employeeShiftRequests=await employeeCall('requests','GET',undefined,employeeCookie)
+  assert.equal((await employeeShiftRequests.json()).shift_change_requests_used,3)
+  const shiftApproval=await call('employee-requests','POST',{id:sqlite.prepare('SELECT id FROM employee_shift_change_requests WHERE employee_id=? ORDER BY created_at LIMIT 1').get(employeeId).id,status:'approved',admin_note:'تمت الموافقة'},cookie)
+  assert.equal(shiftApproval.status,200)
+  assert.equal(sqlite.prepare("SELECT status FROM employee_shift_change_requests WHERE employee_id=? ORDER BY created_at LIMIT 1").get(employeeId).status,'approved')
+  assert.equal((await call('employees', 'POST', { id: employeeId, name: employeeList[0].name, job_title: employeeList[0].job_title, email: employeeList[0].email, work_schedule_locked: false }, cookie)).status, 200)
   assert.equal((await employeeCall('ecosystem-stats', 'GET', undefined, employeeCookie)).status, 403)
   assert.equal((await employeeCall('store-admin', 'GET', undefined, employeeCookie)).status, 403)
   assert.equal((await employeeCall('store-admin', 'POST', { store_name: 'متجر اختبار', activity_type: 'عام', whatsapp_number: '01000000000', username: 'store-test', password: 'store-password' }, employeeCookie)).status, 403)

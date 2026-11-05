@@ -2,7 +2,7 @@ import { passwordVault } from '../../lib/password-vault'
 import { staffChat } from '../../lib/staff-chat'
 import { workProjects } from '../../lib/work-projects'
 import { hash, json, sameOrigin, verifyPassword, type Env } from '../../lib/store'
-import { cairoDay, calculatePayroll, employeeSession, monthlyAttendance, safeEmployee, type Employee, type Attendance } from '../../lib/employees'
+import { cairoDay, cairoTime, calculatePayroll, checkInSchedule, employeeSession, monthlyAttendance, parseWorkWindows, safeEmployee, validCalendarDay, type Employee, type Attendance } from '../../lib/employees'
 import { manageProjects } from '../../lib/projects'
 import { adminHub } from '../../lib/hub-admin'
 import { d1UsageResponse } from '../../lib/d1-usage'
@@ -134,13 +134,32 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
     if (path === 'requests' && request.method === 'GET') {
       const month = new URL(request.url).searchParams.get('month') || cairoDay().slice(0, 7)
       if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return json({ error: 'شهر غير صحيح' }, 400)
-      const rows = await env.DB.prepare('SELECT * FROM employee_requests WHERE employee_id = ? AND day >= ? AND day <= ? ORDER BY created_at DESC').bind(employee.id, month + '-01', month + '-31').all()
-      return json({ requests: rows.results })
+      const [rows, shiftChanges, usage] = await Promise.all([
+        env.DB.prepare('SELECT * FROM employee_requests WHERE employee_id = ? AND day >= ? AND day <= ? ORDER BY created_at DESC').bind(employee.id, month + '-01', month + '-31').all(),
+        env.DB.prepare("SELECT id,employee_id,'shift_change' AS type,day,start_time AS requested_time,end_time AS requested_end,reason,status,admin_note,created_at,decided_at FROM employee_shift_change_requests WHERE employee_id=? AND day>=? AND day<=? ORDER BY created_at DESC").bind(employee.id, month + '-01', month + '-31').all(),
+        env.DB.prepare('SELECT COUNT(*) AS count FROM employee_shift_change_requests WHERE employee_id=? AND request_month=?').bind(employee.id, cairoDay(now).slice(0, 7)).first<{count:number}>(),
+      ])
+      return json({ requests: [...rows.results, ...shiftChanges.results].sort((a:any,b:any)=>Number(b.created_at)-Number(a.created_at)), shift_change_requests_used: usage?.count || 0, shift_change_requests_limit: 3 })
     }
     if (path === 'requests' && request.method === 'POST') {
       const raw = await request.text()
       if (raw.length > 4096) return json({ error: 'طلب كبير جدًا' }, 413)
       const body = JSON.parse(raw)
+      if (body.type === 'shift_change') {
+        if (!validCalendarDay(body.day) || body.day < cairoDay(now) || typeof body.start_time !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.start_time) || typeof body.end_time !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.end_time) || body.start_time >= body.end_time || typeof body.reason !== 'string' || !body.reason.trim() || body.reason.length > 1000) return json({ error: 'راجع يوم وفترة الشفت والسبب؛ يجب أن تكون الفترة في نفس اليوم.' }, 422)
+        const count = await env.DB.prepare('SELECT COUNT(*) AS count FROM employee_shift_change_requests WHERE employee_id=? AND request_month=?').bind(employee.id, cairoDay(now).slice(0, 7)).first<{count:number}>()
+        if ((count?.count || 0) >= 3) return json({ error: 'استخدمت طلبات تغيير الشفت الثلاثة لهذا الشهر.' }, 429)
+        const duplicate = await env.DB.prepare("SELECT id FROM employee_shift_change_requests WHERE employee_id=? AND day=? AND status IN ('pending','approved')").bind(employee.id, body.day).first()
+        if (duplicate) return json({ error: 'يوجد طلب تغيير شفت قيد المراجعة أو موافق عليه لهذا اليوم.' }, 409)
+        const workday = new Date(`${body.day}T00:00:00Z`).getUTCDay()
+        const baseWindows = parseWorkWindows(employee.weekly_work_windows)[String(workday)] || []
+        if (employee.work_schedule_locked === 1 && !baseWindows.length) return json({ error: 'لا يمكن طلب تغيير شفت في يوم راحة أسبوعية.' }, 422)
+        if (baseWindows.some(window => body.start_time >= window.start && body.end_time <= window.end)) return json({ error: 'الفترة المطلوبة موجودة بالفعل ضمن جدولك.' }, 422)
+        const id = crypto.randomUUID()
+        await env.DB.prepare("INSERT INTO employee_shift_change_requests(id,employee_id,request_month,day,start_time,end_time,reason,status,admin_note,created_at) VALUES(?,?,?,?,?,?,?,'pending','',?)").bind(id, employee.id, cairoDay(now).slice(0, 7), body.day, body.start_time, body.end_time, body.reason.trim(), now).run()
+        await recordAdminNotification(env, { actor: employee.name, eventType: 'employee_shift_change_request', title: 'طلب تغيير شفت', detail: `${employee.name} طلب العمل يوم ${body.day} من ${body.start_time} إلى ${body.end_time}`, target: 'employees' })
+        return json({ success: true, id, shift_change_requests_used: (count?.count || 0) + 1, shift_change_requests_limit: 3 })
+      }
       if (!['leave', 'early'].includes(body.type) || typeof body.day !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(body.day) || new Date(body.day + 'T00:00:00Z').toISOString().slice(0, 10) !== body.day || body.day < cairoDay() || typeof body.reason !== 'string' || !body.reason.trim() || body.reason.length > 1000 || (body.type === 'early' && (typeof body.requested_time !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.requested_time)))) return json({ error: 'راجع التاريخ والسبب ووقت الاستئذان؛ التاريخ يجب أن يكون اليوم أو بعده' }, 422)
       const duplicate = await env.DB.prepare("SELECT id FROM employee_requests WHERE employee_id = ? AND day = ? AND type = ? AND status IN ('pending','approved')").bind(employee.id, body.day, body.type).first()
       if (duplicate) return json({ error: 'يوجد طلب لنفس اليوم بالفعل' }, 409)
@@ -180,6 +199,12 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       if (!rows) return json({ error: 'شهر غير صحيح' }, 400)
       const open = await env.DB.prepare('SELECT * FROM attendance_shifts WHERE employee_id = ? AND check_out IS NULL').bind(employee.id).first<Attendance>()
       const today = await env.DB.prepare('SELECT * FROM attendance_shifts WHERE employee_id = ? AND day = ? ORDER BY check_in DESC LIMIT 1').bind(employee.id, cairoDay()).first<Attendance>()
+      let checkIn = checkInSchedule(employee, now)
+      if (!checkIn.allowed && employee.work_schedule_locked === 1) {
+        const currentTime = cairoTime(now)
+        const override = await env.DB.prepare("SELECT id,start_time,end_time FROM employee_shift_change_requests WHERE employee_id=? AND day=? AND status='approved' AND used_at IS NULL AND start_time<=? AND end_time>? ORDER BY decided_at DESC LIMIT 1").bind(employee.id, cairoDay(now), currentTime, currentTime).first<{id:string;start_time:string;end_time:string}>()
+        if (override) checkIn = { allowed: true, windows: [...checkIn.windows, { start: override.start_time, end: override.end_time }] }
+      }
       let payrollView: { absent_days?: number; absent_dates?: string[]; due_piasters?: number; actual_hours?: number; paid_hours?: number; max_daily_hours?: number; max_monthly_hours?: number; hourly_rate_piasters?: number } | null = null
       {
         const approvedLeaves = await env.DB.prepare("SELECT employee_id,day,type,status FROM employee_requests WHERE employee_id=? AND type='leave' AND status='approved' AND day>=? AND day<=?").bind(employee.id, month + '-01', month + '-31').all<{ employee_id: string; day: string; type: string; status: string }>()
@@ -199,13 +224,24 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
           }
         }
       }
-      return json({ records: rows, open, today, serverDay: cairoDay(), payroll: payrollView })
+      return json({ records: rows, open, today, serverDay: cairoDay(), checkIn, payroll: payrollView })
     }
     if (path === 'check-in' && request.method === 'POST') {
+      const schedule = checkInSchedule(employee, now)
+      let approvedOverride: { id: string; start_time: string; end_time: string } | null = null
+      if (!schedule.allowed && employee.work_schedule_locked === 1) {
+        const currentTime = cairoTime(now)
+        approvedOverride = await env.DB.prepare("SELECT id,start_time,end_time FROM employee_shift_change_requests WHERE employee_id=? AND day=? AND status='approved' AND used_at IS NULL AND start_time<=? AND end_time>? ORDER BY decided_at DESC LIMIT 1").bind(employee.id, cairoDay(now), currentTime, currentTime).first<{id:string;start_time:string;end_time:string}>()
+      }
+      if (!schedule.allowed && !approvedOverride) {
+        const hours = schedule.windows.map(window => `${window.start}–${window.end}`).join('، ')
+        return json({ error: hours ? `تسجيل الحضور متاح اليوم بتوقيت القاهرة خلال: ${hours}` : 'لا يوجد وقت حضور مثبت لهذا اليوم.' }, 403)
+      }
       const shiftId = crypto.randomUUID()
       const inserted = await env.DB.prepare('INSERT OR IGNORE INTO attendance_shifts VALUES (?, ?, ?, ?, NULL)').bind(shiftId, employee.id, cairoDay(now), now).run() as { meta?: { changes?: number }; changes?: number }
       const row = await env.DB.prepare('SELECT * FROM attendance_shifts WHERE employee_id = ? AND check_out IS NULL').bind(employee.id).first<Attendance>()
       if ((inserted.meta?.changes ?? inserted.changes ?? 0) > 0 && row) {
+        if (approvedOverride) await env.DB.prepare("UPDATE employee_shift_change_requests SET used_at=? WHERE id=? AND employee_id=? AND status='approved' AND used_at IS NULL").bind(now, approvedOverride.id, employee.id).run()
         await env.DB.prepare("INSERT INTO employee_presence_checks(shift_id,employee_id,state,prompt_stage,last_confirmed_at,next_check_at,updated_at) VALUES(?,?,'waiting',0,?,?,?)").bind(row.id, employee.id, now, now + 3600000, now).run()
         await recordAdminNotification(env, { actor: employee.name, eventType: 'attendance_checkin', title: 'تسجيل حضور', detail: `${employee.name} سجّل حضوره`, target: 'employees' })
       }
