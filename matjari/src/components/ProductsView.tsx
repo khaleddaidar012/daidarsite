@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, Image as ImageIcon, Check, X, Search, Sparkles, AlertCircle, Database } from 'lucide-react';
+import { Plus, Edit2, Trash2, Image as ImageIcon, Check, X, Search, AlertCircle } from 'lucide-react';
 import { Product, Store } from '../types';
 import { api } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
@@ -38,7 +38,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
     setPrice('');
     setCategory(isArabic ? 'عام' : 'General');
     setDescription('');
-    setImageData(`data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><rect width="400" height="400" fill="%23f0f7ff"/><circle cx="200" cy="180" r="90" fill="%23e0f2fe"/><path d="M150 140 Q200 170 250 140 L270 270 Q200 290 130 270 Z" fill="%230084d6"/><text x="200" y="340" font-family="sans-serif" font-size="20" font-weight="bold" fill="%230e1f38" text-anchor="middle">منتج جديد</text></svg>`);
+    setImageData('');
     setIsAvailable(true);
     setFormError('');
     setIsModalOpen(true);
@@ -56,22 +56,50 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (file.size > 2 * 1024 * 1024) {
-      setFormError(isArabic ? 'حجم الصورة كبير، يفضل اختيار صورة أقل من 2 ميغابايت للحفاظ على سرعة قاعدة بيانات D1.' : 'Image size is large, please choose image under 2MB for optimal D1 performance.');
+    e.target.value = '';
+    if (!file.type.startsWith('image/')) {
+      setFormError(isArabic ? 'اختر ملف صورة بصيغة PNG أو JPG أو WebP.' : 'Choose a PNG, JPG, or WebP image.');
       return;
     }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (typeof event.target?.result === 'string') {
-        setImageData(event.target.result);
+    if (file.size > 12 * 1024 * 1024) {
+      setFormError(isArabic ? 'حجم الصورة أكبر من ١٢ ميجابايت.' : 'Image must be smaller than 12 MB.');
+      return;
+    }
+    try {
+      const bitmap = await createImageBitmap(file);
+      const maxDimension = 1400;
+      const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('canvas');
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+      let compressed: Blob | null = null;
+      for (const quality of [0.84, 0.76, 0.66, 0.56, 0.46]) {
+        compressed = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/webp', quality));
+        if (compressed && compressed.size <= 700 * 1024) break;
       }
-    };
-    reader.readAsDataURL(file);
+      if (!compressed || compressed.size > 700 * 1024) {
+        setFormError(isArabic ? 'تعذر ضغط الصورة لحجم مناسب. جرّب صورة أصغر.' : 'Could not compress the image enough. Try a smaller image.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = event => {
+        if (typeof event.target?.result === 'string') {
+          setImageData(event.target.result);
+          setFormError('');
+        }
+      };
+      reader.onerror = () => setFormError(isArabic ? 'تعذر قراءة الصورة. جرّب ملفًا آخر.' : 'Could not read the image. Try another file.');
+      reader.readAsDataURL(compressed);
+    } catch {
+      setFormError(isArabic ? 'تعذر فتح الصورة. جرّب ملف PNG أو JPG أو WebP آخر.' : 'Could not open the image. Try another PNG, JPG, or WebP file.');
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -85,7 +113,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
       setFormError(isArabic ? 'يرجى تحديد سعر صالح للمنتج' : 'Please enter valid product price');
       return;
     }
-    if (!imageData) {
+    if (!imageData && !editingProduct) {
       setFormError(isArabic ? 'يرجى رفع صورة المنتج أو اختيار صورة افتراضية' : 'Please upload a product image');
       return;
     }
@@ -144,12 +172,8 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
   return (
     <div className="space-y-6 sm:space-y-8 animate-fadeIn">
       {/* Top Header Card in Brand Blue & Deep Navy Theme */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 p-4 sm:p-8 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-colors">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 p-5 sm:p-7 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-colors">
         <div>
-          <div className="flex items-center gap-2 text-xs font-bold text-[#0084d6] dark:text-sky-400 bg-[#e6f4fe] dark:bg-sky-950/60 px-3 py-1 rounded-full w-fit mb-2">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Cloudflare D1 Product Engine</span>
-          </div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
             {t('products_title')}
           </h2>
@@ -280,20 +304,22 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       onClick={() => openEditModal(p)}
-                      className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                      className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:border-sky-300 hover:bg-sky-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                       title={t('edit')}
                     >
                       <Edit2 className="w-4 h-4" />
+                      <span>{isArabic ? 'تعديل' : 'Edit'}</span>
                     </button>
                     <button
                       onClick={() => handleDelete(p.id)}
-                      className="p-2 rounded-xl text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors"
+                      className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 transition-colors hover:bg-rose-50 dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950/50"
                       title={t('delete')}
                     >
                       <Trash2 className="w-4 h-4" />
+                      <span>{isArabic ? 'حذف' : 'Delete'}</span>
                     </button>
                   </div>
                 </div>
@@ -306,17 +332,15 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
       {/* Modal: Add/Edit Product */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-xs font-cairo">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-fadeIn transition-colors">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-2xl w-full max-h-[92vh] overflow-y-auto animate-fadeIn transition-colors">
             
             {/* Modal Header */}
-            <div className="p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <div className="sticky top-0 z-10 bg-white/95 p-5 sm:p-7 border-b border-slate-100 dark:border-slate-800 dark:bg-slate-900/95 backdrop-blur flex items-center justify-between">
               <div>
                 <h3 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white">
                   {editingProduct ? (isArabic ? 'تعديل بيانات المنتج' : 'Edit Product') : t('add_product')}
                 </h3>
-                <span className="text-[11px] text-[#0084d6] dark:text-sky-400 font-medium">
-                  Cloudflare D1 Storage
-                </span>
+                <p className="mt-1 text-xs text-slate-500">{isArabic ? 'أدخل بيانات المنتج وصورته ليظهر في متجرك.' : 'Add product details and an image to list it in your store.'}</p>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -327,7 +351,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSave} className="p-4 sm:p-6 space-y-4 sm:space-y-5">
+            <form onSubmit={handleSave} className="p-5 sm:p-7 space-y-5">
               {formError && (
                 <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-medium flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
@@ -381,12 +405,12 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
               </div>
 
               {/* High-Quality Image Upload */}
-              <div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5 dark:border-slate-700 dark:bg-slate-800/60">
                 <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
-                  {t('product_image')} <span className="text-rose-500">*</span>
+                  {t('product_image')} {!editingProduct && <span className="text-rose-500">*</span>}
                 </label>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-                  <div className="w-20 h-20 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 overflow-hidden shrink-0">
+                  <div className="w-24 h-24 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden shrink-0">
                     {imageData ? (
                       <img src={imageData} alt="Preview" className="w-full h-full object-cover" />
                     ) : (
@@ -399,7 +423,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                   <div className="flex-1 w-full">
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/png,image/jpeg,image/webp,image/gif"
                       onChange={handleImageUpload}
                       id="upload-product-img"
                       className="hidden"
@@ -411,8 +435,8 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                       <ImageIcon className="w-4 h-4 text-[#0084d6] dark:text-sky-400" />
                       <span>{t('choose_image')}</span>
                     </label>
-                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
-                      JPG, PNG, WEBP (Base64 in Cloudflare D1).
+                    <p className="text-[11px] leading-5 text-slate-500 dark:text-slate-400 mt-2">
+                      {isArabic ? 'اختر صورة حتى ١٢ ميجابايت؛ سيتم ضغطها تلقائيًا قبل الحفظ.' : 'Choose an image up to 12 MB. It will be optimized automatically before saving.'}
                     </p>
                   </div>
                 </div>

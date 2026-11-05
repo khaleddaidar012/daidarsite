@@ -40,7 +40,8 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
 
   const currency = store?.currency || (isArabic ? 'ج.م' : '$');
   const totalCartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-  const phone = store?.whatsapp_number || '201061532875';
+  const phone = store?.whatsapp_number?.trim() || '';
+  const displayPhone = phone.startsWith('+') || phone.startsWith('0') ? phone : `+${phone}`;
   const defaultLogo = `${import.meta.env.BASE_URL}store-mark.svg`;
   const logoSrc = store?.logo_data || defaultLogo;
 
@@ -147,7 +148,7 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
           </div>
 
           {/* Quick contact pill with phone */}
-          <div className="flex items-center gap-3 bg-white dark:bg-slate-900 p-3.5 sm:p-4 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-2xl shadow-sky-500/5 shrink-0">
+          {phone && <div className="flex items-center gap-3 bg-white dark:bg-slate-900 p-3.5 sm:p-4 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-2xl shadow-sky-500/5 shrink-0">
             <div className="w-11 h-11 rounded-2xl bg-[#e6f4fe] dark:bg-sky-950/70 text-[#0084d6] dark:text-sky-400 flex items-center justify-center font-bold">
               <Phone className="w-5 h-5" />
             </div>
@@ -157,10 +158,10 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                 href={`tel:${phone}`}
                 className="text-sm font-black text-[#0e1f38] dark:text-white font-mono hover:text-[#0084d6] dark:hover:text-sky-400 dir-ltr block transition-colors"
               >
-                +{phone}
+                {displayPhone}
               </a>
             </div>
-          </div>
+          </div>}
         </div>
       </section>
 

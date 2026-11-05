@@ -194,8 +194,8 @@ export function createStoreApi(API_BASE='/api/store') { return {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(product),
     });
-    if (!res.ok) throw new Error('Failed to create product');
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) throw new Error(data.error || 'تعذر حفظ المنتج. تحقق من بياناته وحاول مرة أخرى.');
     return data.product;
   },
 
@@ -205,8 +205,8 @@ export function createStoreApi(API_BASE='/api/store') { return {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(product),
     });
-    if (!res.ok) throw new Error('Failed to update product');
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) throw new Error(data.error || 'تعذر تعديل المنتج. حاول مرة أخرى.');
     return data.product;
   },
 
@@ -214,7 +214,8 @@ export function createStoreApi(API_BASE='/api/store') { return {
     const res = await fetch(`${API_BASE}/products/${id}`, {
       method: 'DELETE',
     });
-    if (!res.ok) throw new Error('Failed to delete product');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) throw new Error(data.error || 'تعذر حذف المنتج. حاول مرة أخرى.');
   },
 
   // 5. Orders
