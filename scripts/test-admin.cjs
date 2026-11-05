@@ -26,6 +26,7 @@ const d1Usage = load('functions/lib/d1-usage.ts', { './store': store })
 const notifications = load('functions/lib/notifications.ts', { './store': store })
 const vapid = load('functions/lib/vapid.ts')
 const employeeLib = load('functions/lib/employees.ts', { './store': store })
+const delegatedStoreCalls = []
 const originalProjects = load('src/data/projects.ts')
 const projectLib = load('functions/lib/projects.ts', { './store': store, '../../src/data/projects': originalProjects })
 const hubApi = load('functions/api/hub/[[path]].ts', { '../../lib/store': store })
@@ -37,7 +38,7 @@ const serviceConfig = load('src/lib/system-management.ts')
 const serviceSubsLib = load('functions/lib/service-subscriptions.ts', {'./store':store,'./employees':employeeLib,'../../src/lib/system-management':serviceConfig})
 const chatLib=load('functions/lib/staff-chat.ts',{'./store':store})
 const admin = load('functions/api/admin/[[path]].ts', { '../../lib/staff-chat':chatLib, '../../lib/service-subscriptions':serviceSubsLib, '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
-const employeeApi = load('functions/api/employee/[[path]].ts', { '../../lib/staff-chat':chatLib, '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications, '../../lib/vapid': vapid }).onRequest
+const employeeApi = load('functions/api/employee/[[path]].ts', { '../../lib/staff-chat':chatLib, '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications, '../../lib/vapid': vapid, '../../../matjari/functions/api/[[route]]': { handleStoreRequest: async (request) => { delegatedStoreCalls.push({ url: request.url, method: request.method, body: request.method === 'GET' ? null : await request.clone().json() }); return Response.json({ success: true, merchants: [] }) } } }).onRequest
 const visit = load('functions/api/visit.ts', { '../lib/store': store }).onRequestPost
 const publicProjects = load('functions/api/projects.ts', { '../lib/store': store }).onRequestGet
 const contact = load('functions/api/contact.ts', { '../lib/store': store, '../lib/notifications': notifications }).onRequestPost
@@ -138,6 +139,7 @@ async function test() {
   sqlite.exec(fs.readFileSync('migrations/0015_employee_hour_limits.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0017_password_vault.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0018_password_vault_projects_permissions.sql', 'utf8'))
+  sqlite.exec(fs.readFileSync('migrations/0019_employee_ecosystem_permissions.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0016_employee_web_push.sql', 'utf8'))
   for (const path of ['employees', 'attendance', 'employee-requests']) assert.equal((await call(path)).status, 401)
   const employeePassword = 'employee-test-password'
@@ -188,6 +190,20 @@ async function test() {
   response = await employeeCall('login', 'POST', { email: employeeForm.email, password: employeePassword })
   assert.equal(response.status, 200)
   const employeeCookie = response.headers.get('set-cookie').split(';')[0]
+  assert.equal((await employeeCall('ecosystem-stats', 'GET', undefined, employeeCookie)).status, 403)
+  assert.equal((await employeeCall('store-admin', 'GET', undefined, employeeCookie)).status, 403)
+  assert.equal((await employeeCall('store-admin', 'POST', { store_name: 'متجر اختبار', activity_type: 'عام', whatsapp_number: '01000000000', username: 'store-test', password: 'store-password' }, employeeCookie)).status, 403)
+  const storeEmployeeId = employeeList.find(item => item.email === employeeForm.email).id
+  assert.equal((await call('employees', 'POST', { ...employeeForm, id: storeEmployeeId, password: '', create_store: 1, manage_store_subscriptions: 1, view_ecosystem_stats: 1 }, cookie)).status, 200)
+  env.ECOSYSTEM_STORE_DB = DB
+  assert.equal((await employeeCall('store-admin', 'GET', undefined, employeeCookie)).status, 200)
+  assert.equal((await employeeCall('store-admin', 'POST', { store_name: 'متجر اختبار', activity_type: 'عام', whatsapp_number: '01000000000', username: 'store-test', password: 'store-password', plan_name: 'غير موثوق', duration_months: 1, price: 1 }, employeeCookie)).status, 200)
+  assert.equal(delegatedStoreCalls.at(-1).body.plan_name, 'الباقة السنوية الاحترافية')
+  assert.equal(delegatedStoreCalls.at(-1).body.duration_months, 12)
+  assert.equal(delegatedStoreCalls.at(-1).body.price, 1200)
+  assert.equal((await employeeCall('store-admin/store-test/renew-subscription', 'POST', { months: 13 }, employeeCookie)).status, 422)
+  assert.equal((await employeeCall('store-admin/store-test/renew-subscription', 'POST', { months: 3 }, employeeCookie)).status, 200)
+  assert.equal(delegatedStoreCalls.at(-1).body.months, 3)
   env.PASSWORD_VAULT_KEY = 'ab'.repeat(32)
   assert.equal((await employeeCall('password-vault', 'GET', undefined, employeeCookie)).status, 403)
   const vaultEmployeeId = employeeList.find(item => item.email === employeeForm.email).id

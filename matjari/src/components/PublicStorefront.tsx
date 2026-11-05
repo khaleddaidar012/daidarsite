@@ -13,6 +13,7 @@ interface PublicStorefrontProps {
   onAddToCart: (product: Product) => void;
   onOpenCart: () => void;
   onBackToDashboard: () => void;
+  previewMode?: boolean;
 }
 
 export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
@@ -22,9 +23,10 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
   onAddToCart,
   onOpenCart,
   onBackToDashboard,
+  previewMode = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const { isDark, toggleTheme } = useTheme();
+  const { toggleTheme } = useTheme();
   const { t, toggleLang, isArabic } = useLanguage();
   const [selectedCategory, setSelectedCategory] = useState<string>(t('all'));
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -39,9 +41,7 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
   const currency = store?.currency || (isArabic ? 'ج.م' : '$');
   const totalCartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const phone = store?.whatsapp_number || '201061532875';
-  const defaultLogo = isDark
-    ? `${import.meta.env.BASE_URL}logo-dark.png`
-    : `${import.meta.env.BASE_URL}logo.png`;
+  const defaultLogo = `${import.meta.env.BASE_URL}store-mark.svg`;
   const logoSrc = store?.logo_data || defaultLogo;
 
   const categories = [t('all'), ...Array.from(new Set(products.map((p) => p.category || (isArabic ? 'عام' : 'General'))))];
@@ -74,23 +74,14 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
           </div>
         )}
 
-        {/* Merchant preview top notification bar in brand navy */}
-        <div className="bg-[#0e1f38] dark:bg-slate-900 text-sky-200 text-xs py-2 px-3 sm:px-6 border-b border-sky-950 dark:border-slate-800">
+        {previewMode && <div className="bg-[#0e1f38] dark:bg-slate-900 text-sky-200 text-xs py-2 px-3 sm:px-6 border-b border-sky-950 dark:border-slate-800">
           <div className="max-w-7xl mx-auto w-full flex items-center justify-between gap-2">
-            <span className="flex items-center gap-1.5 font-bold text-[11px] sm:text-xs truncate max-w-[210px] sm:max-w-none">
-              <Sparkles className="w-3.5 h-3.5 text-[#00b4d8] shrink-0" />
-              <span className="truncate">{t('live_preview')} • Cloudflare D1</span>
-            </span>
-            <button
-              onClick={onBackToDashboard}
-              className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white hover:text-[#00b4d8] font-black flex items-center gap-1 text-[11px] transition-all shrink-0 whitespace-nowrap cursor-pointer"
-              title="العودة ومسح رابط المتجر المؤقت"
-            >
-              <span>{isArabic ? 'العودة للوحة التحكم / الرئيسية' : 'Back to Dashboard / Home'}</span>
-              <ArrowRight className={`w-3.5 h-3.5 ${isArabic ? '' : 'rotate-180'}`} />
+            <span className="flex items-center gap-1.5 font-bold text-[11px] sm:text-xs truncate max-w-[210px] sm:max-w-none"><Sparkles className="w-3.5 h-3.5 text-[#00b4d8] shrink-0" /><span className="truncate">{isArabic ? 'معاينة المتجر' : 'Store preview'}</span></span>
+            <button onClick={onBackToDashboard} className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white hover:text-[#00b4d8] font-black flex items-center gap-1 text-[11px] transition-all shrink-0 whitespace-nowrap cursor-pointer" title={isArabic ? 'العودة للوحة التحكم' : 'Return to dashboard'}>
+              <span>{isArabic ? 'العودة للوحة التحكم' : 'Back to dashboard'}</span><ArrowRight className={`w-3.5 h-3.5 ${isArabic ? '' : 'rotate-180'}`} />
             </button>
           </div>
-        </div>
+        </div>}
 
         {/* Main Navbar */}
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-2 sm:gap-4">

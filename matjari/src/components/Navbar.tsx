@@ -3,6 +3,7 @@ import { Eye, ShieldCheck, Database, Menu, X, Moon, Sun, Globe } from 'lucide-re
 import { Store } from '../types';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
+import { storefrontUrl } from '../services/storefront-url';
 
 interface NavbarProps {
   store: Store | null;
@@ -85,8 +86,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={() => {
               if (store?.id) {
-                const storeUrl = `${window.location.origin}${window.location.pathname}?store_id=${store.id}&view=storefront`;
-                window.open(storeUrl, '_blank');
+                window.open(storefrontUrl(store.id, undefined, true), '_blank', 'noopener,noreferrer');
               }
               onViewStore();
             }}

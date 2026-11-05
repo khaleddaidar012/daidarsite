@@ -3,6 +3,7 @@ import { MerchantDetail } from '../types';
 import { api as defaultApi, createStoreApi } from '../services/api';
 import EcosystemAdmin from '../../../shared/EcosystemAdmin';
 import EcosystemPanel from '../../../shared/EcosystemPanel';
+import { storefrontUrl } from '../services/storefront-url';
 import {
   Store as StoreIcon,
   Plus,
@@ -119,7 +120,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   }, []);
 
   const handleCopyStoreLink = async (storeId: string) => {
-    const url = `${storeBaseUrl||window.location.origin+window.location.pathname}?view=storefront&store_id=${encodeURIComponent(storeId)}`;
+    const url = storefrontUrl(storeId, storeBaseUrl);
     try {
       await navigator.clipboard.writeText(url);
     } catch {
@@ -954,7 +955,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                               }`}
                               title={t('copy_store_url')}
                             >
-                              {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-[#0084d6]" />}
+                              {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-[#0084d6]" />}<span>{isCopied ? 'تم نسخ الرابط' : t('copy_store_url')}</span>
                             </button>
 
                             {/* Direct Preview Button (Matching Screenshot Mockup Pill in Dark Navy) */}

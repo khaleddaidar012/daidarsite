@@ -8,6 +8,7 @@ import { adminHub } from '../../lib/hub-admin'
 import { d1UsageResponse } from '../../lib/d1-usage'
 import { recordAdminNotification } from '../../lib/notifications'
 import { VAPID_PUBLIC_KEY } from '../../lib/vapid'
+import { handleStoreRequest } from '../../../matjari/functions/api/[[route]]'
 export async function onRequest({ request, env }: { request: Request; env: Env }) {
   try {
     if (!env.DB) return json({ error: 'الخدمة غير جاهزة' }, 503)
@@ -37,6 +38,54 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
     }
     const employee = await employeeSession(request, env)
     if (!employee) return json({ error: 'سجل دخولك أولاً' }, 401)
+    if (path === 'ecosystem-stats' && request.method === 'GET') {
+      if (!employee.view_ecosystem_stats) return json({ error: 'حسابك لا يملك صلاحية عرض إحصائيات دعيدر هب.' }, 403)
+      if (!env.ECOSYSTEM_DB || !env.ECOSYSTEM_STORE_DB || !env.ECOSYSTEM_HUB_DB) return json({ error: 'مصادر بيانات المنظومة غير مكتملة.' }, 503)
+      const now = Date.now()
+      const [customers, stores, hubSubs, pendingHub, activeHub, expiredHub, pendingStores, activeStores, expiredStores] = await Promise.all([
+        env.ECOSYSTEM_DB.prepare('SELECT COUNT(*) AS count FROM ec_users WHERE active=1').first<{count:number}>(),
+        env.ECOSYSTEM_STORE_DB.prepare('SELECT COUNT(*) AS count FROM stores').first<{count:number}>(),
+        env.ECOSYSTEM_HUB_DB.prepare('SELECT COUNT(*) AS count FROM hub_subscriptions').first<{count:number}>(),
+        env.ECOSYSTEM_HUB_DB.prepare("SELECT COUNT(*) AS count FROM hub_orders WHERE status IN ('under_review','needs_info')").first<{count:number}>(),
+        env.ECOSYSTEM_HUB_DB.prepare("SELECT COUNT(*) AS count FROM hub_subscriptions WHERE status='active' AND (starts_at IS NULL OR starts_at<=?) AND (expires_at IS NULL OR expires_at>?)").bind(now,now).first<{count:number}>(),
+        env.ECOSYSTEM_HUB_DB.prepare("SELECT COUNT(*) AS count FROM hub_subscriptions WHERE status='expired' OR expires_at<=?").bind(now).first<{count:number}>(),
+        env.ECOSYSTEM_STORE_DB.prepare("SELECT COUNT(*) AS count FROM stores s JOIN subscriptions b ON b.id=(SELECT x.id FROM subscriptions x WHERE x.store_id=s.id ORDER BY x.created_at DESC LIMIT 1) WHERE b.status IN ('pending','awaiting_activation') OR (s.is_active=0 AND EXISTS(SELECT 1 FROM users u WHERE u.store_id=s.id AND u.is_active=1))").first<{count:number}>(),
+        env.ECOSYSTEM_STORE_DB.prepare("SELECT COUNT(*) AS count FROM stores s JOIN subscriptions b ON b.id=(SELECT x.id FROM subscriptions x WHERE x.store_id=s.id ORDER BY x.created_at DESC LIMIT 1) WHERE s.is_active=1 AND b.status IN ('active','trial') AND b.start_date<=date('now') AND b.end_date>=date('now') AND EXISTS(SELECT 1 FROM users u WHERE u.store_id=s.id AND u.is_active=1)").first<{count:number}>(),
+        env.ECOSYSTEM_STORE_DB.prepare("SELECT COUNT(*) AS count FROM stores s JOIN subscriptions b ON b.id=(SELECT x.id FROM subscriptions x WHERE x.store_id=s.id ORDER BY x.created_at DESC LIMIT 1) WHERE b.status='expired' OR b.end_date<date('now')").first<{count:number}>(),
+      ])
+      return json({ counts: { customers: customers?.count || 0, stores: stores?.count || 0, systems: hubSubs?.count || 0, pending: (pendingHub?.count || 0) + (pendingStores?.count || 0), active: (activeHub?.count || 0) + (activeStores?.count || 0), expired: (expiredHub?.count || 0) + (expiredStores?.count || 0) } })
+    }
+    if (path === 'store-admin' && request.method === 'GET') {
+      if (!employee.manage_store_subscriptions) return json({ error: 'حسابك لا يملك صلاحية عرض وتجديد اشتراكات المتاجر.' }, 403)
+      if (!env.ECOSYSTEM_STORE_DB) return json({ error: 'مصدر بيانات المتاجر غير مربوط.' }, 503)
+      const target = new URL('/api/admin/merchants', request.url)
+      return await handleStoreRequest(new Request(target, request), { ...env, DB: env.ECOSYSTEM_STORE_DB, READ_ONLY_PREVIEW: 'false' }, { id: employee.id, username: employee.email, email: employee.email, role: 'super_admin', store_id: null, is_active: 1, password: '' })
+    }
+    if (path === 'store-admin' && request.method === 'POST') {
+      if (!employee.create_store) return json({ error: 'حسابك لا يملك صلاحية إنشاء متجر.' }, 403)
+      if (!request.headers.get('Content-Type')?.startsWith('application/json')) return json({ error: 'يلزم إرسال بيانات المتجر بصيغة JSON.' }, 415)
+      if (!env.ECOSYSTEM_STORE_DB) return json({ error: 'مصدر بيانات المتاجر غير مربوط.' }, 503)
+      const body = await request.clone().json().catch(() => null) as Record<string, unknown> | null
+      if (!body || typeof body.store_name !== 'string' || typeof body.activity_type !== 'string' || typeof body.whatsapp_number !== 'string' || typeof body.username !== 'string' || typeof body.password !== 'string') return json({ error: 'راجع بيانات المتجر وبيانات حساب الدخول.' }, 422)
+      const target = new URL('/api/admin/merchants', request.url)
+      const safeRequest = new Request(target, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, plan_name: 'الباقة السنوية الاحترافية', duration_months: 12, price: 1200 }) })
+      const result = await handleStoreRequest(safeRequest, { ...env, DB: env.ECOSYSTEM_STORE_DB, READ_ONLY_PREVIEW: 'false' }, { id: employee.id, username: employee.email, email: employee.email, role: 'super_admin', store_id: null, is_active: 1, password: '' })
+      if (result.ok) await recordAdminNotification(env, { actor: employee.name, eventType: 'store_created_by_employee', title: 'إنشاء متجر', detail: `${employee.name} أنشأ متجرًا من لوحة الموظفين`, target: 'hub' })
+      return result
+    }
+    const storeRenewal = path.match(/^store-admin\/([a-zA-Z0-9-]+)\/renew-subscription$/)
+    if (storeRenewal && request.method === 'POST') {
+      if (!employee.manage_store_subscriptions) return json({ error: 'حسابك لا يملك صلاحية تجديد اشتراكات المتاجر.' }, 403)
+      if (!request.headers.get('Content-Type')?.startsWith('application/json')) return json({ error: 'يلزم إرسال بيانات التجديد بصيغة JSON.' }, 415)
+      if (!env.ECOSYSTEM_STORE_DB) return json({ error: 'مصدر بيانات المتاجر غير مربوط.' }, 503)
+      const body = await request.clone().json().catch(() => null) as Record<string, unknown> | null
+      if (!body || !Number.isSafeInteger(body.months) || Number(body.months) < 1 || Number(body.months) > 12) return json({ error: 'مدة التجديد غير صحيحة.' }, 422)
+      const target = new URL(`/api/admin/merchants/${storeRenewal[1]}/renew-subscription`, request.url)
+      const safeRequest = new Request(target, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ months: Number(body.months) }) })
+      const result = await handleStoreRequest(safeRequest, { ...env, DB: env.ECOSYSTEM_STORE_DB, READ_ONLY_PREVIEW: 'false' }, { id: employee.id, username: employee.email, email: employee.email, role: 'super_admin', store_id: null, is_active: 1, password: '' })
+      if (result.ok) await recordAdminNotification(env, { actor: employee.name, eventType: 'store_subscription_renewed_by_employee', title: 'تجديد اشتراك متجر', detail: `${employee.name} جدّد اشتراك متجر`, target: 'hub' })
+      return result
+    }
     if (path === 'presence-test' && request.method === 'POST') {
       const shift = await env.DB.prepare('SELECT id FROM attendance_shifts WHERE employee_id=? AND check_out IS NULL').bind(employee.id).first<{id:string}>()
       if (!shift) return json({ error: 'سجّل الحضور أولًا لبدء اختبار التنبيه.' }, 409)

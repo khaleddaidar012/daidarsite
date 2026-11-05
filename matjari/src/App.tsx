@@ -11,6 +11,7 @@ import { ExploreStoresView } from './components/ExploreStoresView';
 import { CartDrawer } from './components/CartDrawer';
 import { Footer } from './components/Footer';
 import { useLanguage } from './context/LanguageContext';
+import { storefrontUrl } from './services/storefront-url';
 
 export type AppView = 'landing' | 'login' | 'merchant_login' | 'super_admin' | 'store_owner' | 'storefront' | 'explore_stores';
 const integratedWithHub = import.meta.env.VITE_MATJARI_HUB_INTEGRATED === '1';
@@ -28,6 +29,7 @@ export const App: React.FC = () => {
   // Public Storefront State
   const [storefrontStore, setStorefrontStore] = useState<Store | null>(null);
   const [storefrontProducts, setStorefrontProducts] = useState<Product[]>([]);
+  const [storefrontPreview, setStorefrontPreview] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
@@ -113,6 +115,7 @@ export const App: React.FC = () => {
 
         // 1. Direct Public Storefront View (?view=storefront&store_id=...)
         if (urlView === 'storefront' && urlStoreId) {
+          setStorefrontPreview(params.get('preview') === '1');
           const store = await api.getStore(urlStoreId);
           if (store) {
             setStorefrontStore(store);
@@ -205,8 +208,7 @@ export const App: React.FC = () => {
 
   // Preview Store in Public Storefront (Opens in new tab)
   const handlePreviewStore = async (storeId: string) => {
-    const url = `${window.location.origin}${window.location.pathname}?view=storefront&store_id=${storeId}`;
-    window.open(url, '_blank');
+    window.open(storefrontUrl(storeId, undefined, true), '_blank', 'noopener,noreferrer');
   };
 
   // Open storefront inline (from landing page card clicks)
@@ -262,12 +264,13 @@ export const App: React.FC = () => {
 
   // Loading State
   if (isLoading) {
+    const publicStoreRequest = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'storefront';
     return (
       <div className="min-h-screen bg-[#f7fafe] dark:bg-slate-950 flex items-center justify-center p-4 font-cairo">
-        <div className="text-center space-y-3">
-          <div className="w-12 h-12 border-3 border-[#0084d6] border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-xs font-bold text-slate-500 dark:text-slate-400">
-            {isArabic ? 'جاري الاتصال بقاعدة بيانات Cloudflare D1...' : 'Connecting to Cloudflare D1...'}
+        <div role="status" className="text-center space-y-4">
+          <img src={`${import.meta.env.BASE_URL}store-mark.svg`} alt={isArabic ? 'متجر' : 'Store'} className="mx-auto h-20 w-20 animate-pulse drop-shadow-sm" />
+          <p className="text-sm font-bold text-slate-600 dark:text-slate-300">
+            {isArabic ? publicStoreRequest ? 'جارٍ تحميل المتجر…' : 'جارٍ تجهيز متجرك…' : publicStoreRequest ? 'Loading the store…' : 'Preparing your store…'}
           </p>
         </div>
       </div>
@@ -282,6 +285,7 @@ export const App: React.FC = () => {
       <>
         <PublicStorefront
           store={storefrontStore}
+          previewMode={storefrontPreview}
           products={storefrontProducts}
           cart={cart}
           onAddToCart={handleAddToCart}

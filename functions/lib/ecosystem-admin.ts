@@ -40,6 +40,17 @@ export async function ecosystemAdministration(request:Request,env:Env):Promise<R
       if(!row)return json({error:'العميل غير موجود'},404);
       return json(await customerOverview(env,{...row,family:'',platform_admin:false}));
     }
+    if(path==='customer'&&request.method==='DELETE'){
+      if(!request.headers.get('Content-Type')?.startsWith('application/json'))return json({error:'يلزم JSON'},415);
+      const id=new URL(request.url).searchParams.get('id')||'';
+      const target=await env.ECOSYSTEM_DB!.prepare("SELECT u.id,u.active,EXISTS(SELECT 1 FROM ec_roles r WHERE r.user_id=u.id AND r.role='platform_admin') AS platform_admin FROM ec_users u WHERE u.id=?").bind(id).first<{id:string;active:number;platform_admin:number}>();
+      if(!target||target.active!==1)return json({error:'العميل غير موجود أو محذوف بالفعل'},404);
+      if(target.id===user.id||target.platform_admin)return json({error:'لا يمكن حذف حسابك أو حساب مدير المنظومة من هذه القائمة'},409);
+      const result=await env.ECOSYSTEM_DB!.prepare('UPDATE ec_users SET active=0 WHERE id=? AND active=1').bind(id).run() as {meta?:{changes?:number};changes?:number};
+      if((result.meta?.changes??result.changes??0)!==1)return json({error:'تغيرت حالة العميل. حدّث القائمة وحاول مرة أخرى.'},409);
+      await ecoAudit(env,user.id,'customer-deactivated',id);
+      return json({success:true,retained:true});
+    }
     if(path==='workspace'&&request.method==='GET'){
       const store=env.ECOSYSTEM_STORE_DB,hub=env.ECOSYSTEM_HUB_DB;
       if(!store||!hub)return json({error:'لم يكتمل ربط مصادر الإدارة في هذه البيئة'},503);
@@ -48,7 +59,7 @@ export async function ecosystemAdministration(request:Request,env:Env):Promise<R
         env.ECOSYSTEM_DB!.prepare('SELECT COUNT(*) AS count FROM ec_users WHERE active=1').first(),
         store.prepare('SELECT COUNT(*) AS count FROM stores').first(),
         hub.prepare('SELECT COUNT(*) AS count FROM hub_subscriptions').first(),
-        env.ECOSYSTEM_DB!.prepare('SELECT id,name,email,active FROM ec_users ORDER BY created_at DESC LIMIT ? OFFSET ?').bind(take,offset).all(),
+        env.ECOSYSTEM_DB!.prepare('SELECT id,name,email,active FROM ec_users WHERE active=1 ORDER BY created_at DESC LIMIT ? OFFSET ?').bind(take,offset).all(),
         store.prepare('SELECT u.id,u.username,u.email,u.role,u.is_active,u.store_id,s.name AS store_name FROM users u LEFT JOIN stores s ON s.id=u.store_id ORDER BY u.created_at DESC LIMIT ? OFFSET ?').bind(take,offset).all(),
         hub.prepare('SELECT id,name,email,active FROM hub_users ORDER BY created_at DESC LIMIT ? OFFSET ?').bind(take,offset).all(),
         store.prepare('SELECT s.id,s.name,s.is_active,b.plan_name,b.status,b.end_date FROM stores s LEFT JOIN subscriptions b ON b.id=(SELECT x.id FROM subscriptions x WHERE x.store_id=s.id ORDER BY x.created_at DESC LIMIT 1) ORDER BY s.created_at DESC LIMIT ? OFFSET ?').bind(take,offset).all(),

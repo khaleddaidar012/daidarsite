@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, type FormEvent } from 'react'
-import { Clock3, FolderKanban, CreditCard, Database, CalendarDays, WalletCards, MessageCircle } from 'lucide-react'
+import { Clock3, FolderKanban, CreditCard, Database, CalendarDays, WalletCards, MessageCircle, Store, BarChart3 } from 'lucide-react'
 import { action, field, callApi, currentMonth, AttendanceTable, time, statusLabel, type Employee, type RecordRow, type EmployeeRequest } from './shared'
 import StaffChat from '@/components/shared/StaffChat'
 import ChatUnreadBadge from '@/components/shared/ChatUnreadBadge'
@@ -10,6 +10,8 @@ import EmployeeProjectManager from './EmployeeProjectManager'
 import HubManualSubscriptionManager from '@/components/shared/HubManualSubscriptionManager'
 import PasswordVault from '@/components/admin/PasswordVault'
 import D1UsageDashboard from '@/components/admin/D1UsageDashboard'
+import EmployeeStoreManager from './EmployeeStoreManager'
+import EmployeeEcosystemStats from './EmployeeEcosystemStats'
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }> }
 function decodeVapidKey(value: string) {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
@@ -45,7 +47,7 @@ export default function EmployeeDashboard() {
   const [pendingCheckoutShiftId, setPendingCheckoutShiftId] = useState('')
   const [requestType, setRequestType] = useState('leave')
   const [reportLoading, setReportLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'chat' | 'tracking' | 'attendance' | 'projects' | 'hub' | 'databases' | 'passwords'>('attendance')
+  const [activeTab, setActiveTab] = useState<'chat' | 'tracking' | 'attendance' | 'projects' | 'hub' | 'databases' | 'passwords' | 'stores' | 'ecosystem-stats'>('attendance')
   function fail(e: Error & { status?: number }) { setError(e.message); if (e.status === 401) setEmployee(null) }
   useEffect(() => { callApi('employee', 'session').then(data => setEmployee(data.employee)).catch(e => { if (e.status !== 401) setError(e.message) }).finally(() => setLoading(false)) }, [])
   useEffect(() => { setShowInPagePrompts(localStorage.getItem('daidar_employee_in_page_prompts') !== 'off') }, [])
@@ -321,6 +323,8 @@ export default function EmployeeDashboard() {
     ...(employee?.track_projects === 1 ? [{ id: 'tracking' as const, label: 'تتبع المشاريع', description: 'الجدول الشهري وحالة التنفيذ', icon: CalendarDays }] : []),
     ...(employee?.manage_projects === 1 ? [{ id: 'projects' as const, label: 'إدارة المشاريع', description: 'معرض أعمال دعيدر', icon: FolderKanban }] : []),
     ...(employee?.manage_hub_subscriptions === 1 ? [{ id: 'hub' as const, label: 'اشتراكات هب', description: 'تسجيل دفعة أو تجديد', icon: CreditCard }] : []),
+    ...(employee?.create_store === 1 || employee?.manage_store_subscriptions === 1 ? [{ id: 'stores' as const, label: 'إدارة المتاجر', description: 'إنشاء متجر أو تجديد اشتراكه حسب الصلاحية', icon: Store }] : []),
+    ...(employee?.view_ecosystem_stats === 1 ? [{ id: 'ecosystem-stats' as const, label: 'إحصائيات المنظومة', description: 'أعداد الحسابات والمتاجر والاشتراكات', icon: BarChart3 }] : []),
     ...((employee?.add_passwords === 1 || employee?.view_passwords === 1) ? [{ id: 'passwords' as const, label: 'كلمات مرور', description: 'حسابات وروابط دخول المشاريع', icon: WalletCards }] : []),
     ...(employee?.view_d1_usage === 1 ? [{ id: 'databases' as const, label: 'سعة قواعد البيانات', description: 'المساحة المستخدمة والمتاحة', icon: Database }] : []),
   ]
@@ -342,6 +346,8 @@ export default function EmployeeDashboard() {
     {activeTab === 'tracking' && employee.track_projects === 1 && <ProjectTracker scope="employee" />}
     {activeTab === 'projects' && employee.manage_projects === 1 && <EmployeeProjectManager />}
     {activeTab === 'hub' && employee.manage_hub_subscriptions === 1 && <HubManualSubscriptionManager scope="employee" />}
+    {activeTab === 'stores' && (employee.create_store === 1 || employee.manage_store_subscriptions === 1) && <EmployeeStoreManager createStore={employee.create_store === 1} renewSubscriptions={employee.manage_store_subscriptions === 1} />}
+    {activeTab === 'ecosystem-stats' && employee.view_ecosystem_stats === 1 && <EmployeeEcosystemStats />}
     {activeTab === 'passwords' && (employee.add_passwords === 1 || employee.view_passwords === 1) && <PasswordVault scope="employee" />}
     {activeTab === 'databases' && employee.view_d1_usage === 1 && <D1UsageDashboard scope="employee" />}
     </>}
