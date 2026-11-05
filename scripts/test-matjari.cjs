@@ -4,11 +4,16 @@ const sqlite=new DatabaseSync(':memory:');sqlite.exec('PRAGMA foreign_keys=ON');
 for(const file of ['0001_initial_schema.sql','0002_auth_sessions.sql'])sqlite.exec(fs.readFileSync('matjari/migrations/'+file,'utf8'));
 const DB={prepare(sql){let args=[];return{bind(...values){args=values;return this},async first(){return sqlite.prepare(sql).get(...args)||null},async all(){return{results:sqlite.prepare(sql).all(...args)}},async run(){return sqlite.prepare(sql).run(...args)}}},async batch(statements){sqlite.exec('BEGIN');try{const out=[];for(const s of statements)out.push(await s.run());sqlite.exec('COMMIT');return out}catch(e){sqlite.exec('ROLLBACK');throw e}}};
 const auth=load('matjari/lib/auth.ts'),{onRequest}=load('matjari/functions/api/[[route]].ts',{'../../lib/auth':auth});
+const {createStoreApi}=load('matjari/src/services/api.ts');
 const call=(path,method='GET',body,cookie='',origin='https://test.example',ip='127.0.0.1')=>onRequest({env:{DB},request:new Request('https://test.example/api/'+path,{method,headers:{'Content-Type':'application/json',Cookie:cookie,Origin:origin,'CF-Connecting-IP':ip},body:body===undefined?undefined:JSON.stringify(body)})});
 const data=async r=>{assert.equal(r.status,200,await r.clone().text());return r.json()};
 const session=r=>r.headers.get('set-cookie').split(';')[0];
 async function test(){
  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM users').get().n,0);
+ const storeAdminApi=createStoreApi('/api/ecosystem/admin/store'),originalFetch=global.fetch;let activationRequest;
+ global.fetch=async(url,options)=>{activationRequest={url:String(url),...options};return new Response(JSON.stringify({success:true,is_active:1}),{status:200,headers:{'Content-Type':'application/json'}})};
+ try{assert.equal(await storeAdminApi.toggleMerchantStatus('store-test'),1)}finally{global.fetch=originalFetch}
+ assert.equal(activationRequest.url,'/api/ecosystem/admin/store/admin/merchants/store-test/toggle-status');assert.equal(activationRequest.method,'PUT');assert.equal(activationRequest.headers['Content-Type'],'application/json');assert.equal(activationRequest.body,'{}');
  assert.equal((await call('admin/merchants')).status,401);
  assert.equal((await call('auth/session')).status,401);
  assert.equal((await call('auth/register','POST',{},'','https://evil.example')).status,403);

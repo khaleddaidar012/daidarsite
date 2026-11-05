@@ -100,6 +100,8 @@ export function createStoreApi(API_BASE='/api/store') { return {
   async toggleMerchantStatus(storeId: string): Promise<number> {
     const res = await fetch(`${API_BASE}/admin/merchants/${storeId}/toggle-status`, {
       method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
     });
     const data = await res.json();
     if (!res.ok || !data.success) {
