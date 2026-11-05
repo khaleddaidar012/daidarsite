@@ -106,6 +106,19 @@ async function test(){
  const rootRoute=load('functions/api/ecosystem/[[path]].ts'),mountedStoreRoute=load('functions/api/store/[[path]].ts'),navigation=load('shared/hub-navigation.ts'),customerModel=load('shared/ecosystem-customer.ts');
  const root=(p,c='',method='GET',body)=>rootRoute.onRequest({request:request('hub','/api/ecosystem/'+p,method,body,c),env:hubEnv});
  const mountedStoreEnv={...storeEnv,ECOSYSTEM_HUB_ORIGIN:'https://hub.example'};
+ const guestStoreLogin=await mountedStoreRoute.onRequest({request:request('hub','/api/store/ecosystem/login?via=hub'),env:mountedStoreEnv});
+ const guestHubAuthorizeUrl=new URL(guestStoreLogin.headers.get('location'));
+ const guestHubAuthorize=await rootRoute.onRequest({request:request('hub',guestHubAuthorizeUrl.pathname+guestHubAuthorizeUrl.search),env:hubEnv});
+ assert.equal(guestHubAuthorize.headers.get('location'),'https://hub.example/ar/hub/login?ecosystem_resume=1');
+ const resumeCookies=cookie(guestStoreLogin)+'; '+cookie(guestHubAuthorize)+'; '+hubCookie;
+ const resume=await rootRoute.onRequest({request:request('hub','/api/ecosystem/continue','GET',undefined,resumeCookies),env:hubEnv});
+ assert.equal(new URL(resume.headers.get('location')).pathname,'/api/ecosystem/authorize');
+ const resumedAuthorizeUrl=new URL(resume.headers.get('location'));
+ const resumedAuthorize=await rootRoute.onRequest({request:request('hub',resumedAuthorizeUrl.pathname+resumedAuthorizeUrl.search,'GET',undefined,hubCookie),env:hubEnv});
+ assert.equal(new URL(resumedAuthorize.headers.get('location')).pathname,'/api/store/ecosystem/callback');
+ const resumedCallbackUrl=new URL(resumedAuthorize.headers.get('location'));
+ const resumedCallback=await mountedStoreRoute.onRequest({request:request('hub',resumedCallbackUrl.pathname+resumedCallbackUrl.search,'GET',undefined,cookie(guestStoreLogin)+'; '+hubCookie),env:mountedStoreEnv});
+ assert.equal(resumedCallback.headers.get('location'),'https://hub.example/ar/hub/stores/?view=store_owner');
  const mountedLogin=await mountedStoreRoute.onRequest({request:request('hub','/api/store/ecosystem/login?via=hub'),env:mountedStoreEnv});
  assert.equal(mountedLogin.status,303);assert.equal(new URL(mountedLogin.headers.get('location')).pathname,'/api/ecosystem/authorize');
  const mountedAuthorize=await rootRoute.onRequest({request:request('hub',new URL(mountedLogin.headers.get('location')).pathname+new URL(mountedLogin.headers.get('location')).search,'GET',undefined,hubCookie),env:hubEnv});
@@ -150,6 +163,6 @@ async function test(){
  await data(await ec('store','logout',ownerCookie,'POST',{}));
  const revoked=await eco.ecosystem(new Request('https://hub.example/api/ecosystem/device/session',{headers:{Authorization:'Bearer '+grant.access_token}}),hubEnv,hubAdapter);assert.equal(revoked.status,401);
  for(const d of [center,hubDB,storeDB])d.sqlite.close();
- console.log('Ecosystem passed: bidirectional-origin and same-site Store SSO callbacks, single-use codes, independent identity IDs, no email merges, explicit password-proof linking, tenant permissions, shared logout, subscription registry, device approval/replay protection, and signed Google OIDC nonce/replay checks.');
+ console.log('Ecosystem passed: bidirectional-origin and same-site Store SSO callbacks, guest-to-Hub-login resume, single-use codes, independent identity IDs, no email merges, explicit password-proof linking, tenant permissions, shared logout, subscription registry, device approval/replay protection, and signed Google OIDC nonce/replay checks.');
 }
 test().catch(e=>{console.error(e);process.exitCode=1});

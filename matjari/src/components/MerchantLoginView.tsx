@@ -39,6 +39,7 @@ export const MerchantLoginView: React.FC<MerchantLoginViewProps> = ({
 }) => {
   const { t, isArabic, toggleLang } = useLanguage();
   const { isDark, toggleTheme } = useTheme();
+  const [linkRequired] = useState(() => new URLSearchParams(window.location.search).get('ecosystem_link') === '1');
   const [linkIdentity,setLinkIdentity]=useState(false);
   const [unified,setUnified]=useState(false);
   React.useEffect(()=>{fetch('/api/ecosystem/config').then(r=>{if(r.ok)setUnified(true)}).catch(()=>{})},[]);
@@ -78,7 +79,7 @@ export const MerchantLoginView: React.FC<MerchantLoginViewProps> = ({
       setIsLoading(true);
       setError('');
       setSuccessMsg('');
-      const res = await api.login(loginUsername.trim(), loginPassword, linkIdentity);
+      const res = await api.login(loginUsername.trim(), loginPassword, linkRequired || linkIdentity);
       onLoginSuccess(res.user, res.store, res.subscription);
     } catch (err: any) {
       setError(err.message || (isArabic ? 'بيانات الدخول غير صحيحة، تأكد من بريد Google وكلمة المرور' : 'Invalid login credentials'));
@@ -294,6 +295,12 @@ export const MerchantLoginView: React.FC<MerchantLoginViewProps> = ({
           </div>
 
           {/* Error Message */}
+          {linkRequired && (
+            <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-6 text-amber-900">
+              <strong>{isArabic ? 'حساب دعيدر هب متصل بالفعل' : 'Your Daidar Hub account is already connected'}</strong>
+              <p>{isArabic ? 'البريد الإلكتروني مرتبط بحساب متجري قديم. سجّل ببيانات الحساب القديم مرة واحدة لربطه بحساب هب وحماية متجرك وبياناتك. بعد التحقق ستدخل متجري تلقائيًا من دعيدر هب.' : 'This email belongs to an existing Matjari account. Sign in with that account once to connect it to Hub and protect its store and data. After verification, Hub will sign you into Matjari automatically.'}</p>
+            </div>
+          )}
           {error && (
             <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs font-bold flex items-center gap-2 animate-fadeIn">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -314,7 +321,7 @@ export const MerchantLoginView: React.FC<MerchantLoginViewProps> = ({
           {/* ───────────────────────────────────────────────────────────── */}
           {authMode === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4 animate-fadeIn">
-              {unified&&<><a href="/api/store/ecosystem/login?via=hub" className="block rounded-xl border border-sky-200 bg-sky-50 p-3 text-center text-sm font-bold text-sky-700">{isArabic?'الدخول بحساب دعيدر الموحد':'Daidar account sign-in'}</a><label className="flex items-start gap-2 text-xs leading-6 text-slate-600"><input type="checkbox" checked={linkIdentity} onChange={e=>setLinkIdentity(e.target.checked)}/>{isArabic?'ربط حساب دعيدر القديم وأنظمته بحسابي الحالي بعد التحقق من كلمة المرور':'Connect my existing Daidar account and its systems after verifying its password'}</label></>}
+              {unified&&!linkRequired&&<><a href="/api/store/ecosystem/login?via=hub" className="block rounded-xl border border-sky-200 bg-sky-50 p-3 text-center text-sm font-bold text-sky-700">{isArabic?'الدخول بحساب دعيدر الموحد':'Daidar account sign-in'}</a><label className="flex items-start gap-2 text-xs leading-6 text-slate-600"><input type="checkbox" checked={linkIdentity} onChange={e=>setLinkIdentity(e.target.checked)}/>{isArabic?'ربط حساب دعيدر القديم وأنظمته بحسابي الحالي بعد التحقق من كلمة المرور':'Connect my existing Daidar account and its systems after verifying its password'}</label></>}
               <div>
                 <label className="block text-xs font-extrabold text-[#0e1f38] dark:text-white mb-1.5">
                   {isArabic ? 'البريد الإلكتروني (Google Gmail) أو اسم المستخدم *' : 'Google Email (Gmail) or Username *'}
@@ -360,7 +367,7 @@ export const MerchantLoginView: React.FC<MerchantLoginViewProps> = ({
                 ) : (
                   <>
                     <LogIn className="w-4 h-4" />
-                    <span>{isArabic ? 'الدخول إلى متجري' : 'Sign In to My Store'}</span>
+                    <span>{linkRequired ? (isArabic ? 'ربط الحساب والدخول' : 'Link account and sign in') : (isArabic ? 'الدخول إلى متجري' : 'Sign In to My Store')}</span>
                     <span>{isArabic ? '←' : '→'}</span>
                   </>
                 )}

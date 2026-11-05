@@ -13,6 +13,7 @@ import { Footer } from './components/Footer';
 import { useLanguage } from './context/LanguageContext';
 
 export type AppView = 'landing' | 'login' | 'merchant_login' | 'super_admin' | 'store_owner' | 'storefront' | 'explore_stores';
+const integratedWithHub = import.meta.env.VITE_MATJARI_HUB_INTEGRATED === '1';
 
 export const App: React.FC = () => {
   const { isArabic } = useLanguage();
@@ -65,6 +66,14 @@ export const App: React.FC = () => {
       url.search = '';
       window.history.replaceState({}, '', url.pathname);
     }
+  };
+
+  const openMerchantAccess = () => {
+    if (integratedWithHub) {
+      window.location.assign('/api/store/ecosystem/login?via=hub');
+      return;
+    }
+    navigateTo('merchant_login');
   };
 
   // Initialize App & Routing
@@ -123,6 +132,19 @@ export const App: React.FC = () => {
           } else {
             setView('landing');
           }
+          setIsLoading(false);
+          return;
+        }
+
+        // Hub-hosted Matjari always starts from the shared Hub identity. A
+        // conflict callback is the one exception: it asks for one-time proof
+        // of ownership of the pre-existing Store account.
+        if (urlView === 'merchant_login') {
+          if (session) setView(session.user.role === 'super_admin' ? 'super_admin' : 'store_owner');
+          else if (integratedWithHub && !params.has('ecosystem_link') && !params.has('ecosystem_resume')) {
+            window.location.assign('/api/store/ecosystem/login?via=hub');
+            return;
+          } else setView('merchant_login');
           setIsLoading(false);
           return;
         }
@@ -329,7 +351,7 @@ export const App: React.FC = () => {
       <LoginView
         onLoginSuccess={handleLoginSuccess}
         onBackToHome={() => navigateTo('landing')}
-        onGoToMerchantLogin={() => navigateTo('merchant_login')}
+        onGoToMerchantLogin={openMerchantAccess}
       />
     );
   }
@@ -365,14 +387,14 @@ export const App: React.FC = () => {
           } else if (currentUser?.role === 'merchant') {
             navigateTo('store_owner');
           } else {
-            navigateTo('merchant_login');
+            openMerchantAccess();
           }
         }}
         onOpenMerchantLogin={() => {
           if (currentUser) {
             navigateTo('store_owner');
           } else {
-            navigateTo('merchant_login');
+            openMerchantAccess();
           }
         }}
         onOpenStorefront={handleOpenStorefront}
@@ -382,7 +404,7 @@ export const App: React.FC = () => {
           } else if (currentUser?.role === 'super_admin') {
             navigateTo('super_admin');
           } else {
-            navigateTo('merchant_login');
+            openMerchantAccess();
           }
         }}
         onLogout={() => handleLogout('merchant_login')}

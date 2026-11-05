@@ -128,7 +128,7 @@ export async function ecosystem(request:Request,e:EcoEnv,adapter:EcoAdapter):Pro
       if(url.origin!==allowed[client])reject('استخدم بوابة الهوية',400);
       const target=url.searchParams.get('client') as 'hub'|'store',state=url.searchParams.get('state')||'',challenge=url.searchParams.get('challenge')||'';
       if(!allowed[target]||!/^[a-f0-9-]{72}$/.test(state)||!/^[-\w]{43}$/.test(challenge))reject('طلب دخول غير صحيح');
-      if(!user)return redirect(allowed[client]+(client==='store'?storeLocation(sameSite,'?view=merchant_login&ecosystem_resume=1'):'/ar/hub?ecosystem_resume=1'),[ecoCookie('__Host-eco_pending',encodeURIComponent(url.search),600)]);
+      if(!user)return redirect(allowed[client]+(client==='store'?storeLocation(sameSite,'?view=merchant_login&ecosystem_resume=1'):'/ar/hub/login?ecosystem_resume=1'),[ecoCookie('__Host-eco_pending',encodeURIComponent(url.search),600)]);
       const code=ecoRandom();await db.prepare('INSERT INTO ec_codes(code,family_id,client,challenge,expires_at) VALUES(?,?,?,?,?)').bind(await ecoHash(code),user.family,target,challenge,Date.now()+60000).run();
       const callback=new URL(clientApiRoot(target,sameSite)+'/callback',allowed[target]);callback.search=new URLSearchParams({code,state}).toString();return redirect(callback.toString(),[ecoCookie('__Host-eco_pending','',0)]);
     }
