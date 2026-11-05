@@ -15,5 +15,6 @@ function run(command, args, env = {}) {
   if (result.status !== 0) process.exit(result.status || 1)
 }
 
+run(npm, ['--prefix', 'matjari', 'ci', '--no-audit', '--no-fund'])
 run(npm, ['--prefix', 'matjari', 'run', 'build'], { MATJARI_MOUNTED_IN_HUB: '1' })
 run(process.execPath, [path.join(root, 'node_modules', 'next', 'dist', 'bin', 'next'), 'build'])
