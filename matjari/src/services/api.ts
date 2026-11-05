@@ -2,7 +2,7 @@ import { Store, Product, TrafficStats, CustomerOrder, User, Subscription, Mercha
 
 
 
-export function createStoreApi(API_BASE='/api') { return {
+export function createStoreApi(API_BASE='/api/store') { return {
   async session(): Promise<{user: User; store: Store | null; subscription: Subscription | null} | null> {
     const res = await fetch(`${API_BASE}/auth/session`, { cache: 'no-store' });
     if (res.status === 401) return null;

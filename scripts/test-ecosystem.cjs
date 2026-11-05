@@ -103,8 +103,16 @@ async function test(){
  assert.equal(center.sqlite.prepare('SELECT COUNT(*) AS n FROM ec_links').get().n,before);
  assert.ok((await data(await ec('hub','session',cookie(conflicting)))).user);
  // Unified customer data, safe destinations and the real administrative bridge.
- const rootRoute=load('functions/api/ecosystem/[[path]].ts'),navigation=load('shared/hub-navigation.ts'),customerModel=load('shared/ecosystem-customer.ts');
+ const rootRoute=load('functions/api/ecosystem/[[path]].ts'),mountedStoreRoute=load('functions/api/store/[[path]].ts'),navigation=load('shared/hub-navigation.ts'),customerModel=load('shared/ecosystem-customer.ts');
  const root=(p,c='',method='GET',body)=>rootRoute.onRequest({request:request('hub','/api/ecosystem/'+p,method,body,c),env:hubEnv});
+ const mountedStoreEnv={...storeEnv,ECOSYSTEM_HUB_ORIGIN:'https://hub.example'};
+ const mountedLogin=await mountedStoreRoute.onRequest({request:request('hub','/api/store/ecosystem/login?via=hub'),env:mountedStoreEnv});
+ assert.equal(mountedLogin.status,303);assert.equal(new URL(mountedLogin.headers.get('location')).pathname,'/api/ecosystem/authorize');
+ const mountedAuthorize=await rootRoute.onRequest({request:request('hub',new URL(mountedLogin.headers.get('location')).pathname+new URL(mountedLogin.headers.get('location')).search,'GET',undefined,hubCookie),env:hubEnv});
+ assert.equal(mountedAuthorize.status,303);assert.equal(new URL(mountedAuthorize.headers.get('location')).pathname,'/api/store/ecosystem/callback');
+ const mountedCallbackUrl=new URL(mountedAuthorize.headers.get('location'));
+ const mountedCallback=await mountedStoreRoute.onRequest({request:request('hub',mountedCallbackUrl.pathname+mountedCallbackUrl.search,'GET',undefined,cookie(mountedLogin)+'; '+hubCookie),env:mountedStoreEnv});
+ assert.equal(mountedCallback.status,303);assert.equal(mountedCallback.headers.get('location'),'https://hub.example/ar/hub/stores/?view=store_owner');
  assert.equal(navigation.safeHubReturn('/ar/hub/subscriptions'),'/ar/hub/subscriptions');
  for(const bad of ['https://evil.example','//evil.example','/ar/hub/%2f%2fevil','/ar/hub/../admin','/ar/hub/dashboard#x'])assert.equal(navigation.safeHubReturn(bad),null);
  assert.equal(customerModel.serviceState('active',Date.now()+100000,Date.now()+200000),'pending');
@@ -142,6 +150,6 @@ async function test(){
  await data(await ec('store','logout',ownerCookie,'POST',{}));
  const revoked=await eco.ecosystem(new Request('https://hub.example/api/ecosystem/device/session',{headers:{Authorization:'Bearer '+grant.access_token}}),hubEnv,hubAdapter);assert.equal(revoked.status,401);
  for(const d of [center,hubDB,storeDB])d.sqlite.close();
- console.log('Ecosystem passed: bidirectional-origin PKCE SSO, single-use codes, independent identity IDs, no email merges, explicit password-proof linking, tenant permissions, shared logout, subscription registry, device approval/replay protection, and signed Google OIDC nonce/replay checks.');
+ console.log('Ecosystem passed: bidirectional-origin and same-site Store SSO callbacks, single-use codes, independent identity IDs, no email merges, explicit password-proof linking, tenant permissions, shared logout, subscription registry, device approval/replay protection, and signed Google OIDC nonce/replay checks.');
 }
 test().catch(e=>{console.error(e);process.exitCode=1});

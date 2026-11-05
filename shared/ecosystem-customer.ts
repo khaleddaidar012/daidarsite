@@ -12,6 +12,7 @@ export async function customerOverview(env:EcoEnv,user:Identity){
   const links=(await env.ECOSYSTEM_DB!.prepare('SELECT system,local_id FROM ec_links WHERE user_id=?').bind(user.id).all()).results;
   const services:any[]=[],orders:any[]=[],unavailable:string[]=[];
   const storeOrigin=new URL(env.ECOSYSTEM_STORE_ORIGIN!).origin;
+  const storePath=storeOrigin===new URL(env.ECOSYSTEM_HUB_ORIGIN!).origin?'/ar/hub/stores/':'/';
   for(const link of links){
     if(link.system==='store'){
       if(!env.ECOSYSTEM_STORE_DB){unavailable.push('store');continue}
@@ -20,7 +21,7 @@ export async function customerOverview(env:EcoEnv,user:Identity){
       const sub=await env.ECOSYSTEM_STORE_DB.prepare('SELECT id,plan_name,status,start_date,end_date FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(row.id).first();
       const start=sub?Date.parse(sub.start_date+'T00:00:00Z'):null,end=sub?Date.parse(sub.end_date+'T23:59:59.999Z'):null;
       const state=serviceState(!row.user_active?'suspended':!row.is_active?'pending':sub?.status||'pending',start,end);
-      const preview=new URL('/',storeOrigin);preview.search=new URLSearchParams({view:'storefront',store_id:row.id}).toString();
+      const preview=new URL(storePath,storeOrigin);preview.search=new URLSearchParams({view:'storefront',store_id:row.id}).toString();
       services.push({id:row.id,system:'store',title:row.name,plan:sub?.plan_name||'',status:state,start,end,can_access:['active','trial'].includes(state),preview_url:row.is_active?preview.toString():null});
     }
     if(link.system==='hub'){

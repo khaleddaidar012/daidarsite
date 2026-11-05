@@ -30,7 +30,9 @@ function reject(message:string,status=400):never{throw Object.assign(new Error(m
 const origin=(value:string|undefined)=>{const u=new URL(value||'https://invalid.invalid');if(u.protocol!=='https:'||u.pathname!=='/'||u.search||u.hash)reject('إعداد نطاق المنظومة غير صحيح',503);return u.origin};
 const clients=(e:EcoEnv)=>({hub:origin(e.ECOSYSTEM_HUB_ORIGIN),store:origin(e.ECOSYSTEM_STORE_ORIGIN)});
 const googleCallback=(e:EcoEnv)=>clients(e).hub+(e.ECOSYSTEM_GOOGLE_CALLBACK_PATH==='/api/hub/google/callback'?'/api/hub/google/callback':'/api/ecosystem/google/callback');
-const homepage=(client:string)=>client==='store'?'/?view=store_owner':'/ar/hub';
+const storeLocation=(sameSite:boolean,query:string)=>`${sameSite?'/ar/hub/stores/':'/'}${query}`;
+const clientApiRoot=(client:string,sameSite:boolean)=>client==='store'&&sameSite?'/api/store/ecosystem':'/api/ecosystem';
+const homepage=(client:string,sameSite:boolean)=>client==='store'?storeLocation(sameSite,'?view=store_owner'):'/ar/hub';
 const redirect=(location:string,cookies:string[]=[])=>{const h=new Headers({'Location':location,'Cache-Control':'no-store','Referrer-Policy':'no-referrer'});cookies.forEach(c=>h.append('Set-Cookie',c));return new Response(null,{status:303,headers:h})};
 export async function ecoAudit(e:EcoEnv,actor:string,action:string,entity:string){await e.ECOSYSTEM_DB!.prepare('INSERT INTO ec_audit(id,actor,action,entity,created_at) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),actor,action,entity,Date.now()).run()}
 export async function ecoUser(request:Request,e:EcoEnv):Promise<Identity|null>{
@@ -89,7 +91,7 @@ async function identityByFamily(e:EcoEnv,family:string):Promise<Identity|null>{r
 export async function ecosystem(request:Request,e:EcoEnv,adapter:EcoAdapter):Promise<Response>{
   if(!e.ECOSYSTEM_DB)return response({error:'الدخول الموحد غير مهيأ في هذه البيئة'},503);
   const url=new URL(request.url),path=url.pathname.replace(/^\/api\/ecosystem\/?/,'');
-  const db=e.ECOSYSTEM_DB,client=adapter.system,allowed=clients(e);
+  const db=e.ECOSYSTEM_DB,client=adapter.system,allowed=clients(e),sameSite=allowed.hub===allowed.store;
   try{
     if(!['GET','HEAD','OPTIONS'].includes(request.method)){
       if(request.headers.get('Origin')&&request.headers.get('Origin')!==url.origin)reject('طلب غير مسموح',403);
@@ -117,7 +119,7 @@ export async function ecosystem(request:Request,e:EcoEnv,adapter:EcoAdapter):Pro
     }
     if(path==='login'&&request.method==='GET'){
       const via=url.searchParams.get('via')==='store'?'store':'hub';
-      const state=ecoRandom(),verifier=ecoRandom();const to=new URL('/api/ecosystem/authorize',allowed[via]);
+      const state=ecoRandom(),verifier=ecoRandom();const to=new URL(clientApiRoot(via,sameSite)+'/authorize',allowed[via]);
       to.search=new URLSearchParams({client,state,challenge:await ecoChallenge(verifier)}).toString();
       const destination=safeHubReturn(url.searchParams.get('return_to'));
       return redirect(to.toString(),[ecoCookie('__Host-eco_state',state,600),ecoCookie('__Host-eco_pkce',verifier,600),ecoCookie('__Host-eco_return',destination||'',destination?600:0)]);
@@ -126,13 +128,13 @@ export async function ecosystem(request:Request,e:EcoEnv,adapter:EcoAdapter):Pro
       if(url.origin!==allowed[client])reject('استخدم بوابة الهوية',400);
       const target=url.searchParams.get('client') as 'hub'|'store',state=url.searchParams.get('state')||'',challenge=url.searchParams.get('challenge')||'';
       if(!allowed[target]||!/^[a-f0-9-]{72}$/.test(state)||!/^[-\w]{43}$/.test(challenge))reject('طلب دخول غير صحيح');
-      if(!user)return redirect(allowed[client]+(client==='store'?'/?view=merchant_login&ecosystem_resume=1':'/ar/hub?ecosystem_resume=1'),[ecoCookie('__Host-eco_pending',encodeURIComponent(url.search),600)]);
+      if(!user)return redirect(allowed[client]+(client==='store'?storeLocation(sameSite,'?view=merchant_login&ecosystem_resume=1'):'/ar/hub?ecosystem_resume=1'),[ecoCookie('__Host-eco_pending',encodeURIComponent(url.search),600)]);
       const code=ecoRandom();await db.prepare('INSERT INTO ec_codes(code,family_id,client,challenge,expires_at) VALUES(?,?,?,?,?)').bind(await ecoHash(code),user.family,target,challenge,Date.now()+60000).run();
-      const callback=new URL('/api/ecosystem/callback',allowed[target]);callback.search=new URLSearchParams({code,state}).toString();return redirect(callback.toString(),[ecoCookie('__Host-eco_pending','',0)]);
+      const callback=new URL(clientApiRoot(target,sameSite)+'/callback',allowed[target]);callback.search=new URLSearchParams({code,state}).toString();return redirect(callback.toString(),[ecoCookie('__Host-eco_pending','',0)]);
     }
     if(path==='continue'&&request.method==='GET'){
-      const pending=ecoRead(request,'__Host-eco_pending');if(!user||!pending){const destination=user&&client==='hub'?safeHubReturn(ecoRead(request,'__Host-eco_return')):null;return redirect(allowed[client]+(destination||homepage(client)),[ecoCookie('__Host-eco_return','',0)])}
-      const q=new URLSearchParams(decodeURIComponent(pending));return redirect(allowed[client]+'/api/ecosystem/authorize?'+q);
+      const pending=ecoRead(request,'__Host-eco_pending');if(!user||!pending){const destination=user&&client==='hub'?safeHubReturn(ecoRead(request,'__Host-eco_return')):null;return redirect(allowed[client]+(destination||homepage(client,sameSite)),[ecoCookie('__Host-eco_return','',0)])}
+      const q=new URLSearchParams(decodeURIComponent(pending));return redirect(allowed[client]+clientApiRoot(client,sameSite)+'/authorize?'+q);
     }
     if(path==='callback'&&request.method==='GET'){
       const state=url.searchParams.get('state'),code=url.searchParams.get('code')||'',verifier=ecoRead(request,'__Host-eco_pkce');
@@ -141,10 +143,10 @@ export async function ecosystem(request:Request,e:EcoEnv,adapter:EcoAdapter):Pro
       if(!row)reject('كود الدخول منتهي أو مستخدم',401);
       const identity=await identityByFamily(e,row.family_id);if(!identity)reject('الجلسة غير صالحة',401);
       let id:string;
-      try{id=await adapter.ensureLocal(identity)}catch(error:any){if(error.status!==409)throw error;return redirect(allowed[client]+(client==='store'?'/?view=merchant_login&ecosystem_link=1':'/ar/hub?ecosystem_link=1'),[await familyCookie(e,identity.id,identity.family),ecoCookie('__Host-eco_state','',0),ecoCookie('__Host-eco_pkce','',0)])}
+      try{id=await adapter.ensureLocal(identity)}catch(error:any){if(error.status!==409)throw error;return redirect(allowed[client]+(client==='store'?storeLocation(sameSite,'?view=merchant_login&ecosystem_link=1'):'/ar/hub?ecosystem_link=1'),[await familyCookie(e,identity.id,identity.family),ecoCookie('__Host-eco_state','',0),ecoCookie('__Host-eco_pkce','',0)])}
       await adapter.sync(identity,id);
       const destination=client==='hub'?safeHubReturn(ecoRead(request,'__Host-eco_return')):null;
-      return redirect(allowed[client]+(destination||homepage(client)),[await familyCookie(e,identity.id,identity.family),ecoCookie('__Host-eco_state','',0),ecoCookie('__Host-eco_pkce','',0),ecoCookie('__Host-eco_return','',0)]);
+      return redirect(allowed[client]+(destination||homepage(client,sameSite)),[await familyCookie(e,identity.id,identity.family),ecoCookie('__Host-eco_state','',0),ecoCookie('__Host-eco_pkce','',0),ecoCookie('__Host-eco_return','',0)]);
     }
     if(path==='google'&&request.method==='GET'){
       if(url.origin!==allowed.hub)return redirect(allowed.hub+'/api/ecosystem/google');

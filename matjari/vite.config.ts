@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const SUBPATH = '/daidarsoluations/ar/new_test_store/';
+const mountedInHub = process.env.MATJARI_MOUNTED_IN_HUB === '1';
 
 // Vite Plugin for Cloudflare D1 Multi-Tenant Emulation using native node:sqlite
 function cloudflareD1Plugin(): Plugin {
@@ -43,7 +44,9 @@ function cloudflareD1Plugin(): Plugin {
 
         const url = new URL(req.url!, `http://${req.headers.host}`);
         let pathPart = url.pathname;
-        if (pathPart.includes('/api/')) {
+        if (pathPart.includes('/api/store/')) {
+          pathPart = pathPart.substring(pathPart.indexOf('/api/store/') + 11);
+        } else if (pathPart.includes('/api/')) {
           pathPart = pathPart.substring(pathPart.indexOf('/api/') + 5);
         }
         const method = req.method;
@@ -728,8 +731,19 @@ function cloudflareD1Plugin(): Plugin {
 
 export default defineConfig(({ command }) => ({
   resolve: { dedupe: ['react', 'react-dom'] },
-  base: command === 'serve' ? SUBPATH : '/',
+  base: command === 'serve' ? SUBPATH : mountedInHub ? '/matjari/' : '/',
   plugins: [react(), cloudflareD1Plugin()],
+  build: mountedInHub ? {
+    outDir: '../public/matjari',
+    emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        entryFileNames: 'assets/matjari.js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: (assetInfo) => assetInfo.name?.endsWith('.css') ? 'assets/matjari.css' : 'assets/[name]-[hash][extname]',
+      },
+    },
+  } : undefined,
   server: {
     port: 5173,
     host: true,

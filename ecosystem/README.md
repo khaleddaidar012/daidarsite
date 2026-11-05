@@ -44,3 +44,7 @@ Google runs through Hub Preview with `HUB_GOOGLE_CLIENT_ID` and encrypted `HUB_G
 - Source subscription renewal does not mint a Flow desktop license. Existing offline Ed25519 trust and license checks remain authoritative. Automated signed license delivery needs a compatible issuance policy and a separate key handling decision.
 - No production customer accounts or subscriptions have been migrated by this pilot. Production rollout requires a reviewed mapping, backups, verification and rollback window.
 - The Flow bundle was compiled and unit tested without downloading or running Electron. An installed desktop end-to-end check remains necessary before distributing it to users.
+
+## Same-site Matjari entry
+
+The main site build compiles the existing `matjari/` application into `/matjari/` assets and serves its Hub entry pages at `/ar/hub/stores/` and `/en/hub/stores/`. Its API is available under `/api/store/*`; the Pages Function adapter uses the existing `ECOSYSTEM_STORE_DB` binding and keeps the original Store data. Same-site SSO sends its callback through `/api/store/ecosystem/callback` on the main site. The separate Store Pages project remains available as a rollback/preview deployment; production Hub links no longer need its `pages.dev` URL.

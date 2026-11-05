@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/build-site.cjs",
     "start": "next start",
     "lint": "next lint",
     "push": "git push -u origin main"
