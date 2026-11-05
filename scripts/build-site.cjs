@@ -1,4 +1,6 @@
 const path = require('node:path')
+const fs = require('node:fs')
+const crypto = require('node:crypto')
 const { spawnSync } = require('node:child_process')
 
 const root = path.resolve(__dirname, '..')
@@ -20,4 +22,11 @@ run(npm, ['--prefix', 'matjari', 'run', 'build'], {
   MATJARI_MOUNTED_IN_HUB: '1',
   VITE_MATJARI_HUB_INTEGRATED: '1',
 })
-run(process.execPath, [path.join(root, 'node_modules', 'next', 'dist', 'bin', 'next'), 'build'])
+const assetHash = crypto.createHash('sha256')
+  .update(fs.readFileSync(path.join(root, 'public', 'matjari', 'assets', 'matjari.js')))
+  .update(fs.readFileSync(path.join(root, 'public', 'matjari', 'assets', 'matjari.css')))
+  .digest('hex')
+  .slice(0, 16)
+run(process.execPath, [path.join(root, 'node_modules', 'next', 'dist', 'bin', 'next'), 'build'], {
+  MATJARI_ASSET_VERSION: assetHash,
+})
