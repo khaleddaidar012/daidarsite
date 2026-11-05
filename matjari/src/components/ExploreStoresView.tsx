@@ -232,7 +232,7 @@ export const ExploreStoresView: React.FC<ExploreStoresViewProps> = ({
       </main>
 
       {/* Footer */}
-      <Footer facebookUrl="https://www.facebook.com/daidarsoluations/" storeName="دعيدر للحلول البرمجية — منصة متجري" />
+      <Footer />
     </div>
   );
 };

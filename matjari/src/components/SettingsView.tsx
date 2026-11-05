@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Save, Check, ShieldCheck, Database, MessageCircle, ExternalLink, RefreshCw, AlertCircle, Sparkles } from 'lucide-react';
+import { Save, Check, ShieldCheck, Database, MessageCircle, RefreshCw, AlertCircle, Sparkles } from 'lucide-react';
 import { Store } from '../types';
 import { api } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
@@ -16,7 +16,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ store, onRefresh }) 
   const [whatsapp, setWhatsapp] = useState(store?.whatsapp_number || '');
   const [currency, setCurrency] = useState(store?.currency || (isArabic ? 'ج.م' : '$'));
   const [bio, setBio] = useState(store?.bio || '');
-  const [facebookUrl, setFacebookUrl] = useState(store?.facebook_url || 'https://www.facebook.com/daidarsoluations/');
   
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -46,7 +45,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ store, onRefresh }) 
         whatsapp_number: whatsapp.trim(),
         currency,
         bio: bio.trim(),
-        facebook_url: facebookUrl.trim(),
       });
 
       await onRefresh();
@@ -193,30 +191,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ store, onRefresh }) 
                 <option value="$">US Dollar ($)</option>
               </select>
             </div>
-          </div>
-        </div>
-
-        {/* Footer & Facebook Profile Integration */}
-        <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-          <h3 className="text-sm font-bold text-slate-800 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center gap-2">
-            <ExternalLink className="w-4 h-4 text-[#0084d6] dark:text-sky-400" />
-            <span>{isArabic ? 'تذييل الصفحة ورابط فيسبوك الرسمي (Develop by)' : 'Footer & Facebook Profile (Develop by)'}</span>
-          </h3>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-2">
-              {isArabic ? 'رابط الحساب / الصفحة على فيسبوك' : 'Facebook Page URL'}
-            </label>
-            <input
-              type="url"
-              value={facebookUrl}
-              onChange={(e) => setFacebookUrl(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:border-[#0084d6] focus:ring-2 focus:ring-sky-100 text-sm font-medium dir-ltr"
-              placeholder="https://www.facebook.com/daidarsoluations/"
-            />
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 block">
-              {isArabic ? 'يظهر هذا الرابط في قسم تذييل الصفحة بجوار شعار العلامة التجارية وعبارة "Develop by".' : 'Linked in the footer next to the brand logo and "Develop by".'}
-            </span>
           </div>
         </div>
 

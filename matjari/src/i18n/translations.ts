@@ -45,7 +45,6 @@ export const translations: Record<string, Record<string, string>> = {
     'visit_store': 'زيارة وتصفح المتجر',
     'control_panel': 'لوحة التحكم',
     'currency_label': 'العملة:',
-    'verified': 'موثوق',
     'active_badge': 'نشط',
     'back_home': 'العودة للصفحة الرئيسية',
 
@@ -162,7 +161,7 @@ export const translations: Record<string, Record<string, string>> = {
     'add_to_cart': 'أضف للسلة',
     'added': 'تمت الإضافة ✓',
     'welcome_to': 'أهلاً بكم في',
-    'shop_safe': 'تسوق آمن وتوصيل مباشر مع دعيدر',
+    'shop_safe': 'تجربة تسوق سهلة وممتعة',
 
     // Super Admin & Store Owner Dashboards
     'admin_dashboard_title': 'لوحة تحكم الأدمن الرئيسي (Cloudflare D1)',
@@ -343,7 +342,6 @@ export const translations: Record<string, Record<string, string>> = {
     'visit_store': 'Visit & Browse Store',
     'control_panel': 'Dashboard',
     'currency_label': 'Currency:',
-    'verified': 'Verified',
     'active_badge': 'Active',
     'back_home': 'Back to Home',
 
@@ -460,7 +458,7 @@ export const translations: Record<string, Record<string, string>> = {
     'add_to_cart': 'Add to Cart',
     'added': 'Added ✓',
     'welcome_to': 'Welcome to',
-    'shop_safe': 'Safe shopping with direct delivery',
+    'shop_safe': 'A simple and enjoyable shopping experience',
 
     // Super Admin & Store Owner Dashboards
     'admin_dashboard_title': 'Super Admin Dashboard (Cloudflare D1)',

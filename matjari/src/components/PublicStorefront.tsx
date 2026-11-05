@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Search, ShieldCheck, Phone, ArrowRight, Heart, Share2, Sparkles, Plus, Check, Moon, Sun, Globe } from 'lucide-react';
+import { ShoppingBag, Search, Phone, ArrowRight, Heart, Share2, Sparkles, Plus, Check, Moon, Sun, Globe } from 'lucide-react';
 import { Store, Product, CartItem } from '../types';
 import { Footer } from './Footer';
 import { api } from '../services/api';
@@ -98,10 +98,6 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                 <h1 className="text-sm sm:text-lg font-black text-[#0e1f38] dark:text-white leading-tight truncate max-w-[150px] xs:max-w-[200px] sm:max-w-xs md:max-w-md">
                   {store?.name || t('daidar_solutions')}
                 </h1>
-                <span className="inline-flex items-center gap-1 text-[10px] font-black bg-[#e6f4fe] dark:bg-sky-950/70 text-[#0084d6] dark:text-sky-400 px-2.5 py-0.5 rounded-full border border-sky-200 dark:border-sky-800 shrink-0">
-                  <ShieldCheck className="w-3 h-3 text-[#0084d6] dark:text-sky-400" />
-                  <span>{t('verified')}</span>
-                </span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate hidden sm:block font-medium">
                 {store?.activity_type || t('cloud_store_mgmt')}
@@ -355,7 +351,7 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
       )}
 
       {/* Bottom Footer */}
-      <Footer facebookUrl={store?.facebook_url} storeName={store?.name} logoData={logoSrc} />
+      <Footer />
     </div>
   );
 };
