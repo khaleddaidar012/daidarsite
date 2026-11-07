@@ -96,6 +96,20 @@ export interface CartItem {
   quantity: number;
 }
 
+export type OrderStatus = 'new' | 'contacted' | 'preparing' | 'shipped' | 'delivered' | 'cancelled';
+
+export interface StoreOrder {
+  id: string;
+  store_id: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_address?: string;
+  items_json: string;
+  total_price: number;
+  status: OrderStatus | 'completed_via_whatsapp';
+  created_at: string;
+}
+
 export interface CustomerOrder {
   store_id?: string;
   customer_name: string;

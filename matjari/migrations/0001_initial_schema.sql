@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS orders (
     customer_address TEXT DEFAULT '',
     items_json TEXT NOT NULL,
     total_price REAL NOT NULL,
-    status TEXT NOT NULL DEFAULT 'completed_via_whatsapp',
+    status TEXT NOT NULL DEFAULT 'new',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY(store_id) REFERENCES stores(id) ON DELETE CASCADE
 );

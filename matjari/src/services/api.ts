@@ -1,4 +1,4 @@
-import { Store, Product, TrafficStats, CustomerOrder, User, Subscription, MerchantDetail } from '../types';
+import { Store, Product, TrafficStats, CustomerOrder, OrderStatus, StoreOrder, User, Subscription, MerchantDetail } from '../types';
 
 
 
@@ -223,7 +223,7 @@ export function createStoreApi(API_BASE='/api/store') { return {
   },
 
   // 5. Orders
-  async getOrders(storeId?: string): Promise<any[]> {
+  async getOrders(storeId?: string): Promise<StoreOrder[]> {
     const query = storeId ? `?store_id=${encodeURIComponent(storeId)}` : '';
     const res = await fetch(`${API_BASE}/orders${query}`);
     if (!res.ok) throw new Error(res.status===401?'انتهت الجلسة. سجل دخولك مرة أخرى.':'تعذر تحميل الطلبات. حاول مرة أخرى.');
@@ -240,6 +240,17 @@ export function createStoreApi(API_BASE='/api/store') { return {
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.success || typeof data.orderId !== 'string') throw new Error(data.error || 'تعذر تسجيل الطلب. حاول مرة أخرى.');
     return data.orderId;
+  },
+
+  async updateOrderStatus(orderId: string, storeId: string, status: OrderStatus): Promise<void> {
+    const query = new URLSearchParams({ id: orderId, store_id: storeId });
+    const res = await fetch(`${API_BASE}/orders?${query}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) throw new Error(data.error || 'تعذر تحديث حالة الطلب. حاول مرة أخرى.');
   },
 
   // 6. Diagnostic & Traffic

@@ -32,6 +32,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [isOrderConfirmed, setIsOrderConfirmed] = useState(false);
+  const [whatsappUrl, setWhatsappUrl] = useState('');
 
   if (!isOpen) return null;
 
@@ -68,7 +69,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         total_price: totalPrice,
       });
 
-      // 2. Format the message for WhatsApp - Clean, ultra-simple, and direct
+      // 2. Prepare a WhatsApp message for the customer to send manually
       const storeName = store?.name || (isArabic ? 'متجري' : 'My Store');
       const itemsList = cart
         .map((item) => `• ${item.product.name} (عدد ${item.quantity})`)
@@ -103,12 +104,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
       setIsOrderConfirmed(true);
 
-      // 4. Direct Redirect to WhatsApp URL
+      // 4. Keep the WhatsApp link for the customer's optional manual confirmation
       const whatsappUrl = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(whatsappMessage)}`;
-      
-      setTimeout(() => {
-        window.open(whatsappUrl, '_blank');
-      }, 500);
+      setWhatsappUrl(whatsappUrl);
 
     } catch (err: any) {
       setError(err.message || (isArabic ? 'حدث خطأ أثناء حفظ الطلب في D1' : 'Error saving order to D1'));
@@ -119,6 +117,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
   const handleFinish = () => {
     setIsOrderConfirmed(false);
+    setWhatsappUrl('');
     onClearCart();
     onClose();
   };
@@ -161,7 +160,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           {/* Body Content */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-6">
             {isOrderConfirmed ? (
-              /* Success / WhatsApp Redirect Screen */
+              /* Success screen with optional, manual WhatsApp confirmation */
               <div className="py-8 sm:py-10 text-center space-y-4">
                 <div className="w-16 h-16 bg-[#e6f4fe] dark:bg-sky-950/70 text-[#0084d6] rounded-full flex items-center justify-center mx-auto shadow-md">
                   <CheckCircle className="w-8 h-8" />
@@ -180,10 +179,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
                 <div className="pt-4 flex flex-col gap-2.5">
                   <button
-                    onClick={() => {
-                      let phone = (store?.whatsapp_number || '201061532875').replace(/[^0-9]/g, '');
-                      window.open(`https://api.whatsapp.com/send?phone=${phone}`, '_blank');
-                    }}
+                    onClick={() => { if (whatsappUrl) window.open(whatsappUrl, '_blank', 'noopener,noreferrer'); }}
                     className="w-full py-3.5 rounded-2xl bg-[#0084d6] hover:bg-[#0074bd] text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-sky-600/25 transition-all"
                   >
                     <MessageSquare className="w-4 h-4" />
@@ -356,7 +352,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 </span>
               </div>
 
-              {/* Order Placement Trigger to WhatsApp in Brand Blue */}
+              {/* Record the order before offering optional WhatsApp confirmation */}
               <button
                 type="submit"
                 form="checkout-form"

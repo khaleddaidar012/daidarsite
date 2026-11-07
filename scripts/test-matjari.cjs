@@ -24,6 +24,9 @@ async function test(){
  let hubLogoutRequest;global.fetch=async(url,options)=>{hubLogoutRequest={url:String(url),...options};return new Response('{}',{status:200})};
  try{await storeAdminApi.logoutHubSession()}finally{global.fetch=originalFetch}
  assert.equal(hubLogoutRequest.url,'/api/ecosystem/logout');assert.equal(hubLogoutRequest.method,'POST');assert.equal(hubLogoutRequest.headers['Content-Type'],'application/json');
+ let orderStatusRequest;global.fetch=async(url,options)=>{orderStatusRequest={url:String(url),...options};return new Response('{"success":true}',{status:200})};
+ try{await storeAdminApi.updateOrderStatus('ord-test','store-test','shipped')}finally{global.fetch=originalFetch}
+ assert.equal(orderStatusRequest.url,'/api/ecosystem/admin/store/orders?id=ord-test&store_id=store-test');assert.equal(orderStatusRequest.method,'PUT');assert.equal(JSON.parse(orderStatusRequest.body).status,'shipped');
  assert.equal((await call('admin/merchants')).status,401);
  assert.equal((await call('auth/session')).status,401);
  assert.equal((await call('auth/register','POST',{},'','https://evil.example')).status,403);
@@ -54,8 +57,13 @@ async function test(){
  assert.equal((await call('stats?store_id='+a.store.id,'GET',undefined,c2)).status,403);
  assert.equal((await call('store','POST',{id:a.store.id,name:'اختراق'},c2)).status,403);
  const order={store_id:a.store.id,customer_name:'عميل تجريبي',customer_phone:'01000000000',items:[{product:{id:p.product.id,price:0},quantity:2}],total_price:0};
- await data(await call('orders','POST',order));
+ const placedOrder=await data(await call('orders','POST',order));
  const orders=await data(await call('orders','GET',undefined,c1));assert.equal(orders.orders[0].total_price,100);
+ assert.equal(orders.orders[0].id,placedOrder.orderId);assert.equal(orders.orders[0].status,'new');
+ assert.equal((await call(`orders?id=${placedOrder.orderId}&store_id=${a.store.id}`,'PUT',{status:'contacted'},c2)).status,403);
+ assert.equal((await call(`orders?id=${placedOrder.orderId}&store_id=${a.store.id}`,'PUT',{status:'unknown'},c1)).status,400);
+ assert.equal((await call(`orders?id=${placedOrder.orderId}&store_id=${a.store.id}`,'PUT',{status:'shipped'},c1)).status,200);
+ const updatedOrders=await data(await call('orders','GET',undefined,c1));assert.equal(updatedOrders.orders[0].status,'shipped');
  const analytics=await data(await call('admin/analytics','GET',undefined,ac));assert.equal(analytics.analytics.totalOrders,1);assert.equal(Object.values(analytics.analytics.monthMap)[0],1);
  assert.equal((await call('orders')).status,401);
  assert.equal((await data(await call('orders','GET',undefined,c2))).orders.length,0);

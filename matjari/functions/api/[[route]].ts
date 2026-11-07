@@ -81,7 +81,7 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
     }
     const adminPath = path.startsWith('admin/') || path === 'd1-status';
     const privatePath = adminPath || ['stats','reset-stats','simulate-visit','simulate-order'].includes(path) ||
-      (path === 'orders' && method === 'GET') || (path === 'store' && method !== 'GET') ||
+      (path === 'orders' && (method === 'GET' || method === 'PUT')) || (path === 'store' && method !== 'GET') ||
       (path.startsWith('products') && method !== 'GET');
     if (privatePath && !actor) return fail('يرجى تسجيل الدخول', 401);
     if (adminPath && actor?.role !== 'super_admin') return fail('هذه الصلاحية للإدارة فقط');
@@ -514,6 +514,18 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
         return new Response(JSON.stringify({ success: true, orders: orders.results || [] }), { headers });
       }
 
+      if (method === 'PUT') {
+        const body = await request.json() as any;
+        const id = url.searchParams.get('id');
+        const storeId = url.searchParams.get('store_id') || actor?.store_id;
+        const allowedStatuses = ['new','contacted','preparing','shipped','delivered','cancelled'];
+        if (!id || !storeId || !allowedStatuses.includes(body.status)) return fail('حالة الطلب غير صحيحة',400);
+        const order = await db.prepare('SELECT id FROM orders WHERE id=? AND store_id=?').bind(id,storeId).first();
+        if (!order) return fail('الطلب غير موجود',404);
+        await db.prepare('UPDATE orders SET status=? WHERE id=? AND store_id=?').bind(body.status,id,storeId).run();
+        return new Response(JSON.stringify({success:true,orderId:id,status:body.status}),{headers});
+      }
+
       if (method === 'POST') {
         await rateLimit(db,request,'orders',30,60000);
         const body = await request.json() as any;
@@ -536,7 +548,7 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
 
         await db.prepare(`
           INSERT INTO orders (id, store_id, customer_name, customer_phone, customer_address, items_json, total_price, status)
-          VALUES (?, ?, ?, ?, ?, ?, ?, 'completed_via_whatsapp')
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'new')
         `).bind(id, store_id, customer_name, customer_phone, customer_address, JSON.stringify(verifiedItems), calculatedTotal/100).run();
 
         return new Response(JSON.stringify({ success: true, orderId: id }), { headers });

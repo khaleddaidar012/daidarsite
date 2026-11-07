@@ -477,12 +477,29 @@ function cloudflareD1Plugin(): Plugin {
                 : db.prepare('SELECT * FROM orders ORDER BY created_at DESC').all();
               return res.end(JSON.stringify({ success: true, orders }));
             }
+            if (method === 'PUT') {
+              const body = await readBody();
+              const id = url.searchParams.get('id');
+              const storeId = url.searchParams.get('store_id');
+              const allowedStatuses = ['new', 'contacted', 'preparing', 'shipped', 'delivered', 'cancelled'];
+              if (!id || !storeId || !allowedStatuses.includes(body.status)) {
+                res.statusCode = 400;
+                return res.end(JSON.stringify({ success: false, error: 'حالة الطلب غير صحيحة' }));
+              }
+              const order = db.prepare('SELECT id FROM orders WHERE id = ? AND store_id = ?').get(id, storeId);
+              if (!order) {
+                res.statusCode = 404;
+                return res.end(JSON.stringify({ success: false, error: 'الطلب غير موجود' }));
+              }
+              db.prepare('UPDATE orders SET status = ? WHERE id = ? AND store_id = ?').run(body.status, id, storeId);
+              return res.end(JSON.stringify({ success: true, orderId: id, status: body.status }));
+            }
             if (method === 'POST') {
               const body = await readBody();
               const id = 'ord-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
               db.prepare(`
                 INSERT INTO orders (id, store_id, customer_name, customer_phone, customer_address, items_json, total_price, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'completed_via_whatsapp')
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'new')
               `).run(id, body.store_id || 'store-elegance', body.customer_name, body.customer_phone, body.customer_address || '', JSON.stringify(body.items), Number(body.total_price));
 
               return res.end(JSON.stringify({ success: true, orderId: id }));
