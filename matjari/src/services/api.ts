@@ -172,6 +172,16 @@ export function createStoreApi(API_BASE='/api/store') { return {
     }
   },
 
+  async activateFreeStore(): Promise<void> {
+    const res = await fetch(`${API_BASE}/auth/activate-free`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) throw new Error(data.error || 'تعذر تفعيل الاشتراك المجاني. حاول مرة أخرى.');
+  },
+
   async saveStore(storeData: Partial<Store>): Promise<Store> {
     const res = await fetch(`${API_BASE}/store`, {
       method: 'POST',

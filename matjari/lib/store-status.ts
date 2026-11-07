@@ -27,7 +27,7 @@ export function storeIsAvailable(status: string) {
 
 export function displayStorePlan(subscription: StoreSubscription) {
   if (!subscription) return 'غير محدد'
-  if (subscription.plan_name && subscription.plan_name !== 'بانتظار التفعيل') return subscription.plan_name
   if (Number(subscription.price || 0) === 0) return 'اشتراك مجاني'
+  if (subscription.plan_name && subscription.plan_name !== 'بانتظار التفعيل') return subscription.plan_name
   return 'اشتراك المتجر'
 }

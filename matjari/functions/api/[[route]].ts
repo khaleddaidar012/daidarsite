@@ -66,6 +66,24 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       ]);
       return new Response(JSON.stringify({success:true}),{headers});
     }
+    if(path==='auth/activate-free'&&method==='POST'){
+      if(!actor)return fail('سجل الدخول أولاً',401);
+      if(actor.role!=='merchant'||!actor.store_id)return fail('هذا الإجراء متاح لصاحب المتجر فقط',403);
+      const store=await db.prepare('SELECT * FROM stores WHERE id=?').bind(actor.store_id).first() as any;
+      const subscription=await db.prepare('SELECT * FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(actor.store_id).first() as any;
+      if(!store||!subscription)return fail('بيانات المتجر أو الاشتراك غير موجودة',404);
+      const isFree=Number(subscription.price)===0&&['active','awaiting_activation'].includes(subscription.status);
+      if(!isFree)return fail('التفعيل الذاتي متاح للاشتراك المجاني فقط',403);
+      if(store.is_active===1&&subscription.status==='active')return new Response(JSON.stringify({success:true,alreadyActive:true}),{headers});
+      if(store.is_active===1)return fail('حالة المتجر لا تسمح بالتفعيل الآن',409);
+      await db.batch([
+        db.prepare("UPDATE subscriptions SET status='active',plan_name='اشتراك مجاني',start_date=date('now'),end_date=date('now','+1 year'),updated_at=datetime('now') WHERE id=? AND status IN ('active','awaiting_activation') AND price=0").bind(subscription.id),
+        db.prepare("UPDATE stores SET is_active=1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND is_active=0").bind(actor.store_id),
+        db.prepare("UPDATE users SET is_active=1,updated_at=CURRENT_TIMESTAMP WHERE store_id=?").bind(actor.store_id)
+      ]);
+      await syncStoreResource(env,actor.store_id);
+      return new Response(JSON.stringify({success:true}),{headers});
+    }
     if (path === 'auth/session' && method === 'GET') {
       if (!actor) return fail('يرجى تسجيل الدخول', 401);
       const store = actor.store_id ? await db.prepare('SELECT * FROM stores WHERE id=?').bind(actor.store_id).first() : null;
@@ -217,7 +235,7 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
 
         db.prepare(`
           INSERT INTO subscriptions (id, store_id, plan_name, status, start_date, end_date, price)
-          VALUES (?, ?, 'الباقة الترحيبية', 'active', date('now'), date('now', '+12 month'), 0)
+          VALUES (?, ?, 'اشتراك مجاني', 'active', date('now'), date('now', '+12 month'), 0)
         `).bind(subId, storeId)]);
 
         const createdStore = await db.prepare('SELECT * FROM stores WHERE id = ?').bind(storeId).first();

@@ -17,6 +17,7 @@ async function test(){
  assert.equal(effectiveStoreStatus(1,1,{status:'active',start_date:'2026-10-01',end_date:'2026-10-31'},now),'expired');
  assert.equal(effectiveStoreStatus(0,1,{status:'active',start_date:'2026-11-01',end_date:'2026-11-30'},now),'suspended');
  assert.equal(displayStorePlan({plan_name:'بانتظار التفعيل',price:0}),'اشتراك مجاني');
+ assert.equal(displayStorePlan({plan_name:'الباقة الترحيبية',price:0}),'اشتراك مجاني');
  const storeAdminApi=createStoreApi('/api/ecosystem/admin/store'),originalFetch=global.fetch;let activationRequest;
  global.fetch=async(url,options)=>{activationRequest={url:String(url),...options};return new Response(JSON.stringify({success:true,is_active:1}),{status:200,headers:{'Content-Type':'application/json'}})};
  try{assert.equal(await storeAdminApi.toggleMerchantStatus('store-test'),1)}finally{global.fetch=originalFetch}
@@ -27,6 +28,9 @@ async function test(){
  let orderStatusRequest;global.fetch=async(url,options)=>{orderStatusRequest={url:String(url),...options};return new Response('{"success":true}',{status:200})};
  try{await storeAdminApi.updateOrderStatus('ord-test','store-test','shipped')}finally{global.fetch=originalFetch}
  assert.equal(orderStatusRequest.url,'/api/ecosystem/admin/store/orders?id=ord-test&store_id=store-test');assert.equal(orderStatusRequest.method,'PUT');assert.equal(JSON.parse(orderStatusRequest.body).status,'shipped');
+ const ownerApi=createStoreApi();let freeActivationRequest;global.fetch=async(url,options)=>{freeActivationRequest={url:String(url),...options};return new Response('{"success":true}',{status:200})};
+ try{await ownerApi.activateFreeStore()}finally{global.fetch=originalFetch}
+ assert.equal(freeActivationRequest.url,'/api/store/auth/activate-free');assert.equal(freeActivationRequest.method,'POST');
  assert.equal((await call('admin/merchants')).status,401);
  assert.equal((await call('auth/session')).status,401);
  assert.equal((await call('auth/register','POST',{},'','https://evil.example')).status,403);
@@ -40,6 +44,7 @@ async function test(){
  assert.equal((await call('admin/merchants','GET',undefined,c1)).status,403);
  assert.equal((await call('store?id='+a.store.id)).status,404);
  assert.equal((await call('products','POST',{store_id:a.store.id,name:'منتج',price:50,image_data:'https://example.com/p.png'},c1)).status,403);
+ sqlite.prepare('UPDATE subscriptions SET price=1200 WHERE store_id=?').run(a.store.id);assert.equal((await call('auth/activate-free','POST',{},c1)).status,403);sqlite.prepare('UPDATE subscriptions SET price=0 WHERE store_id=?').run(a.store.id);
  assert.equal((await call('auth/login','POST',{username:'merchant1',password:'bad'})).status,401);
  const login=await call('auth/login','POST',{username:'merchant1',password:reg('x').password});await data(login);
  const r2=await call('auth/register','POST',reg('merchant2'));const b=await data(r2),c2=session(r2);
@@ -71,6 +76,9 @@ async function test(){
  assert.equal((await call('orders','POST',{...order,store_id:b.store.id})).status,403);
  assert.equal((await call('orders','POST',{...order,store_id:'missing-store'})).status,404);
  assert.equal((await call('orders','POST',(({store_id,...withoutStore})=>withoutStore)(order))).status,400);
+ sqlite.prepare("UPDATE subscriptions SET plan_name='اشتراك مجاني',status='awaiting_activation' WHERE store_id=?").run(b.store.id);
+ const selfActivation=await data(await call('auth/activate-free','POST',{},c2));assert.equal(selfActivation.success,true);
+ const freeStoreSession=await data(await call('auth/session','GET',undefined,c2));assert.equal(freeStoreSession.store.is_active,1);assert.equal(freeStoreSession.subscription.plan_name,'اشتراك مجاني');assert.equal(freeStoreSession.subscription.status,'active');
  const originalSub=sqlite.prepare('SELECT start_date,end_date FROM subscriptions WHERE store_id=?').get(a.store.id);
  for(const [start,end] of [['2099-01-01','2099-12-31'],['2020-01-01','2020-12-31'],['invalid','invalid']]){sqlite.prepare('UPDATE subscriptions SET start_date=?,end_date=? WHERE store_id=?').run(start,end,a.store.id);assert.equal((await call('orders','POST',order)).status,403);assert.equal((await call('products','POST',{store_id:a.store.id,name:'ممنوع',price:50},c1)).status,403);}
  sqlite.prepare('UPDATE subscriptions SET start_date=?,end_date=? WHERE store_id=?').run(originalSub.start_date,originalSub.end_date,a.store.id);

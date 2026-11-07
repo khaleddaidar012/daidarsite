@@ -88,3 +88,32 @@
 .animate-fadeIn {
   animation: fadeIn 0.25s ease-out forwards;
 }
+
+@keyframes freeActivationShine {
+  0% { transform: translateX(180%) skewX(-18deg); opacity: 0; }
+  18% { opacity: 0.8; }
+  72% { opacity: 0.8; }
+  100% { transform: translateX(-380%) skewX(-18deg); opacity: 0; }
+}
+
+.free-activation-shine {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.free-activation-shine::after {
+  position: absolute;
+  z-index: 0;
+  inset-block: -50%;
+  left: 0;
+  width: 30%;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 78%), transparent);
+  animation: freeActivationShine 2.4s ease-in-out infinite;
+  content: '';
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .free-activation-shine::after { animation: none; }
+}
