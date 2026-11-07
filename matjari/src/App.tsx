@@ -206,6 +206,12 @@ export const App: React.FC = () => {
     navigateTo(targetView);
   };
 
+  const handleStoreOwnerLogout = async () => {
+    try { await api.logout(); } catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر تسجيل الخروج'); return; }
+    localStorage.removeItem('my_store_user');
+    window.location.assign('/ar/hub/dashboard');
+  };
+
   // Preview Store in Public Storefront (Opens in new tab)
   const handlePreviewStore = async (storeId: string) => {
     window.open(storefrontUrl(storeId, undefined, true), '_blank', 'noopener,noreferrer');
@@ -332,7 +338,7 @@ export const App: React.FC = () => {
         user={currentUser}
         initialStore={currentStore}
         subscription={currentSubscription}
-        onLogout={() => handleLogout('merchant_login')}
+        onLogout={handleStoreOwnerLogout}
         onPreviewStore={handlePreviewStore}
         onBackToHome={() => navigateTo('landing')}
       />
