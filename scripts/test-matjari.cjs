@@ -6,7 +6,7 @@ const DB={prepare(sql){let args=[];return{bind(...values){args=values;return thi
 const auth=load('matjari/lib/auth.ts'),{onRequest}=load('matjari/functions/api/[[route]].ts',{'../../lib/auth':auth});
 const {effectiveStoreStatus,displayStorePlan}=load('matjari/lib/store-status.ts');
 const {createStoreApi}=load('matjari/src/services/api.ts');
-const call=(path,method='GET',body,cookie='',origin='https://test.example',ip='127.0.0.1')=>onRequest({env:{DB},request:new Request('https://test.example/api/'+path,{method,headers:{'Content-Type':'application/json',Cookie:cookie,Origin:origin,'CF-Connecting-IP':ip},body:body===undefined?undefined:JSON.stringify(body)})});
+const call=(path,method='GET',body,cookie='',origin='https://test.example',ip='127.0.0.1',env={DB})=>onRequest({env,request:new Request('https://test.example/api/'+path,{method,headers:{'Content-Type':'application/json',Cookie:cookie,Origin:origin,'CF-Connecting-IP':ip},body:body===undefined?undefined:JSON.stringify(body)})});
 const data=async r=>{assert.equal(r.status,200,await r.clone().text());return r.json()};
 const session=r=>r.headers.get('set-cookie').split(';')[0];
 async function test(){
@@ -65,7 +65,10 @@ async function test(){
  sqlite.prepare('UPDATE subscriptions SET start_date=?,end_date=? WHERE store_id=?').run(originalSub.start_date,originalSub.end_date,a.store.id);
  const before=sqlite.prepare('SELECT COUNT(*) AS n FROM stores').get().n;const originalBatch=DB.batch;DB.batch=async()=>{throw new Error('Injected storage failure')};
  assert.equal((await call('auth/register','POST',reg('failed'))).status,500);DB.batch=originalBatch;assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM stores').get().n,before);
- await data(await call('auth/logout','POST',{},c1));assert.equal((await call('auth/session','GET',undefined,c1)).status,401);
+ const ecoQueries=[];const ecoDB={prepare(sql){ecoQueries.push(sql);return{bind(){return this},async run(){return{}},async first(){return null},async all(){return{results:[]}}}}};
+ const localLogout=await call('auth/logout','POST',{},c1+'; __Host-eco=unified-session','https://test.example','127.0.0.1',{DB,ECOSYSTEM_DB:ecoDB});
+ await data(localLogout);assert.equal(ecoQueries.length,0);assert.ok(!localLogout.headers.get('set-cookie')?.includes('__Host-eco='));
+ assert.equal((await call('auth/session','GET',undefined,c1)).status,401);
  await data(await call(`admin/merchants/${a.store.id}/toggle-status`,'PUT',undefined,ac));assert.equal((await call('auth/session','GET',undefined,session(login))).status,401);
  assert.equal((await call('store?id='+a.store.id)).status,404);
  assert.ok(!(await data(await call('stores'))).stores.some(store=>store.id===a.store.id));

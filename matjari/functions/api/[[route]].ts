@@ -1,5 +1,5 @@
 import { currentActor, publicUser, newSession, passwordHash, passwordMatches, digest, token, cookie, rateLimit, type Actor } from '../../lib/auth';
-import { ecoLogout, type EcoEnv, type EcoDB } from '../../../shared/ecosystem';
+import { type EcoEnv, type EcoDB } from '../../../shared/ecosystem';
 import { syncStoreResource } from '../../lib/ecosystem';
 import { displayStorePlan, effectiveStoreStatus, storeIsAvailable } from '../../lib/store-status';
 // Cloudflare Pages Function with Cloudflare D1 Binding
@@ -76,7 +76,7 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
     }
     if (path === 'auth/logout' && method === 'POST') {
       await db.prepare('DELETE FROM auth_sessions WHERE token_hash=?').bind(await digest(token(request))).run();
-      const out=new Headers(headers);out.append('Set-Cookie',cookie('',0));if(env.ECOSYSTEM_DB)out.append('Set-Cookie',await ecoLogout(request,env));
+      const out=new Headers(headers);out.append('Set-Cookie',cookie('',0));
       return new Response(JSON.stringify({ success: true }), { headers:out });
     }
     const adminPath = path.startsWith('admin/') || path === 'd1-status';
