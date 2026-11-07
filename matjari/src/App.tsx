@@ -209,7 +209,7 @@ export const App: React.FC = () => {
   const handleStoreOwnerLogout = async () => {
     try { await api.logout(); } catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر تسجيل الخروج'); return; }
     localStorage.removeItem('my_store_user');
-    window.location.assign('/ar/hub/dashboard');
+    window.location.assign('/ar/hub');
   };
 
   // Preview Store in Public Storefront (Opens in new tab)
