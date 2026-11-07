@@ -13,6 +13,10 @@ export function createStoreApi(API_BASE='/api/store') { return {
     const res = await fetch(`${API_BASE}/auth/logout`, {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
     if (!res.ok) throw new Error('تعذر تسجيل الخروج. حاول مرة أخرى.');
   },
+  async logoutHubSession(): Promise<void> {
+    const res = await fetch('/api/ecosystem/logout', {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    if (!res.ok) throw new Error('تعذر تسجيل الخروج من دعيدر هب. حاول مرة أخرى.');
+  },
   // 1. Authentication
   async login(username: string, password: string, linkIdentity=false): Promise<{
     user: User;

@@ -208,6 +208,7 @@ export const App: React.FC = () => {
 
   const handleStoreOwnerLogout = async () => {
     try { await api.logout(); } catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر تسجيل الخروج'); return; }
+    try { await api.logoutHubSession(); } catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر تسجيل الخروج من دعيدر هب'); return; }
     localStorage.removeItem('my_store_user');
     window.location.assign('/ar/hub');
   };

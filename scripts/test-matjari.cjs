@@ -21,6 +21,9 @@ async function test(){
  global.fetch=async(url,options)=>{activationRequest={url:String(url),...options};return new Response(JSON.stringify({success:true,is_active:1}),{status:200,headers:{'Content-Type':'application/json'}})};
  try{assert.equal(await storeAdminApi.toggleMerchantStatus('store-test'),1)}finally{global.fetch=originalFetch}
  assert.equal(activationRequest.url,'/api/ecosystem/admin/store/admin/merchants/store-test/toggle-status');assert.equal(activationRequest.method,'PUT');assert.equal(activationRequest.headers['Content-Type'],'application/json');assert.equal(activationRequest.body,'{}');
+ let hubLogoutRequest;global.fetch=async(url,options)=>{hubLogoutRequest={url:String(url),...options};return new Response('{}',{status:200})};
+ try{await storeAdminApi.logoutHubSession()}finally{global.fetch=originalFetch}
+ assert.equal(hubLogoutRequest.url,'/api/ecosystem/logout');assert.equal(hubLogoutRequest.method,'POST');assert.equal(hubLogoutRequest.headers['Content-Type'],'application/json');
  assert.equal((await call('admin/merchants')).status,401);
  assert.equal((await call('auth/session')).status,401);
  assert.equal((await call('auth/register','POST',{},'','https://evil.example')).status,403);
