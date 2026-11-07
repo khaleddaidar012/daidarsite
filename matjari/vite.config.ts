@@ -1,6 +1,5 @@
 import { defineConfig, Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
-import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -11,7 +10,10 @@ const mountedInHub = process.env.MATJARI_MOUNTED_IN_HUB === '1';
 function cloudflareD1Plugin(): Plugin {
   return {
     name: 'cloudflare-d1-local-plugin',
-    configureServer(server) {
+    async configureServer(server) {
+      // SQLite is only needed by the local D1 emulator. Load it when the dev
+      // server starts so production builds do not require node:sqlite.
+      const { DatabaseSync } = await import('node:sqlite');
       const rootDir = process.cwd();
       const dbPath = path.join(rootDir, '.d1_local.sqlite');
       const migrationFile = path.join(rootDir, 'migrations', '0001_initial_schema.sql');
