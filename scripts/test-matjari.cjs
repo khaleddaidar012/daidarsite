@@ -4,12 +4,19 @@ const sqlite=new DatabaseSync(':memory:');sqlite.exec('PRAGMA foreign_keys=ON');
 for(const file of ['0001_initial_schema.sql','0002_auth_sessions.sql'])sqlite.exec(fs.readFileSync('matjari/migrations/'+file,'utf8'));
 const DB={prepare(sql){let args=[];return{bind(...values){args=values;return this},async first(){return sqlite.prepare(sql).get(...args)||null},async all(){return{results:sqlite.prepare(sql).all(...args)}},async run(){return sqlite.prepare(sql).run(...args)}}},async batch(statements){sqlite.exec('BEGIN');try{const out=[];for(const s of statements)out.push(await s.run());sqlite.exec('COMMIT');return out}catch(e){sqlite.exec('ROLLBACK');throw e}}};
 const auth=load('matjari/lib/auth.ts'),{onRequest}=load('matjari/functions/api/[[route]].ts',{'../../lib/auth':auth});
+const {effectiveStoreStatus,displayStorePlan}=load('matjari/lib/store-status.ts');
 const {createStoreApi}=load('matjari/src/services/api.ts');
 const call=(path,method='GET',body,cookie='',origin='https://test.example',ip='127.0.0.1')=>onRequest({env:{DB},request:new Request('https://test.example/api/'+path,{method,headers:{'Content-Type':'application/json',Cookie:cookie,Origin:origin,'CF-Connecting-IP':ip},body:body===undefined?undefined:JSON.stringify(body)})});
 const data=async r=>{assert.equal(r.status,200,await r.clone().text());return r.json()};
 const session=r=>r.headers.get('set-cookie').split(';')[0];
 async function test(){
  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM users').get().n,0);
+ const now=Date.parse('2026-11-07T12:00:00Z');
+ assert.equal(effectiveStoreStatus(1,1,{status:'active',start_date:'2026-11-01',end_date:'2026-11-30'},now),'active');
+ assert.equal(effectiveStoreStatus(1,1,{status:'active',start_date:'2026-11-08',end_date:'2026-11-30'},now),'scheduled');
+ assert.equal(effectiveStoreStatus(1,1,{status:'active',start_date:'2026-10-01',end_date:'2026-10-31'},now),'expired');
+ assert.equal(effectiveStoreStatus(0,1,{status:'active',start_date:'2026-11-01',end_date:'2026-11-30'},now),'suspended');
+ assert.equal(displayStorePlan({plan_name:'بانتظار التفعيل',price:0}),'اشتراك مجاني');
  const storeAdminApi=createStoreApi('/api/ecosystem/admin/store'),originalFetch=global.fetch;let activationRequest;
  global.fetch=async(url,options)=>{activationRequest={url:String(url),...options};return new Response(JSON.stringify({success:true,is_active:1}),{status:200,headers:{'Content-Type':'application/json'}})};
  try{assert.equal(await storeAdminApi.toggleMerchantStatus('store-test'),1)}finally{global.fetch=originalFetch}
@@ -33,6 +40,10 @@ async function test(){
  const adminHash=await auth.passwordHash('Owner secure password');sqlite.prepare("INSERT INTO users(id,username,password,role) VALUES('owner','owner',?,'super_admin')").run(adminHash);
  const ar=await call('auth/login','POST',{username:'owner',password:'Owner secure password'});await data(ar);const ac=session(ar);
  await data(await call(`admin/merchants/${a.store.id}/toggle-status`,'PUT',undefined,ac));
+ const activated=await data(await call('auth/session','GET',undefined,c1));
+ assert.equal(activated.store.effective_status,'active');assert.equal(activated.subscription.status,'active');
+ assert.ok((await data(await call('stores'))).stores.some(store=>store.id===a.store.id));
+ assert.equal((await call('visit','POST',{store_id:a.store.id})).status,200);
  const p=await data(await call('products','POST',{store_id:a.store.id,name:'منتج',price:50,image_data:'https://example.com/p.png'},c1));
  assert.equal((await call('products/'+p.product.id,'PUT',{name:'اختراق',price:1},c2)).status,403);
  assert.equal((await call('products','POST',{store_id:a.store.id,name:'اختراق',price:1,image_data:'https://example.com/p.png'},c2)).status,403);
@@ -46,7 +57,9 @@ async function test(){
  assert.equal((await call('orders')).status,401);
  assert.equal((await data(await call('orders','GET',undefined,c2))).orders.length,0);
  assert.equal((await call('orders','POST',{...order,items:[{product:{id:p.product.id},quantity:-1}]})).status,400);
- assert.equal((await call('orders','POST',{...order,store_id:b.store.id})).status,404);
+ assert.equal((await call('orders','POST',{...order,store_id:b.store.id})).status,403);
+ assert.equal((await call('orders','POST',{...order,store_id:'missing-store'})).status,404);
+ assert.equal((await call('orders','POST',(({store_id,...withoutStore})=>withoutStore)(order))).status,400);
  const originalSub=sqlite.prepare('SELECT start_date,end_date FROM subscriptions WHERE store_id=?').get(a.store.id);
  for(const [start,end] of [['2099-01-01','2099-12-31'],['2020-01-01','2020-12-31'],['invalid','invalid']]){sqlite.prepare('UPDATE subscriptions SET start_date=?,end_date=? WHERE store_id=?').run(start,end,a.store.id);assert.equal((await call('orders','POST',order)).status,403);assert.equal((await call('products','POST',{store_id:a.store.id,name:'ممنوع',price:50},c1)).status,403);}
  sqlite.prepare('UPDATE subscriptions SET start_date=?,end_date=? WHERE store_id=?').run(originalSub.start_date,originalSub.end_date,a.store.id);
@@ -55,6 +68,7 @@ async function test(){
  await data(await call('auth/logout','POST',{},c1));assert.equal((await call('auth/session','GET',undefined,c1)).status,401);
  await data(await call(`admin/merchants/${a.store.id}/toggle-status`,'PUT',undefined,ac));assert.equal((await call('auth/session','GET',undefined,session(login))).status,401);
  assert.equal((await call('store?id='+a.store.id)).status,404);
+ assert.ok(!(await data(await call('stores'))).stores.some(store=>store.id===a.store.id));
  for(let i=0;i<21;i++)await call('auth/login','POST',{username:'owner',password:'bad'},'','https://test.example','198.51.100.2');
  assert.equal((await call('auth/login','POST',{username:'owner',password:'Owner secure password'},'','https://test.example','198.51.100.2')).status,429);
  sqlite.close();console.log('Matjari passed: sessions, password hashing, CSRF, signup, pending activation, administrator permissions, tenant isolation, product edits, server-calculated order totals, atomic signup, logout, suspension, and login throttling.');

@@ -42,6 +42,8 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
   const totalCartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const phone = store?.whatsapp_number?.trim() || '';
   const displayPhone = phone.startsWith('+') || phone.startsWith('0') ? phone : `+${phone}`;
+  const storeStatus = store?.effective_status || (store?.is_active === 1 ? 'active' : 'awaiting_activation');
+  const canOrder = !!store && ['active', 'trial'].includes(storeStatus);
   const defaultLogo = `${import.meta.env.BASE_URL}store-mark.svg`;
   const logoSrc = store?.logo_data || defaultLogo;
 
@@ -56,6 +58,7 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
   });
 
   const handleAdd = (p: Product) => {
+    if (!canOrder) return;
     onAddToCart(p);
     setAddedAnimationId(p.id);
     setTimeout(() => setAddedAnimationId(null), 1200);
@@ -68,10 +71,10 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
       <header className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 sticky top-0 z-30 transition-colors shadow-2xs">
         
         {/* Inactive Store Preview Bar */}
-        {store?.is_active === 0 && (
+        {store && !canOrder && (
           <div className="bg-amber-500 text-white text-xs py-2 px-3 sm:px-6 font-black text-center flex items-center justify-center gap-2">
             <span>⚠️</span>
-            <span>{isArabic ? 'وضع المعاينة: هذا المتجر قيد المراجعة وبانتظار التفعيل من قبل الإدارة' : 'Preview Mode: This store is pending activation by Admin'}</span>
+            <span>{storeStatus === 'expired' ? (isArabic ? 'الاشتراك منتهي؛ المتجر لا يستقبل طلبات حاليًا' : 'Subscription expired; this store is not accepting orders') : (isArabic ? 'هذا المتجر غير مفعّل حاليًا ولا يستقبل طلبات' : 'This store is not currently active and cannot receive orders')}</span>
           </div>
         )}
 
@@ -119,8 +122,9 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
 
             {/* Cart Button in Brand Blue */}
             <button
+              disabled={!canOrder}
               onClick={onOpenCart}
-              className="relative inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-2xl bg-[#0084d6] hover:bg-[#0074bd] active:scale-95 text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-sky-600/25 transition-all shrink-0 cursor-pointer"
+              className="relative inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-2xl bg-[#0084d6] hover:bg-[#0074bd] active:scale-95 text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-sky-600/25 transition-all shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             >
               <ShoppingBag className="w-4 h-4" />
               <span className="hidden sm:inline">{t('shopping_cart')}</span>
@@ -148,20 +152,17 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
           </div>
 
           {/* Quick contact pill with phone */}
-          {phone && <div className="flex items-center gap-3 bg-white dark:bg-slate-900 p-3.5 sm:p-4 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-2xl shadow-sky-500/5 shrink-0">
+          {phone && <a href={`tel:${phone.replace(/[^\d+]/g, '')}`} aria-label={`${t('support_inquiry')} ${displayPhone}`} className="flex items-center gap-3 bg-white dark:bg-slate-900 p-3.5 sm:p-4 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-2xl shadow-sky-500/5 shrink-0 transition-all hover:border-sky-300 hover:shadow-sky-500/10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 cursor-pointer">
             <div className="w-11 h-11 rounded-2xl bg-[#e6f4fe] dark:bg-sky-950/70 text-[#0084d6] dark:text-sky-400 flex items-center justify-center font-bold">
               <Phone className="w-5 h-5" />
             </div>
             <div className="text-start">
               <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-bold">{t('support_inquiry')}</span>
-              <a 
-                href={`tel:${phone}`}
-                className="text-sm font-black text-[#0e1f38] dark:text-white font-mono hover:text-[#0084d6] dark:hover:text-sky-400 dir-ltr block transition-colors"
-              >
+              <span className="text-sm font-black text-[#0e1f38] dark:text-white font-mono dir-ltr block transition-colors">
                 {displayPhone}
-              </a>
+              </span>
             </div>
-          </div>}
+          </a>}
         </div>
       </section>
 
@@ -260,8 +261,9 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                       </div>
 
                       <button
+                        disabled={!canOrder}
                         onClick={() => handleAdd(p)}
-                        className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer ${
+                        className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
                           isAdded
                             ? 'bg-[#0e1f38] text-white shadow-md'
                             : 'bg-[#e6f4fe] dark:bg-sky-950/70 text-[#0084d6] dark:text-sky-300 hover:bg-[#0084d6] hover:text-white border border-sky-200 dark:border-sky-800'
@@ -323,11 +325,12 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
 
               <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center gap-3">
                 <button
+                  disabled={!canOrder}
                   onClick={() => {
                     handleAdd(selectedProduct);
                     setSelectedProduct(null);
                   }}
-                  className="flex-1 py-3.5 rounded-2xl bg-[#0084d6] hover:bg-[#0074bd] text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-sky-600/25 active:scale-95 transition-all cursor-pointer"
+                  className="flex-1 py-3.5 rounded-2xl bg-[#0084d6] hover:bg-[#0074bd] text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-sky-600/25 active:scale-95 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <ShoppingBag className="w-4 h-4" />
                   <span>{t('add_to_cart')}</span>
@@ -342,8 +345,9 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
       {totalCartCount > 0 && (
         <div className={`fixed bottom-6 ${isArabic ? 'left-6' : 'right-6'} z-40`}>
           <button
+            disabled={!canOrder}
             onClick={onOpenCart}
-            className="flex items-center gap-2.5 px-6 py-4 rounded-full bg-[#0084d6] hover:bg-[#0074bd] active:scale-95 text-white font-black text-sm shadow-2xl shadow-sky-600/35 border border-sky-300/40 transition-transform cursor-pointer"
+            className="flex items-center gap-2.5 px-6 py-4 rounded-full bg-[#0084d6] hover:bg-[#0074bd] active:scale-95 text-white font-black text-sm shadow-2xl shadow-sky-600/35 border border-sky-300/40 transition-transform cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
           >
             <ShoppingBag className="w-5 h-5" />
             <span>{t('shopping_cart')} ({totalCartCount})</span>

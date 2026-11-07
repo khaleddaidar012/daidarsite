@@ -11,7 +11,7 @@ export interface User {
   created_at?: string;
 }
 
-export type SubscriptionStatus = 'active' | 'expired' | 'suspended';
+export type SubscriptionStatus = 'active' | 'trial' | 'awaiting_activation' | 'scheduled' | 'unsubscribed' | 'expired' | 'suspended' | 'cancelled';
 
 export interface Subscription {
   id: string;
@@ -36,6 +36,7 @@ export interface Store {
   facebook_url: string;
   logo_data?: string;
   is_active: number;
+  effective_status?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -45,6 +46,7 @@ export interface MerchantDetail {
   user: User;
   subscription: Subscription;
   productCount?: number;
+  effective_status?: string;
 }
 
 export interface Product {

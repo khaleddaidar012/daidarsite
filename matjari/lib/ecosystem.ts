@@ -1,4 +1,5 @@
 import { ecoBind, ecoLocalId, ecoPublish, type EcoEnv, type Identity, type EcoAdapter } from '../../shared/ecosystem';
+import { displayStorePlan, effectiveStoreStatus } from './store-status';
 export type StoreEcoEnv=EcoEnv & {DB:any};
 export const storeAdapter=(env:StoreEcoEnv):EcoAdapter=>({
  system:'store',
@@ -12,8 +13,8 @@ export const storeAdapter=(env:StoreEcoEnv):EcoAdapter=>({
   const row=await env.DB.prepare('SELECT u.store_id,u.is_active AS user_active,s.is_active FROM users u LEFT JOIN stores s ON s.id=u.store_id WHERE u.id=?').bind(localId).first();if(!row?.store_id)return;
   const sub=await env.DB.prepare('SELECT * FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(row.store_id).first();
   const start=sub?.start_date?Date.parse(sub.start_date+'T00:00:00Z'):null,end=sub?.end_date?Date.parse(sub.end_date+'T23:59:59.999Z'):null;
-  const status=!row.user_active?'suspended':!row.is_active?'awaiting_activation':!sub?'unsubscribed':sub.status!=='active'?sub.status:end&&end<Date.now()?'expired':'active';
-  await ecoPublish(env,'store',user.id,row.store_id,status,sub?.plan_name||'',start,end);
+  const status=effectiveStoreStatus(row.user_active,row.is_active,sub);
+  await ecoPublish(env,'store',user.id,row.store_id,status,displayStorePlan(sub),start,end);
  }
 });
 export async function syncStoreResource(env:StoreEcoEnv,storeId:string){

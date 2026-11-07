@@ -272,18 +272,19 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
 
     if (!matchesSearch) return false;
 
-    if (statusFilter === 'active') return m.store.is_active === 1;
-    if (statusFilter === 'pending') return m.store.is_active === 0 && m.user.is_active === 1;
-    if (statusFilter === 'valid') return m.subscription.status === 'active';
-    if (statusFilter === 'expired') return m.subscription.status !== 'active';
+    const state=m.store.effective_status||m.effective_status||'awaiting_activation';
+    if (statusFilter === 'active') return state === 'active' || state === 'trial';
+    if (statusFilter === 'pending') return state === 'awaiting_activation';
+    if (statusFilter === 'valid') return state === 'active' || state === 'trial';
+    if (statusFilter === 'expired') return !['active','trial','awaiting_activation'].includes(state);
     return true;
   });
 
   const totalStores = merchants.length;
-  const activeStores = merchants.filter(m => m.store.is_active === 1).length;
-  const activeSubscriptions = merchants.filter(m => m.subscription.status === 'active').length;
-  const expiredSubscriptions = totalStores - activeSubscriptions;
-  const pendingStores = merchants.filter(m => m.store.is_active === 0 && m.user.is_active === 1).length;
+  const activeStores = merchants.filter(m => ['active','trial'].includes(m.store.effective_status||m.effective_status||'')).length;
+  const activeSubscriptions = activeStores;
+  const expiredSubscriptions = merchants.filter(m => ['expired','unsubscribed','suspended','cancelled'].includes(m.store.effective_status||m.effective_status||'')).length;
+  const pendingStores = merchants.filter(m => (m.store.effective_status||m.effective_status)==='awaiting_activation').length;
   const openStores = (filter: typeof statusFilter) => {
     setStatusFilter(filter);
     document.getElementById('admin-store-management')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -830,8 +831,12 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
                   {filteredMerchants.map((m) => {
-                    const isStoreActive = m.store.is_active === 1;
-                    const isSubActive = m.subscription.status === 'active';
+                    const status=m.store.effective_status||m.effective_status||'awaiting_activation';
+                    const isStoreActive = status === 'active' || status === 'trial';
+                    const isSubActive = isStoreActive;
+                    const startAt=Date.parse(m.subscription.start_date+'T00:00:00Z'),endAt=Date.parse(m.subscription.end_date+'T23:59:59.999Z');
+                    const validSubscription=['active','trial'].includes(m.subscription.status)&&Number.isFinite(startAt)&&Number.isFinite(endAt)&&startAt<=Date.now()&&endAt>=Date.now();
+                    const canActivate = isStoreActive || (m.store.is_active!==1&&(validSubscription||(m.subscription.status==='awaiting_activation'&&Number(m.subscription.price)===0)));
                     const isCopied = copiedStoreId === m.store.id;
 
                     return (
@@ -919,15 +924,15 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                             {/* Toggle Active Button (Modern Soft Pill) */}
                             <button
                               onClick={() => handleToggleStatus(m)}
-                              disabled={actionLoading}
+                              disabled={actionLoading||!canActivate}
                               className={`px-3 py-1.5 rounded-xl font-bold text-[11px] transition-all cursor-pointer active:scale-95 ${
                                 isStoreActive
                                   ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 hover:bg-rose-100 border border-rose-200 dark:border-rose-900'
                                   : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-900'
                               }`}
-                              title={isStoreActive ? t('deactivate_btn') : t('activate_btn')}
+                              title={!canActivate ? (isArabic?'جدّد الاشتراك أولًا':'Renew the subscription first') : isStoreActive ? t('deactivate_btn') : t('activate_btn')}
                             >
-                              {isStoreActive ? t('deactivate_btn') : t('activate_btn')}
+                              {!canActivate ? (isArabic?'تجديد مطلوب':'Renewal required') : isStoreActive ? t('deactivate_btn') : t('activate_btn')}
                             </button>
 
                             {/* Manual Subscription Renew (Modern Sky Pill) */}

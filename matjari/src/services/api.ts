@@ -233,8 +233,8 @@ export function createStoreApi(API_BASE='/api/store') { return {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(order),
     });
-    if (!res.ok) throw new Error('Failed to place order');
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success || typeof data.orderId !== 'string') throw new Error(data.error || 'تعذر تسجيل الطلب. حاول مرة أخرى.');
     return data.orderId;
   },
 

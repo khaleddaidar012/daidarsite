@@ -1,4 +1,5 @@
 import type {EcoEnv,Identity} from './ecosystem';
+import {displayStorePlan,effectiveStoreStatus} from '../matjari/lib/store-status';
 export type ServiceState='active'|'trial'|'pending'|'expired'|'cancelled'|'suspended';
 export function serviceState(status:string,start:number|null,end:number|null,now=Date.now()):ServiceState {
   if(start!==null&&!Number.isFinite(start)||end!==null&&!Number.isFinite(end))return 'pending';
@@ -20,9 +21,10 @@ export async function customerOverview(env:EcoEnv,user:Identity){
       if(!row)continue;
       const sub=await env.ECOSYSTEM_STORE_DB.prepare('SELECT id,plan_name,status,start_date,end_date FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(row.id).first();
       const start=sub?Date.parse(sub.start_date+'T00:00:00Z'):null,end=sub?Date.parse(sub.end_date+'T23:59:59.999Z'):null;
-      const state=serviceState(!row.user_active?'suspended':!row.is_active?'pending':sub?.status||'pending',start,end);
+      const effectiveStatus=effectiveStoreStatus(row.user_active,row.is_active,sub);
+      const state=serviceState(effectiveStatus,start,end);
       const preview=new URL(storePath,storeOrigin);preview.search=new URLSearchParams({view:'storefront',store_id:row.id}).toString();
-      services.push({id:row.id,system:'store',title:row.name,plan:sub?.plan_name||'',status:state,start,end,can_access:['active','trial'].includes(state),preview_url:row.is_active?preview.toString():null});
+      services.push({id:row.id,system:'store',title:row.name,plan:displayStorePlan(sub),status:state,start,end,can_access:['active','trial'].includes(state),preview_url:preview.toString()});
     }
     if(link.system==='hub'){
       if(!env.ECOSYSTEM_HUB_DB){unavailable.push('hub');continue}

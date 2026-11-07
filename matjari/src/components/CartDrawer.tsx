@@ -59,6 +59,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
       // 1. Record the order in Cloudflare D1
       await api.recordOrder({
+        store_id: store?.id,
         customer_name: customerName.trim(),
         customer_phone: customerPhone.trim(),
         customer_address: customerAddress.trim(),

@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, type FormEvent } from 'react'
 
-type Merchant = { store: { id: string; name: string; is_active: number }; user: { username: string }; subscription: { status: string; end_date: string; plan_name: string }; productCount: number }
+type Merchant = { store: { id: string; name: string; is_active: number; effective_status?: string }; user: { username: string }; subscription: { status: string; end_date: string; plan_name: string }; productCount: number }
 const blank = { store_name: '', activity_type: '', whatsapp_number: '', username: '', password: '' }
 const field = 'mt-1 w-full rounded-xl border border-slate-300 bg-white p-3'
 
@@ -53,7 +53,7 @@ export default function EmployeeStoreManager({ createStore, renewSubscriptions }
       <div className="flex items-end"><button disabled={busy} className="w-full rounded-xl bg-sky-700 px-5 py-3 font-bold text-white disabled:opacity-50">{busy ? 'جارٍ إنشاء المتجر…' : 'إنشاء المتجر'}</button></div>
     </form></section>}
     {renewSubscriptions && <section className="rounded-2xl border bg-white p-5 sm:p-7"><div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-extrabold">تجديد اشتراك متجر</h2><p className="mt-1 text-sm text-slate-500">اختر مدة التجديد، ثم جدّد اشتراك المتجر المطلوب.</p></div><label>مدة التجديد<select className={field} value={months} onChange={e => setMonths(Number(e.target.value))}>{[1,3,6,12].map(value => <option key={value} value={value}>{value} شهر</option>)}</select></label></div>
-      {loading ? <p className="mt-5">جارٍ تحميل المتاجر…</p> : merchants.length ? <div className="mt-5 space-y-3">{merchants.map(merchant => <article key={merchant.store.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4"><div><h3 className="font-bold">{merchant.store.name}</h3><p className="text-sm text-slate-500">{merchant.user.username} · {merchant.subscription.plan_name} · {merchant.subscription.status} · ينتهي {merchant.subscription.end_date}</p></div><button type="button" disabled={busy} onClick={() => void renew(merchant)} className="rounded-xl border border-sky-200 px-4 py-2 font-bold text-sky-800 disabled:opacity-50">تجديد {months} شهر</button></article>)}</div> : <p className="mt-5 rounded-xl bg-slate-50 p-4 text-slate-500">لا توجد متاجر مسجلة.</p>}
+      {loading ? <p className="mt-5">جارٍ تحميل المتاجر…</p> : merchants.length ? <div className="mt-5 space-y-3">{merchants.map(merchant => {const state=merchant.store.effective_status||'awaiting_activation';const label=state==='active'||state==='trial'?'نشط':state==='expired'?'منتهي':state==='suspended'?'موقوف':'بانتظار التفعيل';return <article key={merchant.store.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4"><div><h3 className="font-bold">{merchant.store.name}</h3><p className="text-sm text-slate-500">{merchant.user.username} · {merchant.subscription.plan_name} · حالة الخدمة: {label} · ينتهي {merchant.subscription.end_date}</p></div><button type="button" disabled={busy} onClick={() => void renew(merchant)} className="rounded-xl border border-sky-200 px-4 py-2 font-bold text-sky-800 disabled:opacity-50">تجديد {months} شهر</button></article>})}</div> : <p className="mt-5 rounded-xl bg-slate-50 p-4 text-slate-500">لا توجد متاجر مسجلة.</p>}
       <button type="button" disabled={busy || loading} onClick={() => void load()} className="mt-4 rounded-xl border px-4 py-2 text-sm font-bold">تحديث المتاجر</button>
     </section>}
   </section>

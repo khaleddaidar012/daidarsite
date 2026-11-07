@@ -1,6 +1,7 @@
 import { currentActor, publicUser, newSession, passwordHash, passwordMatches, digest, token, cookie, rateLimit, type Actor } from '../../lib/auth';
 import { ecoLogout, type EcoEnv, type EcoDB } from '../../../shared/ecosystem';
 import { syncStoreResource } from '../../lib/ecosystem';
+import { displayStorePlan, effectiveStoreStatus, storeIsAvailable } from '../../lib/store-status';
 // Cloudflare Pages Function with Cloudflare D1 Binding
 export interface Env extends EcoEnv {
   DB: EcoDB;
@@ -61,7 +62,7 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       await db.batch([
         db.prepare("INSERT INTO stores(id,name,activity_type,whatsapp_number,is_active) SELECT ?,?,?,?,0 WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND store_id IS NULL)").bind(id,b.name.trim(),String(b.activity_type||'عام').slice(0,100),b.whatsapp_number,actor.id),
         db.prepare('UPDATE users SET store_id=? WHERE id=? AND store_id IS NULL').bind(id,actor.id),
-        db.prepare("INSERT INTO subscriptions(id,store_id,plan_name,status,price) SELECT ?,?,'بانتظار التفعيل','active',0 WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND store_id=?)").bind(crypto.randomUUID(),id,actor.id,id)
+        db.prepare("INSERT INTO subscriptions(id,store_id,plan_name,status,price) SELECT ?,?,'اشتراك مجاني','awaiting_activation',0 WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND store_id=?)").bind(crypto.randomUUID(),id,actor.id,id)
       ]);
       return new Response(JSON.stringify({success:true}),{headers});
     }
@@ -69,7 +70,9 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       if (!actor) return fail('يرجى تسجيل الدخول', 401);
       const store = actor.store_id ? await db.prepare('SELECT * FROM stores WHERE id=?').bind(actor.store_id).first() : null;
       const subscription = actor.store_id ? await db.prepare('SELECT * FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(actor.store_id).first() : null;
-      return new Response(JSON.stringify({ success: true, user: publicUser(actor), store, subscription }), { headers });
+      const userActive = actor.store_id ? await db.prepare('SELECT is_active FROM users WHERE id=?').bind(actor.id).first() : null;
+      const effective_status = store ? effectiveStoreStatus(userActive?.is_active, store.is_active, subscription) : null;
+      return new Response(JSON.stringify({ success: true, user: publicUser(actor), store: store ? { ...store, effective_status } : null, subscription: subscription ? { ...subscription, plan_name: displayStorePlan(subscription) } : null }), { headers });
     }
     if (path === 'auth/logout' && method === 'POST') {
       await db.prepare('DELETE FROM auth_sessions WHERE token_hash=?').bind(await digest(token(request))).run();
@@ -100,7 +103,7 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       if (!store?.is_active && !['orders','stats'].includes(path)) return fail('متجرك بانتظار التفعيل من الإدارة');
       if(!['GET','HEAD'].includes(method)){
         const sub=await db.prepare('SELECT status,start_date,end_date FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(storeId).first() as any;
-        if(!usableSubscription(sub))return fail('الاشتراك غير فعال. تواصل مع الدعم للتجديد.');
+        if(!storeIsAvailable(effectiveStoreStatus(1,store?.is_active,sub)))return fail('الاشتراك غير فعال. تواصل مع الدعم للتجديد.');
       }
     }
     if (path === 'store' && method === 'GET' && url.searchParams.get('id')) {
@@ -120,8 +123,8 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
     if (path === 'visit' && method === 'POST') {
       await rateLimit(db,request,'visit',120,3600000);
       const b = await request.json() as any;
-      const store = await db.prepare('SELECT id FROM stores WHERE id=? AND is_active=1').bind(b.store_id || '').first();
-      if (!store) return fail('المتجر غير متاح',404);
+      const storeAccess = typeof b.store_id === 'string' ? await getStoreAccess(db,b.store_id) : null;
+      if (!storeAccess || !storeIsAvailable(storeAccess.status)) return fail('المتجر غير متاح',404);
       await db.prepare('INSERT INTO traffic_stats(id,store_id,device,referrer) VALUES(?,?,?,?)').bind(crypto.randomUUID(),b.store_id,String(b.device||'موبايل').slice(0,80),String(b.referrer||'مباشر').slice(0,300)).run();
       return new Response(JSON.stringify({success:true}),{headers});
     }
@@ -146,19 +149,20 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
           return new Response(JSON.stringify({ success: false, error: 'حساب الأدمن موقوف حالياً.' }), { status: 403, headers });
         }
 
-        let store = null;
-        let subscription = null;
+        let store: any = null;
+        let subscription: any = null;
 
         if ((user as any).store_id) {
           store = await db.prepare('SELECT * FROM stores WHERE id = ?').bind((user as any).store_id).first();
           subscription = await db.prepare('SELECT * FROM subscriptions WHERE store_id = ? ORDER BY created_at DESC LIMIT 1').bind((user as any).store_id).first();
         }
 
+        const effective_status = store ? effectiveStoreStatus(user.is_active,store.is_active,subscription) : null;
         return new Response(JSON.stringify({
           success: true,
           user: publicUser(user),
-          store,
-          subscription,
+          store: store ? { ...store, effective_status } : null,
+          subscription: subscription ? { ...subscription, plan_name: displayStorePlan(subscription) } : null,
         }), { headers: { ...headers, 'Set-Cookie': await newSession(db, user, env, request, body.link_identity===true) } });
       }
     }
@@ -238,10 +242,11 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
           const user = await db.prepare('SELECT id, username, role, is_active FROM users WHERE store_id = ?').bind((store as any).id).first();
           const sub = await db.prepare('SELECT * FROM subscriptions WHERE store_id = ? ORDER BY created_at DESC LIMIT 1').bind((store as any).id).first();
           const pCount = await db.prepare('SELECT COUNT(*) as c FROM products WHERE store_id = ?').bind((store as any).id).first();
+          const effective_status = effectiveStoreStatus(user?.is_active, (store as any).is_active, sub);
           results.push({
-            store,
+            store: { ...(store as any), effective_status },
             user: user || { id: '', username: 'غير مرتبط', is_active: (store as any).is_active },
-            subscription: sub || { status: 'expired', end_date: 'غير محدد', plan_name: 'لا يوجد' },
+            subscription: sub ? { ...(sub as any), plan_name: displayStorePlan(sub as any) } : { status: 'unsubscribed', end_date: 'غير محدد', plan_name: 'غير محدد' },
             productCount: (pCount as any)?.c || 0,
           });
         }
@@ -331,6 +336,14 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
         }
 
         const nextState = (store as any).is_active === 1 ? 0 : 1;
+        if (nextState) {
+          const subscription = await db.prepare('SELECT * FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(storeId).first() as any;
+          if (subscription?.status === 'awaiting_activation' && Number(subscription.price) === 0) {
+            await db.prepare("UPDATE subscriptions SET status='active',plan_name='اشتراك مجاني',start_date=date('now'),end_date=date('now','+1 year'),updated_at=datetime('now') WHERE id=?").bind(subscription.id).run();
+          } else if (!storeIsAvailable(effectiveStoreStatus(1, 1, subscription))) {
+            return new Response(JSON.stringify({ success: false, error: 'لا يمكن تفعيل المتجر قبل تفعيل أو تجديد اشتراكه.' }), { status: 409, headers });
+          }
+        }
         await db.prepare('UPDATE stores SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(nextState, storeId).run();
         await db.prepare('UPDATE users SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE store_id = ?').bind(nextState, storeId).run();
         if (!nextState) await db.prepare('DELETE FROM auth_sessions WHERE user_id IN (SELECT id FROM users WHERE store_id=?)').bind(storeId).run();
@@ -371,7 +384,13 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
           `).bind(subId, storeId, modifier).run();
         }
 
-        const updatedSub = await db.prepare('SELECT * FROM subscriptions WHERE store_id = ? ORDER BY created_at DESC LIMIT 1').bind(storeId).first();
+        const updatedSub = await db.prepare('SELECT * FROM subscriptions WHERE store_id = ? ORDER BY created_at DESC LIMIT 1').bind(storeId).first() as any;
+        if (validDelta > 0 && storeIsAvailable(effectiveStoreStatus(1, 1, updatedSub))) {
+          await db.batch([
+            db.prepare('UPDATE stores SET is_active=1,updated_at=CURRENT_TIMESTAMP WHERE id=?').bind(storeId),
+            db.prepare('UPDATE users SET is_active=1,updated_at=CURRENT_TIMESTAMP WHERE store_id=?').bind(storeId),
+          ]);
+        }
         await syncStoreResource(env,storeId);
         return new Response(JSON.stringify({ success: true, subscription: updatedSub }), { headers });
       }
@@ -386,7 +405,7 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
     }
     if (path === 'stores') {
       if (method === 'GET') {
-        const allStores = await db.prepare('SELECT * FROM stores WHERE is_active = 1 ORDER BY created_at DESC').all();
+        const allStores = await db.prepare(`SELECT s.* FROM stores s WHERE s.is_active=1 AND NOT EXISTS(SELECT 1 FROM users u WHERE u.store_id=s.id AND u.is_active=0) AND EXISTS(SELECT 1 FROM subscriptions b WHERE b.id=(SELECT x.id FROM subscriptions x WHERE x.store_id=s.id ORDER BY x.created_at DESC LIMIT 1) AND b.status IN ('active','trial') AND b.start_date<=date('now') AND b.end_date>=date('now')) ORDER BY s.created_at DESC`).all();
         return new Response(JSON.stringify({ success: true, stores: allStores.results || [] }), { headers });
       }
     }
@@ -394,10 +413,11 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
     if (path === 'store') {
       if (method === 'GET') {
         const requestedId = url.searchParams.get('id');
-        const store = requestedId 
-          ? await db.prepare('SELECT * FROM stores WHERE id = ?').bind(requestedId).first()
-          : await db.prepare('SELECT * FROM stores WHERE is_active = 1 LIMIT 1').first();
-        return new Response(JSON.stringify({ success: true, store: store || null }), { headers });
+        const record = requestedId ? await getStoreAccess(db, requestedId) : null;
+        const fallback = !requestedId ? await db.prepare(`SELECT s.* FROM stores s WHERE s.is_active=1 AND NOT EXISTS(SELECT 1 FROM users u WHERE u.store_id=s.id AND u.is_active=0) AND EXISTS(SELECT 1 FROM subscriptions b WHERE b.id=(SELECT x.id FROM subscriptions x WHERE x.store_id=s.id ORDER BY x.created_at DESC LIMIT 1) AND b.status IN ('active','trial') AND b.start_date<=date('now') AND b.end_date>=date('now') LIMIT 1`).first() : null;
+        const store = requestedId ? record?.store : fallback;
+        if (requestedId && record && !storeIsAvailable(record.status) && actor?.role !== 'super_admin' && actor?.store_id !== requestedId) return fail('المتجر غير متاح حاليًا',404);
+        return new Response(JSON.stringify({ success: true, store: store ? { ...store, effective_status: requestedId ? record?.status : 'active' } : null }), { headers });
       }
 
       if (method === 'POST' || method === 'PUT') {
@@ -429,12 +449,12 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       if (method === 'GET') {
         const storeId = url.searchParams.get('store_id');
         if (storeId) {
-          const s = await db.prepare('SELECT is_active FROM stores WHERE id=?').bind(storeId).first() as any;
-          if (!s || (!s.is_active && actor?.role !== 'super_admin' && actor?.store_id !== storeId)) return fail('المتجر غير متاح',404);
+          const access = await getStoreAccess(db,storeId);
+          if (!access || (!storeIsAvailable(access.status) && actor?.role !== 'super_admin' && actor?.store_id !== storeId)) return fail('المتجر غير متاح حاليًا',404);
         }
         const products = storeId
           ? await db.prepare(`SELECT * FROM products WHERE store_id = ? ${actor?.role === 'super_admin' || actor?.store_id === storeId ? '' : 'AND is_available=1'} ORDER BY created_at DESC`).bind(storeId).all()
-          : await db.prepare('SELECT p.* FROM products p JOIN stores s ON s.id=p.store_id WHERE s.is_active=1 AND p.is_available=1 ORDER BY p.created_at DESC').all();
+          : await db.prepare(`SELECT p.* FROM products p JOIN stores s ON s.id=p.store_id JOIN subscriptions b ON b.id=(SELECT x.id FROM subscriptions x WHERE x.store_id=s.id ORDER BY x.created_at DESC LIMIT 1) WHERE s.is_active=1 AND p.is_available=1 AND b.status IN ('active','trial') AND b.start_date<=date('now') AND b.end_date>=date('now') AND NOT EXISTS(SELECT 1 FROM users u WHERE u.store_id=s.id AND u.is_active=0) ORDER BY p.created_at DESC`).all();
         return new Response(JSON.stringify({ success: true, products: products.results || [] }), { headers });
       }
 
@@ -498,11 +518,11 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
         await rateLimit(db,request,'orders',30,60000);
         const body = await request.json() as any;
         const id = 'ord-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
-        const { store_id = 'store-elegance', customer_name, customer_phone, customer_address = '', items, total_price } = body;
-        const store = await db.prepare('SELECT id FROM stores WHERE id=? AND is_active=1').bind(store_id).first();
-        if (!store) return fail('المتجر غير متاح',404);
-        const subscription=await db.prepare('SELECT status,start_date,end_date FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(store_id).first();
-        if(!usableSubscription(subscription))return fail('المتجر لا يستقبل طلبات حاليًا',403);
+        const { store_id, customer_name, customer_phone, customer_address = '', items, total_price } = body;
+        if(typeof store_id!=='string'||!store_id.trim())return fail('تعذر تحديد المتجر المطلوب',400);
+        const storeAccess=await getStoreAccess(db,store_id);
+        if(!storeAccess)return fail('المتجر غير متاح',404);
+        if(!storeIsAvailable(storeAccess.status))return fail('المتجر لا يستقبل طلبات حاليًا',403);
         if (typeof customer_name !== 'string' || !customer_name.trim() || customer_name.length>160 || typeof customer_phone !== 'string' || !customer_phone || customer_phone.length>30 || String(customer_address).length>1000 || !Array.isArray(items) || !items.length || items.length>50) return fail('راجع بيانات الطلب',400);
         let calculatedTotal = 0;
         const verifiedItems = [];
@@ -531,4 +551,12 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
   }
 };
 
-function usableSubscription(sub:any){if(!sub||!['active','trial'].includes(sub.status))return false;const start=Date.parse(sub.start_date+'T00:00:00Z'),end=Date.parse(sub.end_date+'T23:59:59.999Z');return Number.isFinite(start)&&Number.isFinite(end)&&start<=Date.now()&&end>=Date.now()}
+async function getStoreAccess(db:any,storeId:string,now=Date.now()){
+  const store=await db.prepare('SELECT * FROM stores WHERE id=?').bind(storeId).first() as any;
+  if(!store)return null;
+  const [user,subscription]=await Promise.all([
+    db.prepare('SELECT is_active FROM users WHERE store_id=? ORDER BY created_at LIMIT 1').bind(storeId).first() as Promise<any>,
+    db.prepare('SELECT * FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(storeId).first() as Promise<any>,
+  ]);
+  return {store,subscription,user,status:effectiveStoreStatus(user?.is_active ?? 1,store.is_active,subscription,now)};
+}
