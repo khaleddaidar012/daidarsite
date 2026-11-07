@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MerchantDetail } from '../types';
+import { MerchantDetail, SubscriptionPaymentRequest } from '../types';
 import { api as defaultApi, createStoreApi } from '../services/api';
 import EcosystemAdmin from '../../../shared/EcosystemAdmin';
 import EcosystemPanel from '../../../shared/EcosystemPanel';
@@ -82,6 +82,10 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     totalProducts: 0,
     monthMap: {},
   });
+  const [paymentRequests,setPaymentRequests]=useState<SubscriptionPaymentRequest[]>([]);
+  const [paymentRequestError,setPaymentRequestError]=useState('');
+  const [reviewingRequestId,setReviewingRequestId]=useState<string|null>(null);
+  const [proofPreview,setProofPreview]=useState<{id:string;url:string}|null>(null);
 
   // New Merchant Form State
   const [newStoreName, setNewStoreName] = useState('');
@@ -118,6 +122,12 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   useEffect(() => {
     loadMerchants();
   }, []);
+
+  const loadPaymentRequests=async()=>{try{setPaymentRequestError('');setPaymentRequests(await api.getSubscriptionPaymentRequests())}catch(err:any){setPaymentRequestError(err.message||'تعذر تحميل طلبات الاشتراك')}};
+  useEffect(()=>{void loadPaymentRequests()},[]);
+  useEffect(()=>()=>{if(proofPreview)URL.revokeObjectURL(proofPreview.url)},[proofPreview]);
+  const showPaymentProof=async(id:string)=>{try{const blob=await api.getSubscriptionPaymentProof(id);setProofPreview({id,url:URL.createObjectURL(blob)})}catch(err:any){setPaymentRequestError(err.message||'تعذر تحميل الإيصال')}};
+  const reviewPaymentRequest=async(id:string,status:'approved'|'rejected')=>{try{setReviewingRequestId(id);setPaymentRequestError('');await api.reviewSubscriptionPaymentRequest(id,status);await Promise.all([loadPaymentRequests(),status==='approved'?loadMerchants():Promise.resolve()])}catch(err:any){setPaymentRequestError(err.message||'تعذرت مراجعة الطلب')}finally{setReviewingRequestId(null)}};
 
   const handleCopyStoreLink = async (storeId: string) => {
     const url = storefrontUrl(storeId, storeBaseUrl);
@@ -694,6 +704,15 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
             </div>
           )}
         </div>
+
+        <section aria-labelledby="subscription-payment-requests-title" className="space-y-4 rounded-3xl border border-slate-200/90 bg-white p-4 shadow-xl shadow-sky-500/5 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 id="subscription-payment-requests-title" className="text-lg font-black text-slate-900 dark:text-white">{isArabic?'طلبات الاشتراك وإيصالات التحويل':'Subscription requests and transfer receipts'}</h2><p className="mt-1 text-xs text-slate-500">{isArabic?'راجع الإيصال يدويًا قبل اعتماد الدفع وتفعيل المتجر.':'Verify each transfer receipt before approving payment and activating the store.'}</p></div><button type="button" onClick={()=>void loadPaymentRequests()} className="rounded-xl border px-3 py-2 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800">{isArabic?'تحديث الطلبات':'Refresh requests'}</button></div>
+          {paymentRequestError&&<p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{paymentRequestError}</p>}
+          {!paymentRequests.length&&!paymentRequestError?<p className="rounded-xl bg-slate-50 p-5 text-center text-sm text-slate-500 dark:bg-slate-800">{isArabic?'لا توجد طلبات اشتراك حتى الآن.':'No subscription requests yet.'}</p>:null}
+          <div className="space-y-3">{paymentRequests.map(request=>{let featureIds:string[]=[];try{featureIds=JSON.parse(request.features_json)}catch{}const featureNames:Record<string,string>={main_store:'المتجر الرئيسي',custom_domain:'دومين للمتجر',backups:'نسخ احتياطي',whatsapp_management:'إدارة المتجر عبر واتساب',phone_notifications:'إشعارات تلقائية على الهاتف'};const pending=request.status==='pending';return <article key={request.id} className="grid gap-4 rounded-2xl border border-slate-200 p-4 dark:border-slate-700 lg:grid-cols-[1fr_auto]"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-black text-slate-900 dark:text-white">{request.store_name}</h3><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600 dark:bg-slate-800">{request.status==='pending'?(isArabic?'بانتظار المراجعة':'Pending'):request.status==='approved'?(isArabic?'تم الاعتماد':'Approved'):(isArabic?'مرفوض':'Rejected')}</span></div><p className="mt-1 text-xs text-slate-500">{isArabic?'صاحب المتجر':'Merchant'}: {request.username} · {request.created_at}</p><div className="mt-3 flex flex-wrap gap-2">{featureIds.map(id=><span key={id} className="rounded-lg bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-800 dark:bg-sky-950/40 dark:text-sky-200">{featureNames[id]||id}</span>)}</div><div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs"><span>{isArabic?'شهري':'Monthly'}: <b>{Number(request.monthly_total).toLocaleString(isArabic?'ar-EG':'en-US')} ج.م</b></span><span>{isArabic?'سنوي':'Yearly'}: <b>{Number(request.annual_total).toLocaleString(isArabic?'ar-EG':'en-US')} ج.م</b></span><span className="font-black text-sky-700">{isArabic?'المستحق الآن':'Due now'}: {Number(request.due_now).toLocaleString(isArabic?'ar-EG':'en-US')} ج.م</span></div></div><div className="flex flex-wrap items-center gap-2 lg:justify-end"><button type="button" onClick={()=>void showPaymentProof(request.id)} className="min-h-10 rounded-xl border border-sky-200 px-3 py-2 text-xs font-bold text-sky-800 hover:bg-sky-50">{isArabic?'عرض إيصال التحويل':'View transfer receipt'}</button>{pending&&<><button type="button" disabled={reviewingRequestId===request.id} onClick={()=>void reviewPaymentRequest(request.id,'approved')} className="min-h-10 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white disabled:opacity-50">{isArabic?'تأكيد الدفع وتفعيل المتجر':'Confirm payment & activate'}</button><button type="button" disabled={reviewingRequestId===request.id} onClick={()=>void reviewPaymentRequest(request.id,'rejected')} className="min-h-10 rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 disabled:opacity-50">{isArabic?'رفض الإيصال':'Reject receipt'}</button></>}</div></article>})}</div>
+        </section>
+
+        {proofPreview&&<div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-4" role="dialog" aria-modal="true" aria-label={isArabic?'إيصال التحويل':'Transfer receipt'} onClick={()=>setProofPreview(null)}><div className="max-h-[90vh] max-w-3xl overflow-auto rounded-2xl bg-white p-3 shadow-2xl" onClick={e=>e.stopPropagation()}><div className="mb-2 flex items-center justify-between gap-3"><strong>{isArabic?'إيصال التحويل':'Transfer receipt'}</strong><button type="button" onClick={()=>setProofPreview(null)} className="rounded-lg border px-3 py-1 text-sm">{isArabic?'إغلاق':'Close'}</button></div><img src={proofPreview.url} alt={isArabic?'صورة إيصال التحويل':'Transfer receipt image'} className="max-h-[78vh] max-w-full rounded-xl object-contain"/></div></div>}
 
         {/* 5. MERCHANTS MANAGEMENT CARD & FILTER TABS */}
         <div id="admin-store-management" className="scroll-mt-28 bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-2xl shadow-sky-500/5 space-y-4">

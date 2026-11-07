@@ -1,4 +1,4 @@
-import { Store, Product, TrafficStats, CustomerOrder, OrderStatus, StoreOrder, User, Subscription, MerchantDetail } from '../types';
+import { Store, Product, TrafficStats, CustomerOrder, OrderStatus, StoreOrder, User, Subscription, MerchantDetail, SubscriptionFeatureKey, SubscriptionPaymentRequest } from '../types';
 
 
 
@@ -180,6 +180,32 @@ export function createStoreApi(API_BASE='/api/store') { return {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.success) throw new Error(data.error || 'تعذر تفعيل الاشتراك المجاني. حاول مرة أخرى.');
+  },
+
+  async createSubscriptionPaymentRequest(features: SubscriptionFeatureKey[], proof: string): Promise<{id:string;status:'pending';monthly_total:number;annual_total:number;due_now:number}> {
+    const res=await fetch(`${API_BASE}/subscription-requests`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({features,proof})});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok||!data.success)throw new Error(data.error||'تعذر إرسال طلب الاشتراك');
+    return data.request;
+  },
+
+  async getSubscriptionPaymentRequests(): Promise<SubscriptionPaymentRequest[]> {
+    const res=await fetch(`${API_BASE}/admin/subscription-requests`,{cache:'no-store'});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok||!data.success)throw new Error(data.error||'تعذر تحميل طلبات الاشتراك');
+    return data.requests||[];
+  },
+
+  async getSubscriptionPaymentProof(id:string): Promise<Blob> {
+    const res=await fetch(`${API_BASE}/admin/subscription-requests/${encodeURIComponent(id)}/proof`,{cache:'no-store'});
+    if(!res.ok)throw new Error('تعذر تحميل إيصال التحويل');
+    return res.blob();
+  },
+
+  async reviewSubscriptionPaymentRequest(id:string,status:'approved'|'rejected'): Promise<void> {
+    const res=await fetch(`${API_BASE}/admin/subscription-requests/${encodeURIComponent(id)}/review`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok||!data.success)throw new Error(data.error||'تعذرت مراجعة طلب الاشتراك');
   },
 
   async saveStore(storeData: Partial<Store>): Promise<Store> {

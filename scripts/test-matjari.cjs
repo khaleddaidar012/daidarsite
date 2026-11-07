@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),ts=require('typescript'),{DatabaseSync}=require('node:sqlite');
 function load(file,deps={}){const m={exports:{}};new Function('require','module','exports',ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(n=>deps[n]||(n.startsWith('.')&&fs.existsSync(require('node:path').resolve(require('node:path').dirname(file),n)+'.ts')?load(require('node:path').resolve(require('node:path').dirname(file),n)+'.ts'):require(n)),m,m.exports);return m.exports}
 const sqlite=new DatabaseSync(':memory:');sqlite.exec('PRAGMA foreign_keys=ON');
-for(const file of ['0001_initial_schema.sql','0002_auth_sessions.sql'])sqlite.exec(fs.readFileSync('matjari/migrations/'+file,'utf8'));
+for(const file of ['0001_initial_schema.sql','0002_auth_sessions.sql','0003_subscription_payment_requests.sql'])sqlite.exec(fs.readFileSync('matjari/migrations/'+file,'utf8'));
 const DB={prepare(sql){let args=[];return{bind(...values){args=values;return this},async first(){return sqlite.prepare(sql).get(...args)||null},async all(){return{results:sqlite.prepare(sql).all(...args)}},async run(){return sqlite.prepare(sql).run(...args)}}},async batch(statements){sqlite.exec('BEGIN');try{const out=[];for(const s of statements)out.push(await s.run());sqlite.exec('COMMIT');return out}catch(e){sqlite.exec('ROLLBACK');throw e}}};
 const auth=load('matjari/lib/auth.ts'),{onRequest}=load('matjari/functions/api/[[route]].ts',{'../../lib/auth':auth});
 const {effectiveStoreStatus,displayStorePlan}=load('matjari/lib/store-status.ts');
@@ -48,8 +48,17 @@ async function test(){
  assert.equal((await call('auth/login','POST',{username:'merchant1',password:'bad'})).status,401);
  const login=await call('auth/login','POST',{username:'merchant1',password:reg('x').password});await data(login);
  const r2=await call('auth/register','POST',reg('merchant2'));const b=await data(r2),c2=session(r2);
+ const receipt='data:image/png;base64,iVBORw0KGgo=';
+ assert.equal((await call('subscription-requests','POST',{features:['main_store','custom_domain'],proof:'bad'},c1)).status,400);
+ assert.equal((await call('subscription-requests','POST',{features:['main_store','made_up'],proof:receipt},c1)).status,400);
+ const paymentResult=await call('subscription-requests','POST',{features:['main_store','custom_domain'],proof:receipt,monthly_total:1,due_now:1},c1);assert.equal(paymentResult.status,201);const paymentBody=await paymentResult.json();assert.equal(paymentBody.request.monthly_total,350);assert.equal(paymentBody.request.annual_total,600);assert.equal(paymentBody.request.due_now,950);assert.equal(paymentBody.request.status,'pending');
+ assert.equal((await call('subscription-requests','POST',{features:['main_store'],proof:receipt},c2)).status,201);
  const adminHash=await auth.passwordHash('Owner secure password');sqlite.prepare("INSERT INTO users(id,username,password,role) VALUES('owner','owner',?,'super_admin')").run(adminHash);
  const ar=await call('auth/login','POST',{username:'owner',password:'Owner secure password'});await data(ar);const ac=session(ar);
+ assert.equal((await call('admin/subscription-requests','GET',undefined,c1)).status,403);
+ const paymentQueue=await data(await call('admin/subscription-requests','GET',undefined,ac));assert.equal(paymentQueue.requests.length,2);assert.equal(paymentQueue.requests.find(x=>x.id===paymentBody.request.id).store_name,'متجر merchant1');
+ assert.equal((await call(`admin/subscription-requests/${paymentBody.request.id}/proof`,'GET',undefined,c1)).status,403);
+ const paymentProof=await call(`admin/subscription-requests/${paymentBody.request.id}/proof`,'GET',undefined,ac);assert.equal(paymentProof.status,200);assert.equal(paymentProof.headers.get('content-type'),'image/png');assert.equal((await paymentProof.arrayBuffer()).byteLength,8);
  await data(await call(`admin/merchants/${a.store.id}/toggle-status`,'PUT',undefined,ac));
  const activated=await data(await call('auth/session','GET',undefined,c1));
  assert.equal(activated.store.effective_status,'active');assert.equal(activated.subscription.status,'active');
@@ -69,6 +78,10 @@ async function test(){
  assert.equal((await call(`orders?id=${placedOrder.orderId}&store_id=${a.store.id}`,'PUT',{status:'unknown'},c1)).status,400);
  assert.equal((await call(`orders?id=${placedOrder.orderId}&store_id=${a.store.id}`,'PUT',{status:'shipped'},c1)).status,200);
  const updatedOrders=await data(await call('orders','GET',undefined,c1));assert.equal(updatedOrders.orders[0].status,'shipped');
+ assert.equal((await call(`admin/subscription-requests/${paymentBody.request.id}/review`,'POST',{status:'approved'},ac)).status,200);
+ assert.equal((await call(`admin/subscription-requests/${paymentBody.request.id}/review`,'POST',{status:'approved'},ac)).status,409);
+ const approvedSub=sqlite.prepare('SELECT * FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').get(a.store.id);assert.equal(approvedSub.plan_name,'المتجر الرئيسي + دومين للمتجر');assert.equal(approvedSub.price,350);assert.equal(JSON.parse(approvedSub.notes).annual_domain_fee,600);assert.equal(sqlite.prepare('SELECT is_active FROM stores WHERE id=?').get(a.store.id).is_active,1);
+ const pendingPayment=paymentQueue.requests.find(x=>x.id!==paymentBody.request.id);assert.equal((await call(`admin/subscription-requests/${pendingPayment.id}/review`,'POST',{status:'rejected'},ac)).status,200);
  const analytics=await data(await call('admin/analytics','GET',undefined,ac));assert.equal(analytics.analytics.totalOrders,1);assert.equal(Object.values(analytics.analytics.monthMap)[0],1);
  assert.equal((await call('orders')).status,401);
  assert.equal((await data(await call('orders','GET',undefined,c2))).orders.length,0);

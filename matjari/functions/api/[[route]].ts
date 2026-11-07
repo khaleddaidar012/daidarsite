@@ -10,6 +10,31 @@ export interface Env extends EcoEnv {
 
 export const onRequest = ({request,env}:{request:Request;env:Env}) => handleStoreRequest(request,env);
 
+const subscriptionFeatureCatalog = {
+  main_store: { label: 'المتجر الرئيسي', monthly: 350, annual: 0 },
+  custom_domain: { label: 'دومين للمتجر', monthly: 0, annual: 600 },
+  backups: { label: 'نسخ احتياطي', monthly: 50, annual: 0 },
+  whatsapp_management: { label: 'إدارة المتجر عن طريق واتساب', monthly: 75, annual: 0 },
+  phone_notifications: { label: 'إشعارات تلقائية على هاتفك', monthly: 75, annual: 0 },
+} as const;
+type SubscriptionFeature = keyof typeof subscriptionFeatureCatalog;
+
+function decodePaymentProof(value: unknown): { mime: string; base64: string } | null {
+  if (typeof value !== 'string' || value.length > 1_400_000) return null;
+  const match = value.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+={0,2})$/);
+  if (!match || match[2].length % 4 !== 0) return null;
+  try {
+    const bytes = Uint8Array.from(atob(match[2]), char => char.charCodeAt(0));
+    if (!bytes.length || bytes.length > 1_048_576) return null;
+    const png = match[1] === 'image/png' && bytes.length >= 8 && [137,80,78,71,13,10,26,10].every((n,i)=>bytes[i]===n);
+    const jpeg = match[1] === 'image/jpeg' && bytes.length >= 3 && bytes[0]===255 && bytes[1]===216 && bytes[2]===255;
+    const webp = match[1] === 'image/webp' && bytes.length >= 12 && String.fromCharCode(...bytes.slice(0,4))==='RIFF' && String.fromCharCode(...bytes.slice(8,12))==='WEBP';
+    return png || jpeg || webp ? { mime: match[1], base64: match[2] } : null;
+  } catch {
+    return null;
+  }
+}
+
 // Server-only delegation. The public HTTP entry point never accepts an actor.
 export async function handleStoreRequest(request:Request, env:Env, delegatedActor?:Actor) {
   const url = new URL(request.url);
@@ -84,6 +109,24 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       await syncStoreResource(env,actor.store_id);
       return new Response(JSON.stringify({success:true}),{headers});
     }
+    if(path==='subscription-requests'&&method==='POST'){
+      if(!actor)return fail('يرجى تسجيل الدخول',401);
+      if(actor.role!=='merchant'||!actor.store_id)return fail('طلب الاشتراك متاح لصاحب المتجر فقط');
+      const body=await request.json() as any;
+      const features: unknown=body.features;
+      if(!Array.isArray(features)||features.length>Object.keys(subscriptionFeatureCatalog).length||!features.includes('main_store')||features.some((feature:unknown)=>typeof feature!=='string'||!Object.prototype.hasOwnProperty.call(subscriptionFeatureCatalog,feature)))return fail('راجع اختيارات الاشتراك',400);
+      const uniqueFeatures=[...new Set(features as SubscriptionFeature[])];
+      const proof=decodePaymentProof(body.proof);
+      if(!proof)return fail('ارفع صورة إيصال صحيحة بصيغة PNG أو JPG أو WEBP وبحجم لا يتجاوز 1 ميجابايت',400);
+      const store=await db.prepare('SELECT id FROM stores WHERE id=?').bind(actor.store_id).first();
+      if(!store)return fail('المتجر غير موجود',404);
+      const monthlyTotal=uniqueFeatures.reduce((sum,feature)=>sum+subscriptionFeatureCatalog[feature].monthly,0);
+      const annualTotal=uniqueFeatures.reduce((sum,feature)=>sum+subscriptionFeatureCatalog[feature].annual,0);
+      const id='pay-'+crypto.randomUUID();
+      await db.prepare(`INSERT INTO subscription_payment_requests(id,store_id,user_id,features_json,monthly_total,annual_total,due_now,proof_mime,proof_base64)
+        VALUES(?,?,?,?,?,?,?,?,?)`).bind(id,actor.store_id,actor.id,JSON.stringify(uniqueFeatures),monthlyTotal,annualTotal,monthlyTotal+annualTotal,proof.mime,proof.base64).run();
+      return new Response(JSON.stringify({success:true,request:{id,status:'pending',monthly_total:monthlyTotal,annual_total:annualTotal,due_now:monthlyTotal+annualTotal}}),{status:201,headers});
+    }
     if (path === 'auth/session' && method === 'GET') {
       if (!actor) return fail('يرجى تسجيل الدخول', 401);
       const store = actor.store_id ? await db.prepare('SELECT * FROM stores WHERE id=?').bind(actor.store_id).first() : null;
@@ -103,6 +146,47 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       (path.startsWith('products') && method !== 'GET');
     if (privatePath && !actor) return fail('يرجى تسجيل الدخول', 401);
     if (adminPath && actor?.role !== 'super_admin') return fail('هذه الصلاحية للإدارة فقط');
+    if(path==='admin/subscription-requests'&&method==='GET'){
+      const requests=await db.prepare(`SELECT r.id,r.store_id,r.user_id,r.features_json,r.monthly_total,r.annual_total,r.due_now,r.status,r.created_at,r.reviewed_at,s.name AS store_name,u.username
+        FROM subscription_payment_requests r JOIN stores s ON s.id=r.store_id JOIN users u ON u.id=r.user_id ORDER BY CASE r.status WHEN 'pending' THEN 0 ELSE 1 END,r.created_at DESC LIMIT 100`).all();
+      return new Response(JSON.stringify({success:true,requests:requests.results||[]}),{headers});
+    }
+    const proofMatch=path.match(/^admin\/subscription-requests\/([^/]+)\/proof$/);
+    if(proofMatch&&method==='GET'){
+      const proof=await db.prepare('SELECT proof_mime,proof_base64 FROM subscription_payment_requests WHERE id=?').bind(proofMatch[1]).first() as any;
+      if(!proof)return fail('إيصال التحويل غير موجود',404);
+      const bytes=Uint8Array.from(atob(proof.proof_base64),char=>char.charCodeAt(0));
+      const imageHeaders=new Headers(headers);imageHeaders.set('Content-Type',proof.proof_mime);imageHeaders.set('Content-Disposition','inline');
+      return new Response(bytes,{headers:imageHeaders});
+    }
+    const reviewMatch=path.match(/^admin\/subscription-requests\/([^/]+)\/review$/);
+    if(reviewMatch&&method==='POST'){
+      const body=await request.json() as any;
+      if(!['approved','rejected'].includes(body.status))return fail('حالة المراجعة غير صالحة',400);
+      const payRequest=await db.prepare('SELECT * FROM subscription_payment_requests WHERE id=?').bind(reviewMatch[1]).first() as any;
+      if(!payRequest)return fail('طلب الاشتراك غير موجود',404);
+      if(payRequest.status!=='pending')return fail('تمت مراجعة هذا الطلب بالفعل',409);
+      if(body.status==='rejected'){
+        await db.prepare("UPDATE subscription_payment_requests SET status='rejected',reviewed_by=?,reviewed_at=datetime('now') WHERE id=? AND status='pending'").bind(actor!.id,payRequest.id).run();
+        return new Response(JSON.stringify({success:true,status:'rejected'}),{headers});
+      }
+      const features=JSON.parse(payRequest.features_json) as SubscriptionFeature[];
+      if(!Array.isArray(features)||!features.includes('main_store')||features.some(feature=>!Object.prototype.hasOwnProperty.call(subscriptionFeatureCatalog,feature)))return fail('خيارات الطلب غير صالحة',409);
+      const monthlyTotal=features.reduce((sum,feature)=>sum+subscriptionFeatureCatalog[feature].monthly,0);
+      const annualTotal=features.reduce((sum,feature)=>sum+subscriptionFeatureCatalog[feature].annual,0);
+      const planName=features.map(feature=>subscriptionFeatureCatalog[feature].label).join(' + ');
+      const notes=JSON.stringify({features,annual_domain_fee:annualTotal,annual_domain_until:annualTotal?new Date(Date.now()+365*86400000).toISOString().slice(0,10):null,payment_request_id:payRequest.id});
+      const subId='sub-'+crypto.randomUUID();
+      const reviewToken=crypto.randomUUID();
+      await db.batch([
+        db.prepare("UPDATE subscription_payment_requests SET status='approved',review_token=?,reviewed_by=?,reviewed_at=datetime('now') WHERE id=? AND status='pending'").bind(reviewToken,actor!.id,payRequest.id),
+        db.prepare("INSERT INTO subscriptions(id,store_id,plan_name,status,start_date,end_date,price,notes,created_at,updated_at) SELECT ?,?,?,'active',date('now'),date('now','+1 month'),?,?,strftime('%Y-%m-%d %H:%M:%f','now'),datetime('now') WHERE EXISTS(SELECT 1 FROM subscription_payment_requests WHERE id=? AND status='approved' AND review_token=?)").bind(subId,payRequest.store_id,planName,monthlyTotal,notes,payRequest.id,reviewToken),
+        db.prepare("UPDATE stores SET is_active=1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND EXISTS(SELECT 1 FROM subscription_payment_requests WHERE id=? AND status='approved' AND review_token=?)").bind(payRequest.store_id,payRequest.id,reviewToken),
+        db.prepare("UPDATE users SET is_active=1,updated_at=CURRENT_TIMESTAMP WHERE store_id=? AND EXISTS(SELECT 1 FROM subscription_payment_requests WHERE id=? AND status='approved' AND review_token=?)").bind(payRequest.store_id,payRequest.id,reviewToken),
+      ]);
+      await syncStoreResource(env,payRequest.store_id);
+      return new Response(JSON.stringify({success:true,status:'approved'}),{headers});
+    }
     if (['simulate-visit','simulate-order','reset-stats'].includes(path)) return fail('هذه العملية غير متاحة', 404);
     // Only the server session determines ownership. Body/localStorage roles are ignored.
     if (privatePath && actor?.role !== 'super_admin') {

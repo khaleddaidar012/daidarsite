@@ -26,6 +26,23 @@ export interface Subscription {
   updated_at?: string;
 }
 
+export type SubscriptionFeatureKey = 'main_store' | 'custom_domain' | 'backups' | 'whatsapp_management' | 'phone_notifications';
+export type SubscriptionPaymentStatus = 'pending' | 'approved' | 'rejected';
+export interface SubscriptionPaymentRequest {
+  id: string;
+  store_id: string;
+  user_id: string;
+  features_json: string;
+  monthly_total: number;
+  annual_total: number;
+  due_now: number;
+  status: SubscriptionPaymentStatus;
+  created_at: string;
+  reviewed_at?: string | null;
+  store_name: string;
+  username: string;
+}
+
 export interface Store {
   id: string;
   name: string;

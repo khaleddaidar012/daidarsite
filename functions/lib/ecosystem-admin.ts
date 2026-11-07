@@ -79,7 +79,7 @@ export async function ecosystemAdministration(request:Request,env:Env):Promise<R
     if(path.startsWith('store/')){
       if(!env.ECOSYSTEM_STORE_DB)return json({error:'مصدر المتاجر غير مربوط'},503);
       const localPath=path.slice(6);
-      if(!/^admin\/merchants(?:\/[a-zA-Z0-9-]+\/(?:toggle-status|renew-subscription))?$/.test(localPath)&&!['admin/analytics','d1-status'].includes(localPath))return json({error:'عملية غير متاحة من هذه الواجهة'},404);
+      if(!/^admin\/(?:merchants(?:\/[a-zA-Z0-9-]+\/(?:toggle-status|renew-subscription))?|subscription-requests(?:\/[a-zA-Z0-9-]+\/(?:proof|review))?)$/.test(localPath)&&!['admin/analytics','d1-status'].includes(localPath))return json({error:'عملية غير متاحة من هذه الواجهة'},404);
       if(request.method==='DELETE')return json({error:'الحذف الدائم غير متاح في لوحة المنظومة؛ استخدم الإيقاف للحفاظ على البيانات'},405);
       const target=new URL('/api/'+localPath,request.url);target.search=new URL(request.url).search;
       const result=await handleStoreRequest(new Request(target,request),{...env,DB:env.ECOSYSTEM_STORE_DB,READ_ONLY_PREVIEW:'false'},{id:user.id,username:user.name,email:user.email,role:'super_admin',store_id:null,is_active:1,password:''});
