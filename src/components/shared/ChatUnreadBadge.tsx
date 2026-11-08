@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 
-export default function ChatUnreadBadge({ scope = 'admin' }: { scope?: 'admin' | 'employee' }) {
+export default function ChatUnreadBadge({ scope = 'admin', className = '' }: { scope?: 'admin' | 'employee'; className?: string }) {
   const [unread, setUnread] = useState(0)
   useEffect(() => {
     let alive = true, version = 0
@@ -20,5 +20,5 @@ export default function ChatUnreadBadge({ scope = 'admin' }: { scope?: 'admin' |
     window.addEventListener('focus', refresh)
     return () => { alive = false; window.clearInterval(timer); window.removeEventListener('staff-chat-read', refresh); window.removeEventListener('focus', refresh) }
   }, [scope])
-  return unread > 0 ? <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-xs font-bold text-white" aria-label={`${unread} رسالة غير مقروءة`}>{unread > 99 ? '99+' : unread.toLocaleString('ar-EG')}</span> : null
+  return unread > 0 ? <span className={`inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-xs font-bold text-white ${className}`} aria-label={`${unread} رسالة غير مقروءة`}>{unread > 99 ? '99+' : unread.toLocaleString('ar-EG')}</span> : null
 }

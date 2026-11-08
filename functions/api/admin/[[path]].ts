@@ -8,6 +8,7 @@ import { manageProjects } from '../../lib/projects'
 import { adminHub } from '../../lib/hub-admin'
 import { d1UsageResponse } from '../../lib/d1-usage'
 import { adminNotifications } from '../../lib/notifications'
+import { createDatabaseBackup } from '../../lib/database-backup'
 
 export async function onRequest({ request, env }: { request: Request; env: Env }) {
   try {
@@ -44,6 +45,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
     }
     if (!await authenticated(request, env)) return json({ error: 'سجل دخولك أولاً' }, 401)
     if (path === 'password-vault') return await passwordVault(request, env)
+    if (path === 'database-backup' && request.method === 'POST') return await createDatabaseBackup(env)
     if(path==='chat')return await staffChat(request,env,{key:'admin',name:'الإدارة'})
     if (path === 'service-subscriptions') return await serviceSubscriptions(request, env)
     if (path === 'notifications') return await adminNotifications(request, env)
@@ -82,6 +84,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
     return json({ error: 'غير موجود' }, 404)
   } catch (error) {
     console.error('Admin request failed', error)
+    if (error instanceof Error && error.message.startsWith('backup_too_large:')) return json({ error: 'حجم النسخة أكبر من الحد الذي يمكن تنزيله من لوحة الإدارة. استخدم تصدير Wrangler من Cloudflare لتنزيل قاعدة بهذا الحجم.' }, 413)
     if (error instanceof Error && /no such table:\s*attendance_shifts/i.test(error.message)) return json({error:'يلزم تنفيذ تحديث قاعدة البيانات 0011_employee_multiple_shifts.sql لتفعيل الورديات المتعددة'},503)
     return json({ error: 'تعذر تنفيذ الطلب. راجع إعدادات قاعدة البيانات.' }, 500)
   }

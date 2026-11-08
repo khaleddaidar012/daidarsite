@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Database, RefreshCw } from 'lucide-react'
+import { AlertTriangle, Database, Download, RefreshCw } from 'lucide-react'
 
 type DatabaseUsage = { id: string; name: string; jurisdiction: string | null; usedBytes: number; limitBytes: number; freeBytes: number; usedPercent: number; status: 'healthy' | 'warning' | 'critical' }
 type Usage = {
@@ -36,6 +36,9 @@ export default function D1UsageDashboard({ scope = 'admin' }: { scope?: 'admin' 
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [backupBusy, setBackupBusy] = useState(false)
+  const [backupError, setBackupError] = useState('')
+  const [backupNotice, setBackupNotice] = useState('')
   const load = useCallback(async (quiet = false) => {
     if (quiet) setRefreshing(true); else setLoading(true)
     setError('')
@@ -52,6 +55,34 @@ export default function D1UsageDashboard({ scope = 'admin' }: { scope?: 'admin' 
   }, [scope])
   useEffect(() => { void load() }, [load])
 
+  const downloadBackup = async () => {
+    if (!window.confirm('ستُنزّل نسخة تحتوي على بيانات قواعد البيانات. احفظ الملف في مكان آمن ولا تشاركه. متابعة؟')) return
+    setBackupBusy(true); setBackupError(''); setBackupNotice('')
+    try {
+      const response = await fetch('/api/admin/database-backup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', cache: 'no-store' })
+      if (!response.ok) {
+        const result = await response.json().catch(() => null) as { error?: string } | null
+        throw new Error(result?.error || 'تعذر إنشاء النسخة الاحتياطية')
+      }
+      const body = await response.text()
+      const backup = JSON.parse(body) as { format?: string; unavailableBindings?: string[]; databases?: unknown[] }
+      if (backup.format !== 'daidar-d1-json-backup' || !Array.isArray(backup.databases)) throw new Error('صيغة النسخة التي وصلت غير صحيحة')
+      const file = new Blob([body], { type: 'application/json;charset=utf-8' })
+      const disposition = response.headers.get('Content-Disposition') || ''
+      const fileName = disposition.match(/filename="([^"]+)"/)?.[1] || `daidar-d1-backup-${new Date().toISOString().slice(0, 10)}.json`
+      const url = URL.createObjectURL(file)
+      const link = document.createElement('a')
+      link.href = url; link.download = fileName; link.click()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      const unavailable = backup.unavailableBindings || []
+      setBackupNotice(unavailable.length
+        ? `تم التنزيل، لكن القواعد غير المرتبطة لم تدخل في الملف: ${unavailable.join('، ')}.`
+        : `تم تنزيل نسخة JSON تشمل ${backup.databases.length} قواعد بيانات.`)
+    } catch (cause) {
+      setBackupError(cause instanceof Error ? cause.message : 'تعذر إنشاء النسخة الاحتياطية')
+    } finally { setBackupBusy(false) }
+  }
+
   const alerts = usage?.databases.filter(database => database.status !== 'healthy') || []
   const accountStatus = usage?.account.status || 'healthy'
   const hasAlert = alerts.length > 0 || accountStatus !== 'healthy'
@@ -63,11 +94,19 @@ export default function D1UsageDashboard({ scope = 'admin' }: { scope?: 'admin' 
         <h2 className="mt-1 text-2xl font-extrabold">سعة قواعد البيانات</h2>
         <p className="mt-2 text-sm text-slate-500">تُحدّث القائمة من Cloudflare عند فتح الصفحة أو الضغط على تحديث.</p>
       </div>
-      <button type="button" onClick={() => void load(true)} disabled={loading || refreshing} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
-        <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> تحديث الآن
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => void load(true)} disabled={loading || refreshing} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> تحديث الآن
+        </button>
+        {scope === 'admin' && <button type="button" onClick={() => void downloadBackup()} disabled={backupBusy} className="inline-flex items-center gap-2 rounded-xl bg-sky-700 px-4 py-2.5 font-bold text-white shadow-sm hover:bg-sky-800 disabled:opacity-50">
+          <Download size={16} className={backupBusy ? 'animate-bounce' : ''} /> {backupBusy ? 'جارٍ تجهيز النسخة…' : 'تنزيل نسخة محلية'}
+        </button>}
+      </div>
     </div>
 
+    {backupError && <div role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">تعذر تنزيل النسخة الاحتياطية: {backupError}. إذا تجاوزت القواعد الحجم المسموح، استخدم تصدير Wrangler من Cloudflare.</div>}
+    {backupNotice && <div role="status" className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">{backupNotice}</div>}
+    {scope === 'admin' && <p className="mt-3 text-xs text-slate-500">ينزّل الملف مخطط وجداول قواعد D1 المرتبطة بالإدارة، دون أسرار الإعدادات. الملف يحتوي بيانات خاصة؛ احتفظ به بأمان.</p>}
     {error && <div role="alert" className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><strong>تعذر جلب السعة.</strong> {error}<p className="mt-2">تُحفظ بيانات اعتماد Cloudflare على الخادم فقط؛ لا تضع الـAPI Token في الصفحة أو المحادثة.</p></div>}
     {loading && <p className="py-10 text-center text-slate-500">جارٍ جلب قواعد D1 من Cloudflare…</p>}
     {usage && <>
