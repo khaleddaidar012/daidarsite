@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Check, CreditCard, MessageCircle, Upload, Sparkles, Globe, Bell, DatabaseBackup, Store } from 'lucide-react';
+import { Check, CreditCard, MessageCircle, Upload, Sparkles, Globe, Database, Store } from 'lucide-react';
 import { api } from '../services/api';
 import type { SubscriptionFeatureKey, Store as StoreType } from '../types';
 
@@ -7,9 +7,9 @@ type Props={store:StoreType;support:string;isArabic:boolean};
 const features:{id:SubscriptionFeatureKey;name:string;price:number;period:'monthly'|'annual';description:string;Icon:typeof Store}[]=[
  {id:'main_store',name:'المتجر الرئيسي',price:350,period:'monthly',description:'إنشاء وإدارة واجهة متجرك على الإنترنت',Icon:Store},
  {id:'custom_domain',name:'دومين للمتجر',price:600,period:'annual',description:'استخدام عنوان نطاق خاص بمتجرك',Icon:Globe},
- {id:'backups',name:'نسخ احتياطي',price:50,period:'monthly',description:'نسخ احتياطي دوري لبيانات متجرك',Icon:DatabaseBackup},
+ {id:'backups',name:'نسخ احتياطي',price:50,period:'monthly',description:'نسخ احتياطي دوري لبيانات متجرك',Icon:Database},
  {id:'whatsapp_management',name:'إدارة المتجر عن طريق واتساب',price:75,period:'monthly',description:'متابعة المساعدة وإدارة المتجر عبر واتساب',Icon:MessageCircle},
- {id:'phone_notifications',name:'إشعارات تلقائية على هاتفك',price:75,period:'monthly',description:'تنبيهات تلقائية على هاتفك',Icon:Bell},
+ {id:'phone_notifications',name:'إشعارات تلقائية على هاتفك',price:75,period:'monthly',description:'تنبيهات تلقائية على هاتفك',Icon:Sparkles},
 ];
 const format=(n:number,ar:boolean)=>`${n.toLocaleString(ar?'ar-EG':'en-US')} ج.م`;
 
