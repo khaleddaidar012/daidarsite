@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from 'next'
-import { Cairo, Inter } from 'next/font/google'
 import '../styles/globals.css'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import { VisitTracker } from '@/components/providers/VisitTracker'
@@ -9,20 +8,6 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: 'cover',
 }
-
-const cairo = Cairo({
-  subsets: ['arabic', 'latin'],
-  variable: '--font-cairo',
-  display: 'swap',
-  weight: ['300', '400', '500', '600', '700', '800'],
-})
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-  weight: ['300', '400', '500', '600', '700'],
-})
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://daidarsolutions.com'),
@@ -104,7 +89,7 @@ export default function RootLayout({
       </head>
       <body
         suppressHydrationWarning
-        className={`${cairo.variable} ${inter.variable} font-arabic antialiased bg-[#f8fafc] dark:bg-[#0b1628] text-[#0f2744] dark:text-[#e8f0fb] transition-colors duration-200`}
+        className="font-arabic antialiased bg-[#f8fafc] dark:bg-[#0b1628] text-[#0f2744] dark:text-[#e8f0fb] transition-colors duration-200"
       >
         <ThemeProvider>
           <VisitTracker />

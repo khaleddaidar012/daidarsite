@@ -6,6 +6,8 @@
    CSS Custom Properties / Design Tokens
    ============================================ */
 :root {
+  --font-cairo: "Cairo", "Noto Sans Arabic", Tahoma, Arial, sans-serif;
+  --font-inter: Inter, Arial, sans-serif;
   --brand-50:  #f0f4f9;
   --brand-100: #e2eaf4;
   --brand-200: #c9d8ea;
