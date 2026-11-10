@@ -30,3 +30,18 @@ const assetHash = crypto.createHash('sha256')
 run(process.execPath, [path.join(root, 'node_modules', 'next', 'dist', 'bin', 'next'), 'build'], {
   MATJARI_ASSET_VERSION: assetHash,
 })
+
+// The Pages project is configured to publish Vercel's static-output path.
+// Next's `output: 'export'` writes the same static site to `out`, so mirror it
+// to the configured Pages path after confirming the export completed.
+const nextExport = path.join(root, 'out')
+const pagesStaticOutput = path.join(root, '.vercel', 'output', 'static')
+if (!fs.existsSync(path.join(nextExport, 'index.html'))) {
+  throw new Error(`Next.js static export was not found at ${nextExport}`)
+}
+fs.mkdirSync(pagesStaticOutput, { recursive: true })
+fs.cpSync(nextExport, pagesStaticOutput, { recursive: true, force: true })
+if (!fs.existsSync(path.join(pagesStaticOutput, 'index.html'))) {
+  throw new Error(`Cloudflare Pages static output was not created at ${pagesStaticOutput}`)
+}
+console.log(`Prepared Cloudflare Pages static output: ${path.relative(root, pagesStaticOutput)}`)
