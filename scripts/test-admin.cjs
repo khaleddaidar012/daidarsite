@@ -256,6 +256,11 @@ async function test() {
   sqlite.prepare('INSERT INTO subscriptions(id,store_id,plan_name,status,start_date,end_date,price,created_at) VALUES(?,?,?,?,?,?,?,?)').run('test-sub', 'store-test', 'اشتراك مدفوع', 'active', '2026-01-01', '2026-12-01', 350, '2026-01-01')
   sqlite.prepare("INSERT INTO subscription_payment_requests(id,store_id,status,proof_mime,proof_base64,created_at) VALUES(?,?,?,?,?,?)").run('customer-proof', 'store-test', 'pending', 'image/png', 'iVBORw0KGgo=', '2026-11-08')
   env.ECOSYSTEM_STORE_DB = DB
+  sqlite.exec('DROP TABLE employee_store_renewal_requests')
+  const missingRenewalMigration = await employeeCall('store-admin/store-test/renew-subscription', 'POST', { months: 1, receipt_source: 'customer_receipt' }, employeeCookie)
+  assert.equal(missingRenewalMigration.status, 503)
+  assert.match((await missingRenewalMigration.json()).error, /0004_employee_store_renewal_requests\.sql/)
+  sqlite.exec(fs.readFileSync('matjari/migrations/0004_employee_store_renewal_requests.sql', 'utf8'))
   assert.equal((await employeeCall('store-admin', 'GET', undefined, employeeCookie)).status, 200)
   assert.equal((await employeeCall('store-admin', 'POST', { store_name: 'متجر اختبار', activity_type: 'عام', whatsapp_number: '01000000000', username: 'store-test', password: 'store-password', plan_name: 'غير موثوق', duration_months: 1, price: 1 }, employeeCookie)).status, 200)
   assert.equal(delegatedStoreCalls.at(-1).body.plan_name, 'الباقة السنوية الاحترافية')

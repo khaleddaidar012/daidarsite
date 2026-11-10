@@ -330,6 +330,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
     return json({ error: 'غير موجود' }, 404)
   } catch (error) {
     console.error('Employee request failed', error)
+    if (error instanceof Error && /no such table:\s*employee_store_renewal_requests/i.test(error.message)) return json({ error: 'طلبات تجديد المتاجر تحتاج تشغيل matjari/migrations/0004_employee_store_renewal_requests.sql على قاعدة ECOSYSTEM_STORE_DB المرتبطة ببيئة الإنتاج.' }, 503)
     if(error instanceof Error&&/no such table:\s*attendance_shift_reports/i.test(error.message))return json({error:'نفّذ تحديث 0013_checkout_accomplishments.sql لحفظ الإنجازات وتأكيد الانصراف'},503)
     if(error instanceof Error&&/no such table:\s*employee_presence_checks/i.test(error.message))return json({error:'نفّذ migration 0015_employee_hour_limits.sql لتفعيل حدود الساعات وتأكيد التواجد.'},503)
     if(error instanceof Error&&/no such table:\s*employee_push_subscriptions/i.test(error.message))return json({error:'نفّذ migration 0016_employee_web_push.sql لتسجيل إشعارات الجهاز.'},503)
