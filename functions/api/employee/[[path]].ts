@@ -63,13 +63,26 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       if (!result.ok) return result
       const data = await result.clone().json().catch(() => ({})) as Record<string, unknown>
       let renewalRequests: unknown[] = []
+      let customerPaymentRequests: Array<{ id: string; store_id: string; status: string; created_at: string; has_receipt: boolean }> = []
+      let customerPaymentTrackingAvailable = false
       try {
         const rows = await env.ECOSYSTEM_STORE_DB.prepare('SELECT id,store_id,months,status,created_at,reviewed_at FROM employee_store_renewal_requests WHERE employee_id=? ORDER BY created_at DESC LIMIT 100').bind(employee.id).all()
         renewalRequests = rows.results || []
       } catch (error) {
         if (!(error instanceof Error) || !/no such table/i.test(error.message)) throw error
       }
-      return json({ ...data, renewal_requests: renewalRequests })
+      try {
+        const rows = await env.ECOSYSTEM_STORE_DB.prepare(`SELECT r.id,r.store_id,r.status,r.created_at,CASE WHEN COALESCE(r.proof_base64,'')<>'' THEN 1 ELSE 0 END AS has_receipt
+          FROM subscription_payment_requests r
+          WHERE r.id=(SELECT x.id FROM subscription_payment_requests x WHERE x.store_id=r.store_id ORDER BY x.created_at DESC LIMIT 1)`).all()
+        customerPaymentRequests = (rows.results || []).map((row: any) => ({ ...row, has_receipt: !!row.has_receipt }))
+        customerPaymentTrackingAvailable = true
+      } catch (error) {
+        if (!(error instanceof Error) || !/no such table/i.test(error.message)) throw error
+      }
+      const paymentRequestByStore = new Map(customerPaymentRequests.map(item => [item.store_id,item]))
+      const merchants = Array.isArray(data.merchants) ? data.merchants.map((merchant: any) => ({ ...merchant, customer_payment_tracking_available: customerPaymentTrackingAvailable, customer_subscription_request: paymentRequestByStore.get(merchant.store?.id) || null })) : data.merchants
+      return json({ ...data, merchants, renewal_requests: renewalRequests })
     }
     if (path === 'store-admin' && request.method === 'POST') {
       if (!employee.create_store) return json({ error: 'حسابك لا يملك صلاحية إنشاء متجر.' }, 403)
@@ -84,6 +97,19 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       return result
     }
     const storeRenewal = path.match(/^store-admin\/([a-zA-Z0-9-]+)\/renew-subscription$/)
+    const customerReceiptDownload = path.match(/^store-admin\/([a-zA-Z0-9-]+)\/subscription-receipt$/)
+    if (customerReceiptDownload && request.method === 'GET') {
+      if (!employee.manage_store_subscriptions) return json({ error: 'حسابك لا يملك صلاحية عرض إيصالات اشتراكات المتاجر.' }, 403)
+      if (!env.ECOSYSTEM_STORE_DB) return json({ error: 'مصدر بيانات المتاجر غير مربوط.' }, 503)
+      const receipt = await env.ECOSYSTEM_STORE_DB.prepare('SELECT proof_mime,proof_base64 FROM subscription_payment_requests WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(customerReceiptDownload[1]).first<{proof_mime:string;proof_base64:string}>()
+      if (!receipt?.proof_base64) return json({ error: 'لا يوجد إيصال اشتراك مرفق لهذا المتجر.' }, 404)
+      if (!['image/png','image/jpeg','image/webp'].includes(receipt.proof_mime)) return json({ error: 'صيغة إيصال الاشتراك غير مدعومة.' }, 422)
+      let bytes: Uint8Array
+      try { bytes = Uint8Array.from(atob(receipt.proof_base64), char => char.charCodeAt(0)) }
+      catch { return json({ error: 'تعذر قراءة صورة إيصال الاشتراك.' }, 422) }
+      const extension = receipt.proof_mime === 'image/jpeg' ? 'jpg' : receipt.proof_mime.split('/')[1]
+      return new Response(bytes, { headers: { 'Content-Type': receipt.proof_mime, 'Content-Disposition': `attachment; filename="subscription-receipt-${customerReceiptDownload[1]}.${extension}"`, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } })
+    }
     if (storeRenewal && request.method === 'POST') {
       if (!employee.manage_store_subscriptions) return json({ error: 'حسابك لا يملك صلاحية تجديد اشتراكات المتاجر.' }, 403)
       if (!request.headers.get('Content-Type')?.startsWith('application/json')) return json({ error: 'يلزم إرسال بيانات التجديد بصيغة JSON.' }, 415)

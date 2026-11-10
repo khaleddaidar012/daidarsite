@@ -38,7 +38,7 @@ const serviceConfig = load('src/lib/system-management.ts')
 const serviceSubsLib = load('functions/lib/service-subscriptions.ts', {'./store':store,'./employees':employeeLib,'../../src/lib/system-management':serviceConfig})
 const chatLib=load('functions/lib/staff-chat.ts',{'./store':store})
 const admin = load('functions/api/admin/[[path]].ts', { '../../lib/staff-chat':chatLib, '../../lib/service-subscriptions':serviceSubsLib, '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
-const employeeApi = load('functions/api/employee/[[path]].ts', { '../../lib/staff-chat':chatLib, '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications, '../../lib/vapid': vapid, '../../../matjari/functions/api/[[route]]': { handleStoreRequest: async (request) => { delegatedStoreCalls.push({ url: request.url, method: request.method, body: request.method === 'GET' ? null : await request.clone().json() }); return Response.json({ success: true, merchants: [] }) } } }).onRequest
+const employeeApi = load('functions/api/employee/[[path]].ts', { '../../lib/staff-chat':chatLib, '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications, '../../lib/vapid': vapid, '../../../matjari/functions/api/[[route]]': { handleStoreRequest: async (request) => { delegatedStoreCalls.push({ url: request.url, method: request.method, body: request.method === 'GET' ? null : await request.clone().json() }); return Response.json({ success: true, merchants: request.method === 'GET' ? [{ store: { id: 'store-test' }, user: { username: 'store-test' } }] : [] }) } } }).onRequest
 const visit = load('functions/api/visit.ts', { '../lib/store': store }).onRequestPost
 const publicProjects = load('functions/api/projects.ts', { '../lib/store': store }).onRequestGet
 const contact = load('functions/api/contact.ts', { '../lib/store': store, '../lib/notifications': notifications }).onRequestPost
@@ -243,6 +243,7 @@ async function test() {
   assert.equal((await call('employees', 'POST', { id: employeeId, name: employeeList[0].name, job_title: employeeList[0].job_title, email: employeeList[0].email, work_schedule_locked: false }, cookie)).status, 200)
   assert.equal((await employeeCall('ecosystem-stats', 'GET', undefined, employeeCookie)).status, 403)
   assert.equal((await employeeCall('store-admin', 'GET', undefined, employeeCookie)).status, 403)
+  assert.equal((await employeeCall('store-admin/store-test/subscription-receipt', 'GET', undefined, employeeCookie)).status, 403)
   assert.equal((await employeeCall('store-admin', 'POST', { store_name: 'متجر اختبار', activity_type: 'عام', whatsapp_number: '01000000000', username: 'store-test', password: 'store-password' }, employeeCookie)).status, 403)
   const storeEmployeeId = employeeList.find(item => item.email === employeeForm.email).id
   assert.equal((await call('employees', 'POST', { ...employeeForm, id: storeEmployeeId, password: '', create_store: 1, manage_store_subscriptions: 1, view_ecosystem_stats: 1 }, cookie)).status, 200)
@@ -261,7 +262,16 @@ async function test() {
   assert.equal(missingRenewalMigration.status, 503)
   assert.match((await missingRenewalMigration.json()).error, /0004_employee_store_renewal_requests\.sql/)
   sqlite.exec(fs.readFileSync('matjari/migrations/0004_employee_store_renewal_requests.sql', 'utf8'))
-  assert.equal((await employeeCall('store-admin', 'GET', undefined, employeeCookie)).status, 200)
+  const storeAdminList = await employeeCall('store-admin', 'GET', undefined, employeeCookie)
+  assert.equal(storeAdminList.status, 200)
+  const listedStore = (await storeAdminList.json()).merchants[0]
+  assert.equal(listedStore.customer_payment_tracking_available, true)
+  assert.deepEqual({ ...listedStore.customer_subscription_request }, { id: 'customer-proof', store_id: 'store-test', status: 'pending', created_at: '2026-11-08', has_receipt: true })
+  const downloadedCustomerReceipt = await employeeCall('store-admin/store-test/subscription-receipt', 'GET', undefined, employeeCookie)
+  assert.equal(downloadedCustomerReceipt.status, 200)
+  assert.equal(downloadedCustomerReceipt.headers.get('content-type'), 'image/png')
+  assert.match(downloadedCustomerReceipt.headers.get('content-disposition'), /attachment/)
+  assert.equal((await downloadedCustomerReceipt.arrayBuffer()).byteLength, 8)
   assert.equal((await employeeCall('store-admin', 'POST', { store_name: 'متجر اختبار', activity_type: 'عام', whatsapp_number: '01000000000', username: 'store-test', password: 'store-password', plan_name: 'غير موثوق', duration_months: 1, price: 1 }, employeeCookie)).status, 200)
   assert.equal(delegatedStoreCalls.at(-1).body.plan_name, 'الباقة السنوية الاحترافية')
   assert.equal(delegatedStoreCalls.at(-1).body.duration_months, 12)
