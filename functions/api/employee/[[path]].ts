@@ -66,7 +66,9 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       let customerPaymentRequests: Array<{ id: string; store_id: string; status: string; created_at: string; has_receipt: boolean }> = []
       let customerPaymentTrackingAvailable = false
       try {
-        const rows = await env.ECOSYSTEM_STORE_DB.prepare('SELECT id,store_id,months,status,created_at,reviewed_at FROM employee_store_renewal_requests WHERE employee_id=? ORDER BY created_at DESC LIMIT 100').bind(employee.id).all()
+        const rows = await env.ECOSYSTEM_STORE_DB.prepare(`SELECT r.id,r.store_id,r.months,r.status,r.created_at,r.reviewed_at,p.status AS source_payment_status
+          FROM employee_store_renewal_requests r LEFT JOIN subscription_payment_requests p ON p.id=r.source_payment_request_id
+          WHERE r.employee_id=? ORDER BY r.created_at DESC LIMIT 100`).bind(employee.id).all()
         renewalRequests = rows.results || []
       } catch (error) {
         if (!(error instanceof Error) || !/no such table/i.test(error.message)) throw error
@@ -128,6 +130,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       if (body.receipt_source === 'customer_receipt') {
         const receipt = await env.ECOSYSTEM_STORE_DB.prepare("SELECT id,proof_mime,proof_base64 FROM subscription_payment_requests WHERE store_id=? AND status='pending' ORDER BY created_at DESC LIMIT 1").bind(storeId).first<{id:string;proof_mime:string;proof_base64:string}>()
         if (!receipt) return json({ error: 'لم أجد إيصالًا مرفوعًا من العميل. اختر «رفع صورة من الجهاز» وأرفق الإيصال يدويًا.' }, 422)
+        if (Number(body.months) !== 1) return json({ error: 'طلب العميل الحالي وإيصاله يغطيان شهرًا واحدًا فقط. اختر شهرًا واحدًا أو ارفع إيصالًا مستقلًا يغطي مدة أطول.' }, 422)
         sourcePaymentRequestId = receipt.id
         proofMime = receipt.proof_mime
         proofBase64 = receipt.proof_base64

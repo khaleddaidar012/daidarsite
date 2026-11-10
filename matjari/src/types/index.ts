@@ -51,6 +51,8 @@ export interface EmployeeStoreRenewalRequest {
   months: number;
   proof_mime: string;
   source_payment_request_id?: string | null;
+  source_payment_status?: 'pending' | 'approved' | 'rejected' | null;
+  source_payment_due_now?: number | null;
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
   reviewed_at?: string | null;

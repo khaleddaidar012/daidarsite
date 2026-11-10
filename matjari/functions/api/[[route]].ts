@@ -152,8 +152,8 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       return new Response(JSON.stringify({success:true,requests:requests.results||[]}),{headers});
     }
     if(path==='admin/employee-renewal-requests'&&method==='GET'){
-      const requests=await db.prepare(`SELECT r.id,r.store_id,r.employee_name,r.employee_email,r.months,r.proof_mime,r.source_payment_request_id,r.status,r.created_at,r.reviewed_at,s.name AS store_name,u.username
-        FROM employee_store_renewal_requests r JOIN stores s ON s.id=r.store_id LEFT JOIN users u ON u.store_id=s.id
+      const requests=await db.prepare(`SELECT r.id,r.store_id,r.employee_name,r.employee_email,r.months,r.proof_mime,r.source_payment_request_id,r.status,r.created_at,r.reviewed_at,s.name AS store_name,u.username,p.status AS source_payment_status,p.due_now AS source_payment_due_now
+        FROM employee_store_renewal_requests r JOIN stores s ON s.id=r.store_id LEFT JOIN users u ON u.store_id=s.id LEFT JOIN subscription_payment_requests p ON p.id=r.source_payment_request_id
         WHERE u.id=(SELECT id FROM users WHERE store_id=s.id ORDER BY created_at LIMIT 1)
         ORDER BY CASE r.status WHEN 'pending' THEN 0 ELSE 1 END,r.created_at DESC LIMIT 100`).all();
       return new Response(JSON.stringify({success:true,requests:requests.results||[]}),{headers});
@@ -173,6 +173,10 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       const renewal=await db.prepare('SELECT * FROM employee_store_renewal_requests WHERE id=?').bind(employeeRenewalReview[1]).first() as any;
       if(!renewal)return fail('طلب التجديد غير موجود',404);
       if(renewal.status!=='pending')return fail('تمت مراجعة هذا الطلب بالفعل',409);
+      const sourcePayment=renewal.source_payment_request_id?await db.prepare('SELECT * FROM subscription_payment_requests WHERE id=?').bind(renewal.source_payment_request_id).first() as any:null;
+      if(body.status==='approved'&&sourcePayment&&sourcePayment.store_id!==renewal.store_id)return fail('إيصال التحويل لا يخص المتجر الموجود في طلب التجديد.',409);
+      if(body.status==='approved'&&sourcePayment?.status==='approved')return fail('إيصال العميل معتمد بالفعل؛ لا توافق على طلب التجديد المكرر حتى لا يُمدد الاشتراك مرتين.',409);
+      if(body.status==='approved'&&renewal.source_payment_request_id&&sourcePayment?.status!=='pending')return fail('طلب العميل المرتبط بالإيصال ليس قيد المراجعة، فلا يمكن تجديد الاشتراك بهذا الإيصال.',409);
       const reviewToken=crypto.randomUUID();
       if(body.status==='rejected'){
         await db.prepare("UPDATE employee_store_renewal_requests SET status='rejected',review_token=?,reviewed_by=?,reviewed_at=datetime('now') WHERE id=? AND status='pending'").bind(reviewToken,actor!.id,renewal.id).run();
@@ -180,6 +184,27 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       }
       const months=Number(renewal.months);
       if(!Number.isInteger(months)||months<1||months>12)return fail('مدة التجديد في الطلب غير صالحة',409);
+      if(renewal.source_payment_request_id&&months!==1)return fail('إيصال طلب العميل الحالي يغطي شهرًا واحدًا فقط. ارفض الطلب واطلب إيصالًا مستقلًا للمدة الأطول.',409);
+      if(renewal.source_payment_request_id&&sourcePayment){
+        const features=(JSON.parse(sourcePayment.features_json||'[]') as unknown[]).filter((feature):feature is keyof typeof subscriptionFeatureCatalog=>typeof feature==='string'&&feature in subscriptionFeatureCatalog);
+        if(!features.length)return fail('مزايا طلب العميل غير صالحة؛ راجع الطلب الأصلي.',409);
+        const monthlyTotal=Number(sourcePayment.monthly_total)||0;
+        const annualTotal=Number(sourcePayment.annual_total)||0;
+        const planName=features.map(feature=>subscriptionFeatureCatalog[feature].label).join(' + ');
+        const notes=JSON.stringify({features,annual_domain_fee:annualTotal,annual_domain_until:annualTotal?new Date(Date.now()+365*86400000).toISOString().slice(0,10):null,payment_request_id:sourcePayment.id});
+        const paymentReviewToken=crypto.randomUUID();
+        await db.batch([
+          db.prepare("UPDATE subscription_payment_requests SET status='approved',review_token=?,reviewed_by=?,reviewed_at=datetime('now') WHERE id=? AND status='pending'").bind(paymentReviewToken,actor!.id,sourcePayment.id),
+          db.prepare("UPDATE employee_store_renewal_requests SET status='approved',review_token=?,reviewed_by=?,reviewed_at=datetime('now') WHERE id=? AND status='pending' AND EXISTS(SELECT 1 FROM subscription_payment_requests WHERE id=? AND status='approved' AND review_token=?)").bind(paymentReviewToken,actor!.id,renewal.id,sourcePayment.id,paymentReviewToken),
+          db.prepare("INSERT INTO subscriptions(id,store_id,plan_name,status,start_date,end_date,price,notes,created_at,updated_at) SELECT ?,?,?,'active',date('now'),date('now','+1 month'),?,?,strftime('%Y-%m-%d %H:%M:%f','now'),datetime('now') WHERE EXISTS(SELECT 1 FROM subscription_payment_requests WHERE id=? AND status='approved' AND review_token=?) AND EXISTS(SELECT 1 FROM employee_store_renewal_requests WHERE id=? AND status='approved' AND review_token=?)").bind('sub-'+crypto.randomUUID(),renewal.store_id,planName,monthlyTotal+annualTotal,notes,sourcePayment.id,paymentReviewToken,renewal.id,paymentReviewToken),
+          db.prepare("UPDATE stores SET is_active=1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND EXISTS(SELECT 1 FROM subscription_payment_requests WHERE id=? AND status='approved' AND review_token=?) AND EXISTS(SELECT 1 FROM employee_store_renewal_requests WHERE id=? AND status='approved' AND review_token=?)").bind(renewal.store_id,sourcePayment.id,paymentReviewToken,renewal.id,paymentReviewToken),
+          db.prepare("UPDATE users SET is_active=1,updated_at=CURRENT_TIMESTAMP WHERE store_id=? AND EXISTS(SELECT 1 FROM subscription_payment_requests WHERE id=? AND status='approved' AND review_token=?) AND EXISTS(SELECT 1 FROM employee_store_renewal_requests WHERE id=? AND status='approved' AND review_token=?)").bind(renewal.store_id,sourcePayment.id,paymentReviewToken,renewal.id,paymentReviewToken),
+        ]);
+        const reviewed=await db.prepare('SELECT status,review_token FROM employee_store_renewal_requests WHERE id=?').bind(renewal.id).first() as any;
+        if(reviewed?.status!=='approved'||reviewed?.review_token!==paymentReviewToken)return fail('تمت مراجعة الطلب من مسؤول آخر. حدّث القائمة.',409);
+        await syncStoreResource(env,renewal.store_id);
+        return new Response(JSON.stringify({success:true,status:'approved'}),{headers});
+      }
       const existingSub=await db.prepare('SELECT id FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(renewal.store_id).first() as {id:string}|null;
       const subId=existingSub?.id||'sub-'+crypto.randomUUID();
       await db.batch([
