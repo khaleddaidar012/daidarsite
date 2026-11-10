@@ -180,7 +180,7 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       }
       const months=Number(renewal.months);
       if(!Number.isInteger(months)||months<1||months>12)return fail('مدة التجديد في الطلب غير صالحة',409);
-      const existingSub=await db.prepare('SELECT id FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(renewal.store_id).first<{id:string}>();
+      const existingSub=await db.prepare('SELECT id FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(renewal.store_id).first() as {id:string}|null;
       const subId=existingSub?.id||'sub-'+crypto.randomUUID();
       await db.batch([
         db.prepare("UPDATE employee_store_renewal_requests SET status='approved',review_token=?,reviewed_by=?,reviewed_at=datetime('now') WHERE id=? AND status='pending'").bind(reviewToken,actor!.id,renewal.id),
