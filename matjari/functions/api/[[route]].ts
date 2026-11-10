@@ -151,6 +151,49 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
         FROM subscription_payment_requests r JOIN stores s ON s.id=r.store_id JOIN users u ON u.id=r.user_id ORDER BY CASE r.status WHEN 'pending' THEN 0 ELSE 1 END,r.created_at DESC LIMIT 100`).all();
       return new Response(JSON.stringify({success:true,requests:requests.results||[]}),{headers});
     }
+    if(path==='admin/employee-renewal-requests'&&method==='GET'){
+      const requests=await db.prepare(`SELECT r.id,r.store_id,r.employee_name,r.employee_email,r.months,r.proof_mime,r.source_payment_request_id,r.status,r.created_at,r.reviewed_at,s.name AS store_name,u.username
+        FROM employee_store_renewal_requests r JOIN stores s ON s.id=r.store_id LEFT JOIN users u ON u.store_id=s.id
+        WHERE u.id=(SELECT id FROM users WHERE store_id=s.id ORDER BY created_at LIMIT 1)
+        ORDER BY CASE r.status WHEN 'pending' THEN 0 ELSE 1 END,r.created_at DESC LIMIT 100`).all();
+      return new Response(JSON.stringify({success:true,requests:requests.results||[]}),{headers});
+    }
+    const employeeRenewalProof=path.match(/^admin\/employee-renewal-requests\/([^/]+)\/proof$/);
+    if(employeeRenewalProof&&method==='GET'){
+      const proof=await db.prepare('SELECT proof_mime,proof_base64 FROM employee_store_renewal_requests WHERE id=?').bind(employeeRenewalProof[1]).first() as any;
+      if(!proof)return fail('إيصال التحويل غير موجود',404);
+      const bytes=Uint8Array.from(atob(proof.proof_base64),char=>char.charCodeAt(0));
+      const imageHeaders=new Headers(headers);imageHeaders.set('Content-Type',proof.proof_mime);imageHeaders.set('Content-Disposition','inline');
+      return new Response(bytes,{headers:imageHeaders});
+    }
+    const employeeRenewalReview=path.match(/^admin\/employee-renewal-requests\/([^/]+)\/review$/);
+    if(employeeRenewalReview&&method==='POST'){
+      const body=await request.json() as any;
+      if(!['approved','rejected'].includes(body.status))return fail('حالة المراجعة غير صالحة',400);
+      const renewal=await db.prepare('SELECT * FROM employee_store_renewal_requests WHERE id=?').bind(employeeRenewalReview[1]).first() as any;
+      if(!renewal)return fail('طلب التجديد غير موجود',404);
+      if(renewal.status!=='pending')return fail('تمت مراجعة هذا الطلب بالفعل',409);
+      const reviewToken=crypto.randomUUID();
+      if(body.status==='rejected'){
+        await db.prepare("UPDATE employee_store_renewal_requests SET status='rejected',review_token=?,reviewed_by=?,reviewed_at=datetime('now') WHERE id=? AND status='pending'").bind(reviewToken,actor!.id,renewal.id).run();
+        return new Response(JSON.stringify({success:true,status:'rejected'}),{headers});
+      }
+      const months=Number(renewal.months);
+      if(!Number.isInteger(months)||months<1||months>12)return fail('مدة التجديد في الطلب غير صالحة',409);
+      const existingSub=await db.prepare('SELECT id FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(renewal.store_id).first<{id:string}>();
+      const subId=existingSub?.id||'sub-'+crypto.randomUUID();
+      await db.batch([
+        db.prepare("UPDATE employee_store_renewal_requests SET status='approved',review_token=?,reviewed_by=?,reviewed_at=datetime('now') WHERE id=? AND status='pending'").bind(reviewToken,actor!.id,renewal.id),
+        db.prepare("UPDATE subscriptions SET end_date=date(CASE WHEN end_date>date('now') THEN end_date ELSE date('now') END,'+'||?||' month'),status='active',updated_at=datetime('now') WHERE id=? AND EXISTS(SELECT 1 FROM employee_store_renewal_requests WHERE id=? AND status='approved' AND review_token=?)").bind(months,subId,renewal.id,reviewToken),
+        db.prepare("INSERT INTO subscriptions(id,store_id,plan_name,status,start_date,end_date,price,created_at,updated_at) SELECT ?,?,'الباقة المجددة','active',date('now'),date('now','+'||?||' month'),1000,datetime('now'),datetime('now') WHERE NOT EXISTS(SELECT 1 FROM subscriptions WHERE store_id=?) AND EXISTS(SELECT 1 FROM employee_store_renewal_requests WHERE id=? AND status='approved' AND review_token=?)").bind(subId,renewal.store_id,months,renewal.store_id,renewal.id,reviewToken),
+        db.prepare("UPDATE stores SET is_active=1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND EXISTS(SELECT 1 FROM employee_store_renewal_requests WHERE id=? AND status='approved' AND review_token=?)").bind(renewal.store_id,renewal.id,reviewToken),
+        db.prepare("UPDATE users SET is_active=1,updated_at=CURRENT_TIMESTAMP WHERE store_id=? AND EXISTS(SELECT 1 FROM employee_store_renewal_requests WHERE id=? AND status='approved' AND review_token=?)").bind(renewal.store_id,renewal.id,reviewToken),
+      ]);
+      const reviewed=await db.prepare('SELECT status,review_token FROM employee_store_renewal_requests WHERE id=?').bind(renewal.id).first() as any;
+      if(reviewed?.status!=='approved'||reviewed?.review_token!==reviewToken)return fail('تمت مراجعة الطلب من مسؤول آخر. حدّث القائمة.',409);
+      await syncStoreResource(env,renewal.store_id);
+      return new Response(JSON.stringify({success:true,status:'approved'}),{headers});
+    }
     const proofMatch=path.match(/^admin\/subscription-requests\/([^/]+)\/proof$/);
     if(proofMatch&&method==='GET'){
       const proof=await db.prepare('SELECT proof_mime,proof_base64 FROM subscription_payment_requests WHERE id=?').bind(proofMatch[1]).first() as any;
@@ -661,7 +704,9 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
   } catch (error: any) {
     const status = error.status || (error instanceof SyntaxError || error instanceof TypeError ? 400 : /UNIQUE constraint/.test(error.message || '') ? 409 : 500);
     if (status === 500) console.error('Matjari request failed', error);
-    return new Response(JSON.stringify({ success: false, error: status === 429 ? error.message : status === 409 ? 'البيانات مسجلة بالفعل' : status === 400 ? 'راجع البيانات المرسلة' : 'تعذر تنفيذ الطلب. حاول مرة أخرى.' }), { status, headers });
+    const missingRenewalTable=error instanceof Error&&/no such table:\s*employee_store_renewal_requests/i.test(error.message);
+    const message=missingRenewalTable?'نفّذ تحديث قاعدة المتاجر 0004_employee_store_renewal_requests.sql لتفعيل طلبات التجديد.':status===429?error.message:status===409?'البيانات مسجلة بالفعل':status===400?'راجع البيانات المرسلة':'تعذر تنفيذ الطلب. حاول مرة أخرى.';
+    return new Response(JSON.stringify({ success: false, error: message }), { status: missingRenewalTable?503:status, headers });
   }
 };
 

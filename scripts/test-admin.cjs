@@ -246,6 +246,15 @@ async function test() {
   assert.equal((await employeeCall('store-admin', 'POST', { store_name: 'متجر اختبار', activity_type: 'عام', whatsapp_number: '01000000000', username: 'store-test', password: 'store-password' }, employeeCookie)).status, 403)
   const storeEmployeeId = employeeList.find(item => item.email === employeeForm.email).id
   assert.equal((await call('employees', 'POST', { ...employeeForm, id: storeEmployeeId, password: '', create_store: 1, manage_store_subscriptions: 1, view_ecosystem_stats: 1 }, cookie)).status, 200)
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS stores(id TEXT PRIMARY KEY,name TEXT NOT NULL,is_active INTEGER NOT NULL DEFAULT 0,updated_at TEXT);
+    CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,store_id TEXT,username TEXT,is_active INTEGER NOT NULL DEFAULT 1);
+    CREATE TABLE IF NOT EXISTS subscriptions(id TEXT PRIMARY KEY,store_id TEXT,plan_name TEXT,status TEXT,start_date TEXT,end_date TEXT,price REAL,created_at TEXT,updated_at TEXT);
+    CREATE TABLE IF NOT EXISTS subscription_payment_requests(id TEXT PRIMARY KEY,store_id TEXT,status TEXT,proof_mime TEXT,proof_base64 TEXT,created_at TEXT);`)
+  sqlite.exec(fs.readFileSync('matjari/migrations/0004_employee_store_renewal_requests.sql', 'utf8'))
+  sqlite.prepare('INSERT INTO stores(id,name) VALUES(?,?)').run('store-test', 'متجر تجريبي')
+  sqlite.prepare('INSERT INTO users(id,store_id,username) VALUES(?,?,?)').run('store-user', 'store-test', 'store-test')
+  sqlite.prepare('INSERT INTO subscriptions(id,store_id,plan_name,status,start_date,end_date,price,created_at) VALUES(?,?,?,?,?,?,?,?)').run('test-sub', 'store-test', 'اشتراك مدفوع', 'active', '2026-01-01', '2026-12-01', 350, '2026-01-01')
+  sqlite.prepare("INSERT INTO subscription_payment_requests(id,store_id,status,proof_mime,proof_base64,created_at) VALUES(?,?,?,?,?,?)").run('customer-proof', 'store-test', 'pending', 'image/png', 'iVBORw0KGgo=', '2026-11-08')
   env.ECOSYSTEM_STORE_DB = DB
   assert.equal((await employeeCall('store-admin', 'GET', undefined, employeeCookie)).status, 200)
   assert.equal((await employeeCall('store-admin', 'POST', { store_name: 'متجر اختبار', activity_type: 'عام', whatsapp_number: '01000000000', username: 'store-test', password: 'store-password', plan_name: 'غير موثوق', duration_months: 1, price: 1 }, employeeCookie)).status, 200)
@@ -253,8 +262,17 @@ async function test() {
   assert.equal(delegatedStoreCalls.at(-1).body.duration_months, 12)
   assert.equal(delegatedStoreCalls.at(-1).body.price, 1200)
   assert.equal((await employeeCall('store-admin/store-test/renew-subscription', 'POST', { months: 13 }, employeeCookie)).status, 422)
-  assert.equal((await employeeCall('store-admin/store-test/renew-subscription', 'POST', { months: 3 }, employeeCookie)).status, 200)
-  assert.equal(delegatedStoreCalls.at(-1).body.months, 3)
+  const delegatedCountBeforeRenewal = delegatedStoreCalls.length
+  const customerReceiptRenewal = await employeeCall('store-admin/store-test/renew-subscription', 'POST', { months: 3, receipt_source: 'customer_receipt' }, employeeCookie)
+  assert.equal(customerReceiptRenewal.status, 200)
+  assert.equal(delegatedStoreCalls.length, delegatedCountBeforeRenewal)
+  assert.equal(sqlite.prepare('SELECT end_date FROM subscriptions WHERE id=?').get('test-sub').end_date, '2026-12-01')
+  assert.deepEqual({ ...sqlite.prepare('SELECT months,status,source_payment_request_id,proof_base64 FROM employee_store_renewal_requests').get() }, { months: 3, status: 'pending', source_payment_request_id: 'customer-proof', proof_base64: 'iVBORw0KGgo=' })
+  assert.equal((await employeeCall('store-admin/store-test/renew-subscription', 'POST', { months: 1, receipt_source: 'customer_receipt' }, employeeCookie)).status, 409)
+  sqlite.prepare("UPDATE employee_store_renewal_requests SET status='rejected' WHERE status='pending'").run()
+  const localReceiptRenewal = await employeeCall('store-admin/store-test/renew-subscription', 'POST', { months: 1, receipt_source: 'device_upload', proof: 'data:image/jpeg;base64,aGVsbG8=' }, employeeCookie)
+  assert.equal(localReceiptRenewal.status, 200)
+  assert.equal(sqlite.prepare('SELECT count(*) AS count FROM employee_store_renewal_requests').get().count, 2)
   env.PASSWORD_VAULT_KEY = 'ab'.repeat(32)
   assert.equal((await employeeCall('password-vault', 'GET', undefined, employeeCookie)).status, 403)
   const vaultEmployeeId = employeeList.find(item => item.email === employeeForm.email).id

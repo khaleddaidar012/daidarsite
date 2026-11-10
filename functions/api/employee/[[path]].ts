@@ -59,7 +59,17 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       if (!employee.manage_store_subscriptions) return json({ error: 'حسابك لا يملك صلاحية عرض وتجديد اشتراكات المتاجر.' }, 403)
       if (!env.ECOSYSTEM_STORE_DB) return json({ error: 'مصدر بيانات المتاجر غير مربوط.' }, 503)
       const target = new URL('/api/admin/merchants', request.url)
-      return await handleStoreRequest(new Request(target, request), { ...env, DB: env.ECOSYSTEM_STORE_DB, READ_ONLY_PREVIEW: 'false' }, { id: employee.id, username: employee.email, email: employee.email, role: 'super_admin', store_id: null, is_active: 1, password: '' })
+      const result = await handleStoreRequest(new Request(target, request), { ...env, DB: env.ECOSYSTEM_STORE_DB, READ_ONLY_PREVIEW: 'false' }, { id: employee.id, username: employee.email, email: employee.email, role: 'super_admin', store_id: null, is_active: 1, password: '' })
+      if (!result.ok) return result
+      const data = await result.clone().json().catch(() => ({})) as Record<string, unknown>
+      let renewalRequests: unknown[] = []
+      try {
+        const rows = await env.ECOSYSTEM_STORE_DB.prepare('SELECT id,store_id,months,status,created_at,reviewed_at FROM employee_store_renewal_requests WHERE employee_id=? ORDER BY created_at DESC LIMIT 100').bind(employee.id).all()
+        renewalRequests = rows.results || []
+      } catch (error) {
+        if (!(error instanceof Error) || !/no such table/i.test(error.message)) throw error
+      }
+      return json({ ...data, renewal_requests: renewalRequests })
     }
     if (path === 'store-admin' && request.method === 'POST') {
       if (!employee.create_store) return json({ error: 'حسابك لا يملك صلاحية إنشاء متجر.' }, 403)
@@ -78,13 +88,44 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       if (!employee.manage_store_subscriptions) return json({ error: 'حسابك لا يملك صلاحية تجديد اشتراكات المتاجر.' }, 403)
       if (!request.headers.get('Content-Type')?.startsWith('application/json')) return json({ error: 'يلزم إرسال بيانات التجديد بصيغة JSON.' }, 415)
       if (!env.ECOSYSTEM_STORE_DB) return json({ error: 'مصدر بيانات المتاجر غير مربوط.' }, 503)
-      const body = await request.clone().json().catch(() => null) as Record<string, unknown> | null
-      if (!body || !Number.isSafeInteger(body.months) || Number(body.months) < 1 || Number(body.months) > 12) return json({ error: 'مدة التجديد غير صحيحة.' }, 422)
-      const target = new URL(`/api/admin/merchants/${storeRenewal[1]}/renew-subscription`, request.url)
-      const safeRequest = new Request(target, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ months: Number(body.months) }) })
-      const result = await handleStoreRequest(safeRequest, { ...env, DB: env.ECOSYSTEM_STORE_DB, READ_ONLY_PREVIEW: 'false' }, { id: employee.id, username: employee.email, email: employee.email, role: 'super_admin', store_id: null, is_active: 1, password: '' })
-      if (result.ok) await recordAdminNotification(env, { actor: employee.name, eventType: 'store_subscription_renewed_by_employee', title: 'تجديد اشتراك متجر', detail: `${employee.name} جدّد اشتراك متجر`, target: 'hub' })
-      return result
+      const raw = await request.text()
+      if (raw.length > 1450000) return json({ error: 'حجم الإيصال كبير. الحد الأقصى 1 ميجابايت.' }, 413)
+      const body = JSON.parse(raw) as Record<string, unknown>
+      if (!Number.isSafeInteger(body.months) || Number(body.months) < 1 || Number(body.months) > 12) return json({ error: 'مدة التجديد غير صحيحة.' }, 422)
+      if (!['customer_receipt', 'device_upload'].includes(String(body.receipt_source))) return json({ error: 'اختر إيصال العميل أو ارفع صورة من جهازك.' }, 422)
+      const storeId = storeRenewal[1]
+      const store = await env.ECOSYSTEM_STORE_DB.prepare('SELECT id,name FROM stores WHERE id=?').bind(storeId).first<{id:string;name:string}>()
+      if (!store) return json({ error: 'المتجر غير موجود.' }, 404)
+      const pending = await env.ECOSYSTEM_STORE_DB.prepare("SELECT id FROM employee_store_renewal_requests WHERE store_id=? AND status='pending'").bind(storeId).first()
+      if (pending) return json({ error: 'يوجد طلب تجديد لهذا المتجر بانتظار موافقة الإدارة.' }, 409)
+      let proofMime = '', proofBase64 = '', sourcePaymentRequestId: string | null = null
+      if (body.receipt_source === 'customer_receipt') {
+        const receipt = await env.ECOSYSTEM_STORE_DB.prepare("SELECT id,proof_mime,proof_base64 FROM subscription_payment_requests WHERE store_id=? AND status='pending' ORDER BY created_at DESC LIMIT 1").bind(storeId).first<{id:string;proof_mime:string;proof_base64:string}>()
+        if (!receipt) return json({ error: 'لم أجد إيصالًا مرفوعًا من العميل. اختر «رفع صورة من الجهاز» وأرفق الإيصال يدويًا.' }, 422)
+        sourcePaymentRequestId = receipt.id
+        proofMime = receipt.proof_mime
+        proofBase64 = receipt.proof_base64
+      } else {
+        if (typeof body.proof !== 'string') return json({ error: 'ارفع صورة إيصال التحويل من جهازك.' }, 422)
+        const match = body.proof.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+={0,2})$/)
+        if (!match) return json({ error: 'صيغة الإيصال غير صحيحة. استخدم PNG أو JPG أو WEBP.' }, 422)
+        let imageBytes: string
+        try { imageBytes = atob(match[2]) } catch { return json({ error: 'تعذر قراءة صورة الإيصال.' }, 422) }
+        if (imageBytes.length > 1024 * 1024) return json({ error: 'حجم الإيصال يجب ألا يتجاوز 1 ميجابايت.' }, 413)
+        proofMime = match[1]
+        proofBase64 = match[2]
+      }
+      const id = crypto.randomUUID()
+      try {
+        await env.ECOSYSTEM_STORE_DB.prepare(`INSERT INTO employee_store_renewal_requests(id,store_id,employee_id,employee_name,employee_email,months,proof_mime,proof_base64,source_payment_request_id,status)
+          VALUES(?,?,?,?,?,?,?,?,?,'pending')`).bind(id,storeId,employee.id,employee.name,employee.email,Number(body.months),proofMime,proofBase64,sourcePaymentRequestId).run()
+      } catch (error) {
+        if (error instanceof Error && /no such table/i.test(error.message)) return json({ error: 'ميزة طلبات التجديد تحتاج تحديث قاعدة المتاجر: 0004_employee_store_renewal_requests.sql' }, 503)
+        throw error
+      }
+      try { await recordAdminNotification(env, { actor: employee.name, eventType: 'employee_store_renewal_request', title: 'طلب تجديد اشتراك متجر', detail: `${employee.name} طلب تجديد متجر «${store.name}» لمدة ${Number(body.months)} شهرًا مع إيصال تحويل`, target: 'hub' }) }
+      catch (error) { console.error('[employee-store-renewal-notification]', error) }
+      return json({ success: true, id, status: 'pending' })
     }
     if (path === 'presence-test' && request.method === 'POST') {
       const shift = await env.DB.prepare('SELECT id FROM attendance_shifts WHERE employee_id=? AND check_out IS NULL').bind(employee.id).first<{id:string}>()

@@ -43,6 +43,21 @@ export interface SubscriptionPaymentRequest {
   username: string;
 }
 
+export interface EmployeeStoreRenewalRequest {
+  id: string;
+  store_id: string;
+  employee_name: string;
+  employee_email: string;
+  months: number;
+  proof_mime: string;
+  source_payment_request_id?: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  reviewed_at?: string | null;
+  store_name: string;
+  username?: string;
+}
+
 export interface Store {
   id: string;
   name: string;

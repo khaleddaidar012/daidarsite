@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Save, Check, ShieldCheck, Database, MessageCircle, RefreshCw, AlertCircle, Sparkles } from 'lucide-react';
+import { Save, Check, ShieldCheck, MessageCircle, AlertCircle, Sparkles } from 'lucide-react';
 import { Store } from '../types';
 import { api } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
@@ -20,7 +20,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ store, onRefresh }) 
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [d1Status, setD1Status] = useState<any>(null);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,15 +53,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ store, onRefresh }) 
       setErrorMessage(err.message || 'Error updating settings in Cloudflare D1');
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const checkD1Status = async () => {
-    try {
-      const status = await api.getD1Status();
-      setD1Status(status);
-    } catch (err) {
-      console.error(err);
     }
   };
 
@@ -213,51 +203,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ store, onRefresh }) 
         </div>
       </form>
 
-      {/* Cloudflare D1 Architecture Card */}
-      <div className="bg-[#0e1f38] dark:bg-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-800">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-sky-500/20 border border-sky-500/30 text-[#00b4d8] flex items-center justify-center">
-              <Database className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-base text-white">بنية قاعدة البيانات: Cloudflare D1 Exclusive</h3>
-              <p className="text-xs text-slate-400">Strictly migrated and queried via Cloudflare D1</p>
-            </div>
-          </div>
-
-          <button
-            onClick={checkD1Status}
-            className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition-colors flex items-center gap-1.5"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>فحص حالة الاتصال</span>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs mt-4">
-          <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700/60">
-            <span className="text-slate-400 block text-[11px]">محرك التخزين</span>
-            <span className="font-bold text-[#00b4d8] mt-1 block">Cloudflare D1 Engine</span>
-          </div>
-
-          <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700/60">
-            <span className="text-slate-400 block text-[11px]">مسار الرفع (Subpath)</span>
-            <span className="font-bold text-white mt-1 block">daidarsoluations/ar/new_test_store</span>
-          </div>
-
-          <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700/60">
-            <span className="text-slate-400 block text-[11px]">التوافق والـ Migration</span>
-            <span className="font-bold text-[#00b4d8] mt-1 block">0001_initial_schema.sql نشط</span>
-          </div>
-        </div>
-
-        {d1Status && (
-          <div className="mt-4 p-3 rounded-xl bg-slate-950 border border-sky-500/40 text-[11px] font-mono text-sky-300">
-            {JSON.stringify(d1Status, null, 2)}
-          </div>
-        )}
-      </div>
     </div>
   );
 };

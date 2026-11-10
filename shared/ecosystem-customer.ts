@@ -19,11 +19,11 @@ export async function customerOverview(env:EcoEnv,user:Identity){
       if(!env.ECOSYSTEM_STORE_DB){unavailable.push('store');continue}
       const row=await env.ECOSYSTEM_STORE_DB.prepare('SELECT s.id,s.name,s.is_active,u.is_active AS user_active FROM users u JOIN stores s ON s.id=u.store_id WHERE u.id=?').bind(link.local_id).first();
       if(!row)continue;
-      const sub=await env.ECOSYSTEM_STORE_DB.prepare('SELECT id,plan_name,status,start_date,end_date FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(row.id).first();
+      const sub=await env.ECOSYSTEM_STORE_DB.prepare('SELECT id,plan_name,status,start_date,end_date,price FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(row.id).first();
       const start=sub?Date.parse(sub.start_date+'T00:00:00Z'):null,end=sub?Date.parse(sub.end_date+'T23:59:59.999Z'):null;
       const effectiveStatus=effectiveStoreStatus(row.user_active,row.is_active,sub);
       const state=serviceState(effectiveStatus,start,end);
-      const preview=new URL(storePath,storeOrigin);preview.search=new URLSearchParams({view:'storefront',store_id:row.id}).toString();
+      const preview=new URL(storePath,storeOrigin);preview.hostname='daidarsite2.pages.dev';preview.search=new URLSearchParams({view:'storefront',store_id:row.id}).toString();
       services.push({id:row.id,system:'store',title:row.name,plan:displayStorePlan(sub),status:state,start,end,can_access:['active','trial'].includes(state),preview_url:preview.toString()});
     }
     if(link.system==='hub'){

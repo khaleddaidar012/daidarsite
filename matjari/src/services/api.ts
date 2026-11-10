@@ -1,4 +1,4 @@
-import { Store, Product, TrafficStats, CustomerOrder, OrderStatus, StoreOrder, User, Subscription, MerchantDetail, SubscriptionFeatureKey, SubscriptionPaymentRequest } from '../types';
+import { Store, Product, TrafficStats, CustomerOrder, OrderStatus, StoreOrder, User, Subscription, MerchantDetail, SubscriptionFeatureKey, SubscriptionPaymentRequest, EmployeeStoreRenewalRequest } from '../types';
 
 
 
@@ -206,6 +206,25 @@ export function createStoreApi(API_BASE='/api/store') { return {
     const res=await fetch(`${API_BASE}/admin/subscription-requests/${encodeURIComponent(id)}/review`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});
     const data=await res.json().catch(()=>({}));
     if(!res.ok||!data.success)throw new Error(data.error||'تعذرت مراجعة طلب الاشتراك');
+  },
+
+  async getEmployeeStoreRenewalRequests(): Promise<EmployeeStoreRenewalRequest[]> {
+    const res=await fetch(`${API_BASE}/admin/employee-renewal-requests`,{cache:'no-store'});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok||!data.success)throw new Error(data.error||'تعذر تحميل طلبات التجديد');
+    return data.requests||[];
+  },
+
+  async getEmployeeStoreRenewalProof(id:string): Promise<Blob> {
+    const res=await fetch(`${API_BASE}/admin/employee-renewal-requests/${encodeURIComponent(id)}/proof`,{cache:'no-store'});
+    if(!res.ok)throw new Error('تعذر تحميل إيصال التجديد');
+    return res.blob();
+  },
+
+  async reviewEmployeeStoreRenewalRequest(id:string,status:'approved'|'rejected'): Promise<void> {
+    const res=await fetch(`${API_BASE}/admin/employee-renewal-requests/${encodeURIComponent(id)}/review`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok||!data.success)throw new Error(data.error||'تعذرت مراجعة طلب التجديد');
   },
 
   async saveStore(storeData: Partial<Store>): Promise<Store> {
