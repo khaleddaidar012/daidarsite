@@ -33,6 +33,12 @@ export default function EmployeesManager({ onUnauthorized }: { onUnauthorized: (
     return () => { active = false }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month, revision])
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void callApi('admin', `payroll?month=${month}`).then(data => setPayroll(data.payroll)).catch(e => fail(e as Error & { status?: number }))
+    }, 60_000)
+    return () => window.clearInterval(timer)
+  }, [month])
   async function save(e: FormEvent) {
     e.preventDefault(); setBusy(true); setError(''); setNotice('')
     try { await callApi('admin', 'employees', 'POST', { ...form, monthly_salary_piasters: Math.round(Number(form.monthly_salary || 0) * 100), weekly_days_off: form.weekly_days_off, max_daily_hours: Number(form.max_daily_hours), max_monthly_hours: Number(form.max_monthly_hours) }); setForm(blank); setRevision(n => n + 1); setNotice('تم حفظ الحساب والمرتب وحدود الساعات وأيام الراحة.') } catch (e) { fail(e as Error) } finally { setBusy(false) }

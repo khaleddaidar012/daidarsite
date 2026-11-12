@@ -141,6 +141,13 @@ export default function EmployeeDashboard() {
     return () => { active = false }
   }, [employee, month, revision])
   useEffect(() => {
+    if (!employee) return
+    const timer = window.setInterval(() => {
+      void callApi('employee', `attendance?month=${month}`).then(data => setPayroll(data.payroll)).catch(() => {})
+    }, 60_000)
+    return () => window.clearInterval(timer)
+  }, [employee, month])
+  useEffect(() => {
     if (!employee || !open) { setPresencePrompt(null); return }
     let live = true
     const check = async () => {

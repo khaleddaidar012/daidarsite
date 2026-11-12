@@ -135,9 +135,9 @@ export function calculatePayroll(employees: Employee[], attendance: Attendance[]
     }
     const actualHours = Array.from(byDay.values()).reduce((sum, hours) => sum + Math.min(hours, maxDaily), 0)
     const leaveHours = requests.filter(r => r.employee_id === employee.id && r.type === 'leave' && r.status === 'approved' && r.day >= monthStart && r.day <= cutoff && r.day >= createdDay && !daysOff.has(new Date(`${r.day}T00:00:00Z`).getUTCDay())).length * maxDaily
-    const paidHours = scheduleDayAccrual ? scheduledDays ? Math.min(maxMonthly, elapsedWorkdays / scheduledDays * maxMonthly) : 0 : Math.min(maxMonthly, actualHours + leaveHours)
-    const earned = scheduleDayAccrual ? (scheduledDays ? monthly * elapsedWorkdays / scheduledDays : 0) : Math.min(monthly, hourlyRate * paidHours)
-    const dailyRate = scheduleDayAccrual ? (scheduledDays ? monthly / scheduledDays : 0) : hourlyRate * maxDaily
+    const paidHours = scheduleDayAccrual ? eligibleScheduledDays ? Math.min(maxMonthly, elapsedWorkdays / eligibleScheduledDays * maxMonthly) : 0 : Math.min(maxMonthly, actualHours + leaveHours)
+    const earned = scheduleDayAccrual ? (eligibleScheduledDays ? monthly * elapsedWorkdays / eligibleScheduledDays : 0) : Math.min(monthly, hourlyRate * paidHours)
+    const dailyRate = scheduleDayAccrual ? (eligibleScheduledDays ? monthly / eligibleScheduledDays : 0) : hourlyRate * maxDaily
     const deduction = scheduleDayAccrual ? 0 : Math.max(0, Math.min(monthly, (maxMonthly - paidHours) * hourlyRate))
     return { employee_id: employee.id, name: employee.name, job_title: employee.job_title, active: employee.active, monthly_salary_piasters: monthly, weekly_days_off: Array.from(daysOff), scheduled_days: scheduledDays, elapsed_workdays: elapsedWorkdays, attended_days: attendanceByEmployee.get(employee.id)?.size || 0, approved_leave_days: requests.filter(r => r.employee_id === employee.id && r.type === 'leave' && r.status === 'approved' && r.day >= monthStart && r.day <= cutoff).length, absent_days: absentDays, absent_dates: absentDates, daily_rate_piasters: Math.round(dailyRate), hourly_rate_piasters: Math.round(hourlyRate), max_daily_hours: maxDaily, max_monthly_hours: maxMonthly, actual_hours: Math.min(maxMonthly, actualHours), paid_hours: paidHours, deduction_piasters: Math.round(deduction / 100) * 100, due_piasters: Math.max(0, Math.round(earned / 100) * 100) }
   })

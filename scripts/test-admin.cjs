@@ -51,6 +51,11 @@ function request(path, method = 'GET', body, cookie, origin = 'https://test.exam
 async function call(path, method, body, cookie, origin) { return admin({ request: request(path, method, body, cookie, origin), env }) }
 async function test() {
   const pushLib = load('workers/attendance-push/worker.ts', { '../../functions/lib/vapid': vapid })
+  assert.equal(pushLib.nextPresenceAlertAt(1, 1000), 301000, 'second presence alert is 5 minutes after the first')
+  assert.equal(pushLib.nextPresenceAlertAt(2, 1000), 901000, 'third presence alert is 15 minutes after the first')
+  assert.equal(pushLib.presenceCheckoutAt(901000, 1000), 901000, 'unanswered third alert stops attendance at the third alert time')
+  assert.equal(pushLib.presenceCheckoutAt(null, 1000), 1000, 'without an alert time, presence falls back to the last confirmation')
+  assert.deepEqual(pushLib.presencePromptTimestamps(3, 901000, 1000), { promptSentAt: 901000, firstAlertAt: 1000 }, 'the third alert time is retained separately from the first-alert schedule anchor')
   const receiver = createECDH('prime256v1'); receiver.generateKeys()
   const pushSub = { endpoint: 'https://push.example/test', p256dh: receiver.getPublicKey().toString('base64url'), auth: randomBytes(16).toString('base64url') }
   const pushPlaintext = JSON.stringify({ title: 'تأكيد الحضور', stage: 2 })
@@ -208,6 +213,9 @@ async function test() {
   assert.equal(novemberAccrual.elapsed_workdays, 4)
   assert.equal(novemberAccrual.due_piasters, 54500)
   assert.equal(novemberAccrual.deduction_piasters, 0)
+  const midMonthAccrual = employeeLib.calculatePayroll([{ id:'midmonth-payroll',name:'موظف',job_title:'موظف',email:'midmonth@example.com',active:1,password_hash:'',created_at:Date.parse('2026-01-01T00:00:00Z'),monthly_salary_piasters:300000,weekly_days_off:'[4,5]',max_daily_hours:7.5,max_monthly_hours:104,work_schedule_locked:1,work_schedule_effective_day:'2026-11-04' }],[],[],'2026-11',Date.parse('2026-11-05T12:00:00Z'))[0]
+  assert.equal(midMonthAccrual.elapsed_workdays, 1)
+  assert.equal(midMonthAccrual.due_piasters, 15800, 'salary accrual divides by scheduled days from the effective schedule date')
   assert.equal((await call('employees', 'POST', { id: employeeList[0].id, name: employeeList[0].name, job_title: employeeList[0].job_title, email: employeeList[0].email, weekly_work_windows: {}, work_schedule_locked: true }, cookie)).status, 200)
   assert.equal((await call('employees', 'POST', { ...employeeForm, id: employeeList[0].id, password: '', monthly_salary_piasters: -1 }, cookie)).status, 422)
   const payrollMonth = employeeLib.cairoDay().slice(0, 7)

@@ -5,6 +5,16 @@ type WorkerEnv = { DB: D1; VAPID_PRIVATE_JWK: string; VAPID_SUBJECT: string }
 type CheckRow = { shift_id: string; employee_id: string; state: 'waiting' | 'prompted' | 'retry_wait'; prompt_stage: number; last_confirmed_at: number; prompt_sent_at: number | null; next_check_at: number; name: string }
 type SubscriptionRow = { endpoint: string; p256dh: string; auth: string }
 type EmployeeRow = { monthly_salary_piasters: number; max_daily_hours: number; max_monthly_hours: number; view_due: number; weekly_days_off: string; work_schedule_locked: number; work_schedule_effective_day: string; created_at: number }
+export const PRESENCE_ALERT_OFFSETS_MS = [5 * 60_000, 15 * 60_000] as const
+export function nextPresenceAlertAt(promptStage: number, firstAlertAt: number) {
+  return firstAlertAt + (PRESENCE_ALERT_OFFSETS_MS[promptStage - 1] ?? PRESENCE_ALERT_OFFSETS_MS[1])
+}
+export function presenceCheckoutAt(thirdAlertAt: number | null, lastConfirmedAt: number) {
+  return thirdAlertAt || lastConfirmedAt
+}
+export function presencePromptTimestamps(stage: number, sentAt: number, firstAlertAt: number) {
+  return { promptSentAt: sentAt, firstAlertAt: stage === 1 ? sentAt : firstAlertAt }
+}
 const enc = new TextEncoder()
 const b64u = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
 const fromB64u = (value: string) => Uint8Array.from(atob(value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - value.length % 4) % 4)), c => c.charCodeAt(0))
@@ -130,22 +140,25 @@ async function processChecks(env: WorkerEnv) {
       // never count a delivery failure as employee absence.
       await env.DB.prepare("UPDATE employee_presence_checks SET state='waiting',prompt_sent_at=NULL,next_check_at=?,updated_at=? WHERE shift_id=? AND state='prompted' AND prompt_stage=0 AND next_check_at=?").bind(now + 60000, now, check.shift_id, check.next_check_at).run()
     } else if (check.prompt_stage >= 3) {
-      const firstUnconfirmedAlertAt = check.prompt_sent_at || check.last_confirmed_at
+      const thirdAlertAt = check.prompt_stage >= 3 ? check.prompt_sent_at : null
+      const firstUnconfirmedAlertAt = presenceCheckoutAt(thirdAlertAt, check.last_confirmed_at)
       await env.DB.batch([
         env.DB.prepare("UPDATE attendance_shifts SET check_out=? WHERE id=? AND check_out IS NULL AND EXISTS (SELECT 1 FROM employee_presence_checks WHERE shift_id=? AND state='prompted' AND prompt_stage>=3 AND next_check_at=?)").bind(firstUnconfirmedAlertAt, check.shift_id, check.shift_id, check.next_check_at),
         env.DB.prepare("UPDATE employee_presence_checks SET state='closed',updated_at=? WHERE shift_id=? AND state='prompted' AND next_check_at<=?").bind(now, check.shift_id, now),
       ])
     } else {
-      const delayFromFirstAlert = check.prompt_stage === 1 ? 5 : 15
-      const firstAlertAt = check.prompt_sent_at || now
-      await env.DB.prepare("UPDATE employee_presence_checks SET state='retry_wait',next_check_at=?,updated_at=? WHERE shift_id=? AND state='prompted' AND next_check_at<=?").bind(firstAlertAt + delayFromFirstAlert * 60000, now, check.shift_id, now).run()
+      const firstAlertAt = check.last_confirmed_at
+      await env.DB.prepare("UPDATE employee_presence_checks SET state='retry_wait',next_check_at=?,updated_at=? WHERE shift_id=? AND state='prompted' AND next_check_at<=?").bind(nextPresenceAlertAt(check.prompt_stage, firstAlertAt), now, check.shift_id, now).run()
     }
   }
 }
 async function deliverPrompt(check: CheckRow, stage: number, env: WorkerEnv, now: number, deadline: number) {
   let delivered = false
   try { delivered = await notify(check, stage, env, now) } catch (error) { console.error('Attendance notification failed', error) }
-  if (!delivered) {
+  if (delivered) {
+    const timestamps = presencePromptTimestamps(stage, now, check.last_confirmed_at)
+    await env.DB.prepare('UPDATE employee_presence_checks SET prompt_sent_at=?,last_confirmed_at=?,updated_at=? WHERE shift_id=? AND state=\'prompted\' AND prompt_stage=? AND next_check_at=?').bind(timestamps.promptSentAt, timestamps.firstAlertAt, now, check.shift_id, stage, deadline).run()
+  } else {
     await env.DB.prepare("UPDATE employee_presence_checks SET prompt_stage=0,prompt_sent_at=?,updated_at=? WHERE shift_id=? AND state='prompted' AND prompt_stage=? AND next_check_at=?").bind(now, now, check.shift_id, stage, deadline).run()
   }
 }
