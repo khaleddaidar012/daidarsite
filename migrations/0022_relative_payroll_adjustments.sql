@@ -1,0 +1,1 @@
+ALTER TABLE employee_payroll_adjustments ADD COLUMN adjustment_piasters INTEGER;
