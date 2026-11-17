@@ -3,6 +3,11 @@ export type WorkWindow = { start: string; end: string }
 export type WeeklyWorkWindows = Record<string, WorkWindow[]>
 export type Employee = { id: string; name: string; job_title: string; email: string; active: number; password_hash: string; created_at: number; manage_projects: number; manage_hub_subscriptions: number; manage_store_subscriptions: number; create_store: number; view_ecosystem_stats: number; track_projects: number; view_d1_usage: number; add_passwords: number; view_passwords: number; monthly_salary_piasters: number; weekly_days_off: string; view_absences: number; view_due: number; max_daily_hours: number; max_monthly_hours: number; weekly_work_windows: string; work_schedule_locked: number; work_schedule_effective_day: string }
 export type Attendance = { id: string; employee_id: string; day: string; check_in: number; check_out: number | null; accomplishments?: string }
+export type PayrollAdjustment = { due_piasters: number; adjustment_piasters: number | null }
+export function adjustedPayrollDue(base: number, adjustment?: PayrollAdjustment | null) {
+  if (!adjustment) return base
+  return adjustment.adjustment_piasters === null ? adjustment.due_piasters : Math.max(0, base + adjustment.adjustment_piasters)
+}
 export type PayrollRow = { employee_id: string; name: string; job_title: string; active: number; monthly_salary_piasters: number; weekly_days_off: number[]; scheduled_days: number; elapsed_workdays: number; attended_days: number; approved_leave_days: number; absent_days: number; absent_dates: string[]; daily_rate_piasters: number; hourly_rate_piasters: number; max_daily_hours: number; max_monthly_hours: number; actual_hours: number; paid_hours: number; deduction_piasters: number; due_piasters: number }
 export function cairoDay(now = Date.now()) {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(now))
@@ -192,23 +197,34 @@ export async function adminEmployees(request: Request, env: Env, path: string) {
     ])
     const payroll = calculatePayroll(employees.results, attendance.results, requests.results, month)
     if (!payroll) return json({ error: 'شهر غير صحيح' }, 400)
-    const adjustments = await env.DB!.prepare('SELECT employee_id,due_piasters,note,updated_by,updated_at FROM employee_payroll_adjustments WHERE month=?').bind(month).all<{ employee_id: string; due_piasters: number; note: string; updated_by: string; updated_at: number }>()
+    const adjustments = await env.DB!.prepare('SELECT employee_id,due_piasters,adjustment_piasters,note,updated_by,updated_at FROM employee_payroll_adjustments WHERE month=?').bind(month).all<PayrollAdjustment & { employee_id: string; note: string; updated_by: string; updated_at: number }>()
     const byEmployee = new Map(adjustments.results.map(row => [row.employee_id, row]))
-    return json({ payroll: payroll.map(row => { const adjustment = byEmployee.get(row.employee_id); return { ...row, calculated_due_piasters: row.due_piasters, due_piasters: adjustment?.due_piasters ?? row.due_piasters, manual_due_piasters: adjustment?.due_piasters ?? null, adjustment_note: adjustment?.note || '', adjusted_by: adjustment?.updated_by || null, adjusted_at: adjustment?.updated_at || null } }), month })
+    return json({ payroll: payroll.map(row => { const adjustment = byEmployee.get(row.employee_id); return { ...row, calculated_due_piasters: row.due_piasters, due_piasters: adjustedPayrollDue(row.due_piasters,adjustment), adjustment_piasters: adjustment?.adjustment_piasters ?? null, manual_due_piasters: adjustment?.adjustment_piasters === null ? adjustment.due_piasters : null, adjustment_note: adjustment?.note || '', adjusted_by: adjustment?.updated_by || null, adjusted_at: adjustment?.updated_at || null } }), month })
   }
   if (path === 'payroll' && request.method === 'POST') {
     const raw = await request.text()
     if (raw.length > 4096) return json({ error: 'طلب كبير جدًا' }, 413)
-    const body = JSON.parse(raw) as { employee_id?: unknown; month?: unknown; due_piasters?: unknown; note?: unknown; clear?: unknown }
+    const body = JSON.parse(raw) as { employee_id?: unknown; month?: unknown; due_piasters?: unknown; adjustment_piasters?: unknown; note?: unknown; clear?: unknown }
     if (typeof body.employee_id !== 'string' || body.employee_id.length > 64 || typeof body.month !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(body.month)) return json({ error: 'الموظف أو الشهر غير صحيح' }, 422)
-    const employee = await env.DB!.prepare('SELECT id FROM employees WHERE id=?').bind(body.employee_id).first()
+    const employee = await env.DB!.prepare('SELECT id,name,job_title,active,created_at,monthly_salary_piasters,weekly_days_off,max_daily_hours,max_monthly_hours,weekly_work_windows,work_schedule_locked,work_schedule_effective_day FROM employees WHERE id=?').bind(body.employee_id).first<Employee>()
     if (!employee) return json({ error: 'الموظف غير موجود' }, 404)
     if (body.clear === true) {
       await env.DB!.prepare('DELETE FROM employee_payroll_adjustments WHERE employee_id=? AND month=?').bind(body.employee_id, body.month).run()
       return json({ success: true, cleared: true })
     }
-    if (!Number.isSafeInteger(body.due_piasters) || (body.due_piasters as number) < 0 || (body.due_piasters as number) > 10000000000 || (body.due_piasters as number) % 100 !== 0 || (body.note !== undefined && (typeof body.note !== 'string' || body.note.length > 500))) return json({ error: 'أدخل المستحق النهائي بالجنيه الصحيح، مع ملاحظة اختيارية.' }, 422)
-    await env.DB!.prepare('INSERT INTO employee_payroll_adjustments(employee_id,month,due_piasters,note,updated_by,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(employee_id,month) DO UPDATE SET due_piasters=excluded.due_piasters,note=excluded.note,updated_by=excluded.updated_by,updated_at=excluded.updated_at').bind(body.employee_id, body.month, body.due_piasters, typeof body.note === 'string' ? body.note.trim() : '', env.ADMIN_EMAIL?.trim() || 'admin', Date.now()).run()
+    const relative = body.adjustment_piasters !== undefined
+    const amount = relative ? body.adjustment_piasters : body.due_piasters
+    if ((relative && body.due_piasters !== undefined) || !Number.isSafeInteger(amount) || Math.abs(amount as number) > 10000000000 || (!relative && (amount as number) < 0) || (amount as number) % 100 !== 0 || (body.note !== undefined && (typeof body.note !== 'string' || body.note.length > 500))) return json({ error: 'أدخل زيادة أو خصمًا بالجنيه الصحيح، مع ملاحظة اختيارية.' }, 422)
+    const [attendance, requests] = await Promise.all([
+      env.DB!.prepare('SELECT id,employee_id,day,check_in,check_out FROM attendance_shifts WHERE employee_id=? AND day>=? AND day<=?').bind(employee.id, body.month+'-01', body.month+'-31').all<Attendance>(),
+      env.DB!.prepare("SELECT employee_id,day,type,status FROM employee_requests WHERE employee_id=? AND type='leave' AND status='approved' AND day>=? AND day<=?").bind(employee.id,body.month+'-01',body.month+'-31').all<{employee_id:string;day:string;type:string;status:string}>(),
+    ])
+    const base = calculatePayroll([employee],attendance.results,requests.results,body.month)![0].due_piasters
+    // Older clients submit a target total. Preserve its difference, never freeze future accrual.
+    const delta = relative ? amount as number : (amount as number)-base
+    const snapshot = Math.max(0,base+delta)
+    if(snapshot>10000000000)return json({error:'القيمة تتجاوز الحد المسموح'},422)
+    await env.DB!.prepare('INSERT INTO employee_payroll_adjustments(employee_id,month,due_piasters,adjustment_piasters,note,updated_by,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(employee_id,month) DO UPDATE SET due_piasters=excluded.due_piasters,adjustment_piasters=excluded.adjustment_piasters,note=excluded.note,updated_by=excluded.updated_by,updated_at=excluded.updated_at').bind(body.employee_id, body.month, snapshot, delta, typeof body.note === 'string' ? body.note.trim() : '', env.ADMIN_EMAIL?.trim() || 'admin', Date.now()).run()
     return json({ success: true })
   }
   if (path !== 'employees') return json({ error: 'غير مسموح' }, 405)

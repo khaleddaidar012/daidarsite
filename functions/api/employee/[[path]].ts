@@ -2,7 +2,7 @@ import { passwordVault } from '../../lib/password-vault'
 import { staffChat } from '../../lib/staff-chat'
 import { workProjects } from '../../lib/work-projects'
 import { hash, json, sameOrigin, verifyPassword, type Env } from '../../lib/store'
-import { cairoDay, cairoTime, calculatePayroll, checkInSchedule, employeeSession, monthlyAttendance, parseWorkWindows, safeEmployee, validCalendarDay, type Employee, type Attendance } from '../../lib/employees'
+import { adjustedPayrollDue, type PayrollAdjustment, cairoDay, cairoTime, calculatePayroll, checkInSchedule, employeeSession, monthlyAttendance, parseWorkWindows, safeEmployee, validCalendarDay, type Employee, type Attendance } from '../../lib/employees'
 import { manageProjects } from '../../lib/projects'
 import { adminHub } from '../../lib/hub-admin'
 import { d1UsageResponse } from '../../lib/d1-usage'
@@ -289,8 +289,8 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
           payrollView.hourly_rate_piasters = ownPayroll.hourly_rate_piasters
           if (employee.view_absences) { payrollView.absent_days = ownPayroll.absent_days; payrollView.absent_dates = ownPayroll.absent_dates }
           if (employee.view_due) {
-            const adjustment = await env.DB.prepare('SELECT due_piasters FROM employee_payroll_adjustments WHERE employee_id=? AND month=?').bind(employee.id, month).first<{ due_piasters: number }>()
-            payrollView.due_piasters = adjustment?.due_piasters ?? ownPayroll.due_piasters
+            const adjustment = await env.DB.prepare('SELECT due_piasters,adjustment_piasters FROM employee_payroll_adjustments WHERE employee_id=? AND month=?').bind(employee.id, month).first<PayrollAdjustment>()
+            payrollView.due_piasters = adjustedPayrollDue(ownPayroll.due_piasters,adjustment)
           }
         }
       }
