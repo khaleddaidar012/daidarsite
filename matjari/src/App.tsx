@@ -83,6 +83,15 @@ export const App: React.FC = () => {
     const initApp = async () => {
       try {
         setIsLoading(true);
+        // Custom domains resolve the store on the server, never from an editable URL.
+        const domainResponse = await fetch('/api/store/domain-store', {cache:'no-store'});
+        if(domainResponse.ok){
+          const mapping=await domainResponse.json();
+          if(mapping.store_id){
+            const [store,products]=await Promise.all([api.getStore(mapping.store_id),api.getProducts(mapping.store_id)]);
+            setStorefrontStore(store);setStorefrontProducts(products);setStorefrontPreview(false);setView('storefront');setIsLoading(false);return;
+          }
+        }
         const params = new URLSearchParams(window.location.search);
         const urlView = params.get('view');
         const urlStoreId = params.get('store_id');

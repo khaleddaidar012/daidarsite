@@ -4,6 +4,7 @@ import { api as defaultApi, createStoreApi } from '../services/api';
 import EcosystemAdmin from '../../../shared/EcosystemAdmin';
 import EcosystemPanel from '../../../shared/EcosystemPanel';
 import { storefrontUrl } from '../services/storefront-url';
+import { DomainManager } from './DomainManager';
 import {
   Store as StoreIcon,
   Plus,
@@ -711,6 +712,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
           )}
         </div>
 
+        <DomainManager admin apiClient={api}/>
         <section aria-labelledby="subscription-payment-requests-title" className="space-y-4 rounded-3xl border border-slate-200/90 bg-white p-4 shadow-xl shadow-sky-500/5 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 id="subscription-payment-requests-title" className="text-lg font-black text-slate-900 dark:text-white">{isArabic?'طلبات الاشتراك وإيصالات التحويل':'Subscription requests and transfer receipts'}</h2><p className="mt-1 text-xs text-slate-500">{isArabic?'راجع الإيصال يدويًا قبل اعتماد الدفع وتفعيل المتجر.':'Verify each transfer receipt before approving payment and activating the store.'}</p></div><button type="button" onClick={()=>void loadPaymentRequests()} className="rounded-xl border px-3 py-2 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800">{isArabic?'تحديث الطلبات':'Refresh requests'}</button></div>
           {paymentRequestError&&<p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{paymentRequestError}</p>}

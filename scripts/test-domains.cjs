@@ -1,0 +1,77 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),ts=require('typescript'),{DatabaseSync}=require('node:sqlite');
+function load(file,deps={}){const m={exports:{}};new Function('require','module','exports',ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(n=>deps[n]||(n.startsWith('.')?load(path.resolve(path.dirname(file),n)+'.ts'):require(n)),m,m.exports);return m.exports}
+const sqlite=new DatabaseSync(':memory:');sqlite.exec('PRAGMA foreign_keys=ON');
+for(const f of fs.readdirSync('matjari/migrations').filter(f=>f.endsWith('.sql')).sort())sqlite.exec(fs.readFileSync('matjari/migrations/'+f,'utf8'));
+const DB={prepare(sql){let args=[];return{bind(...values){args=values;return this},async first(){return sqlite.prepare(sql).get(...args)||null},async all(){return{results:sqlite.prepare(sql).all(...args)}},async run(){return sqlite.prepare(sql).run(...args)}}},async batch(statements){sqlite.exec('BEGIN');try{const out=[];for(const s of statements)out.push(await s.run());sqlite.exec('COMMIT');return out}catch(e){sqlite.exec('ROLLBACK');throw e}}};
+sqlite.exec("INSERT INTO stores(id,name,activity_type) VALUES('s1','First','test'),('s2','Second','test'); INSERT INTO users(id,username,password,role,store_id) VALUES('u1','first','test','merchant','s1'),('u2','second','test','merchant','s2'),('admin','admin','test','super_admin',NULL)");
+const {handleStoreRequest}=load('matjari/functions/api/[[route]].ts');
+const {pricePiasters,domainName}=load('matjari/lib/domains.ts');
+const {onRequest:middleware}=load('functions/_middleware.ts');
+const env={DB,DOMAIN_CF_ACCOUNT_ID:'test-account',DOMAIN_CF_API_TOKEN:'private-test-token',DOMAIN_PAGES_PROJECT:'test-project',DOMAIN_ROUTING_ENABLED:'1'};
+const merchant={id:'u1',role:'merchant',store_id:'s1'},other={id:'u2',role:'merchant',store_id:'s2'},admin={id:'admin',role:'super_admin'};
+const receipt='data:image/png;base64,iVBORw0KGgo=';
+const call=(route,method='GET',body,actor=merchant,customEnv=env,origin='https://test.example')=>handleStoreRequest(new Request('https://test.example/api/'+route,{method,headers:{'Content-Type':'application/json',Origin:origin},body:body===undefined?undefined:JSON.stringify(body)}),customEnv,actor);
+const data=async res=>{assert.equal(res.status,200,await res.clone().text());return res.json()};
+let available=true,price='10.00',registered=false,attached=false,dns=[],pagesStatus='pending';const calls=[];
+global.fetch=async(url,init={})=>{
+ calls.push({url,method:init.method,body:init.body});const u=new URL(url);
+ assert.equal(u.hostname,'api.cloudflare.com');assert.equal(init.headers.Authorization,'Bearer private-test-token');
+ let result;
+ if(u.pathname.endsWith('/domain-search')||u.pathname.endsWith('/domain-check'))result={domains:[{name:'demo-shop.com',registrable:available,pricing:{currency:'USD',registration_cost:price,renewal_cost:'12.00'}}]};
+ else if(u.pathname.endsWith('/registrar/registrations/demo-shop.com'))result={domain_name:'demo-shop.com',status:registered?'active':'registration_pending'};
+ else if(u.pathname==='/client/v4/zones')result=[{id:'zone',name:'demo-shop.com',status:'active'}];
+ else if(u.pathname.endsWith('/dns_records')){if(init.method==='POST')dns.push(JSON.parse(init.body));result=dns;}
+ else if(u.pathname.endsWith('/domains/demo-shop.com')){if(!attached)return Response.json({success:false},{status:404});result={status:pagesStatus};}
+ else if(u.pathname.endsWith('/domains')&&init.method==='POST'){attached=true;result={status:'pending'};}
+ else throw Error('Unexpected Cloudflare call '+url);
+ return Response.json({success:true,result});
+};
+async function test(){
+ assert.equal(pricePiasters('10.00',53.8626,150),68863);assert.equal(domainName('DEMO-SHOP.COM'),'demo-shop.com');
+ for(const bad of ['https://shop.com','shop.com/path','shop..com','127.0.0.1','shop.com?x=1'])assert.throws(()=>domainName(bad));
+ assert.throws(()=>pricePiasters('-1',53,150));assert.throws(()=>pricePiasters('10',Infinity,150));
+ assert.equal((await call('domains/requests','GET',undefined,null)).status,401);
+ assert.equal((await call('admin/domains/settings')).status,403);
+ assert.equal((await call('domains/quote','POST',{domain:'demo-shop.com'},merchant,env,'https://attacker.test')).status,403);
+ assert.equal((await call('domains/search?q=demo','GET',undefined,merchant,{DB})).status,503);
+ const search=await data(await call('domains/search?q=demo'));assert.equal(search.domains[0].total_piasters,68863);assert.ok(!JSON.stringify(search).includes('token'));
+ available=false;assert.equal((await call('domains/quote','POST',{domain:'demo-shop.com'})).status,409);available=true;
+ const q=(await data(await call('domains/quote','POST',{domain:'demo-shop.com',total_piasters:1,store_id:'s2'}))).quote;
+ assert.equal(q.total_piasters,68863);assert.equal(sqlite.prepare('SELECT store_id FROM domain_requests WHERE id=?').get(q.id).store_id,'s1');
+ assert.equal((await call(`domains/requests/${q.id}/proof`,'POST',{proof:receipt},other)).status,404);
+ assert.equal((await call(`domains/requests/${q.id}/proof`,'POST',{proof:'data:image/svg+xml;base64,AAAA'})).status,400);
+ await data(await call('admin/domains/settings','PUT',{usd_egp:60,margin_egp:200,rate_date:'2026-11-16'},admin));
+ // An expired quote still accepts the actual transfer receipt for manual resolution.
+ sqlite.prepare('UPDATE domain_requests SET quote_expires=0 WHERE id=?').run(q.id);
+ await data(await call(`domains/requests/${q.id}/proof`,'POST',{proof:receipt,total_piasters:1}));
+ await data(await call(`domains/requests/${q.id}/proof`,'POST',{proof:receipt}));
+ assert.equal(sqlite.prepare('SELECT total_piasters FROM domain_requests WHERE id=?').get(q.id).total_piasters,68863);
+ assert.equal((await data(await call('domains/requests','GET',undefined,other))).requests.length,0);
+ assert.ok(!(await data(await call('domains/requests'))).requests[0].proof_base64);
+ assert.equal((await call(`admin/domains/requests/${q.id}/proof`)).status,403);
+ assert.equal((await data(await call(`admin/domains/requests/${q.id}/proof`,'GET',undefined,admin))).proof,receipt);
+ assert.equal((await call('domains/quote','POST',{domain:'demo-shop.com'},other)).status,409);
+ assert.equal((await call(`admin/domains/requests/${q.id}/purchased`,'POST',{},admin)).status,409);
+ assert.equal((await call(`admin/domains/requests/${q.id}/review`,'POST',{status:'rejected'},admin)).status,400);
+ await data(await call(`admin/domains/requests/${q.id}/review`,'POST',{status:'approved'},admin));
+ assert.equal((await call(`admin/domains/requests/${q.id}/review`,'POST',{status:'approved'},admin)).status,409);
+ assert.equal((await call(`admin/domains/requests/${q.id}/purchased`,'POST',{},admin)).status,409);
+ registered=true;await data(await call(`admin/domains/requests/${q.id}/purchased`,'POST',{},admin));
+ dns=[{type:'A',content:'192.0.2.1'}];assert.equal((await call(`admin/domains/requests/${q.id}/link`,'POST',{},admin)).status,409);assert.equal(attached,false);
+ dns=[];assert.equal((await data(await call(`admin/domains/requests/${q.id}/link`,'POST',{},admin))).status,'linking');
+ assert.equal(dns[0].content,'test-project.pages.dev');
+ await data(await call(`admin/domains/requests/${q.id}/link`,'POST',{},admin));assert.equal(dns.length,1);
+ pagesStatus='active';await data(await call(`admin/domains/requests/${q.id}/verify`,'POST',{},admin));
+ assert.equal(sqlite.prepare('SELECT status FROM domain_requests WHERE id=?').get(q.id).status,'active');
+ assert.ok(!calls.some(c=>c.method==='POST'&&c.url.endsWith('/registrar/registrations')),'Never auto-purchase a domain');
+ const route=async(hostname,pathname,method='GET',body)=>{let forwarded;const request=new Request('https://'+hostname+pathname,{method,headers:{Cookie:'private=secret',Authorization:'private','Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const response=await middleware({request,env:{...env,ECOSYSTEM_STORE_DB:DB},next:async req=>{forwarded=req||request;return new Response('next')}});return{response,forwarded}};
+ assert.equal((await route('unknown.example','/')).response.status,404);
+ assert.equal((await route('demo-shop.com','/api/admin/settings')).response.status,404);
+ assert.equal((await (await route('demo-shop.com','/api/store/domain-store')).response.json()).store_id,'s1');
+ const publicStore=await route('demo-shop.com','/api/store/store?id=s2&preview=1');assert.equal(new URL(publicStore.forwarded.url).searchParams.get('id'),'s1');assert.equal(publicStore.forwarded.headers.get('Cookie'),null);
+ const order=await route('demo-shop.com','/api/store/orders','POST',{store_id:'s2'});assert.equal((await order.forwarded.json()).store_id,'s1');
+ assert.equal(new URL((await route('demo-shop.com','/')).forwarded.url).pathname,'/ar/hub/stores/');
+ assert.equal((await route('daidarsoluations.com','/admin')).response.status,200);
+ console.log('Domain tests passed: pricing snapshots, authorization, CSRF, receipts, duplicates, manual purchase, DNS conflicts, retries, activation, and custom host isolation.');
+}
+test().catch(e=>{console.error(e);process.exitCode=1});

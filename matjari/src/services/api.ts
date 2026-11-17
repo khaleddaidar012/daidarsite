@@ -3,6 +3,12 @@ import { Store, Product, TrafficStats, CustomerOrder, OrderStatus, StoreOrder, U
 
 
 export function createStoreApi(API_BASE='/api/store') { return {
+  async domainRequest(path:string, method='GET', body?:unknown):Promise<any> {
+    const res=await fetch(`${API_BASE}/${path}`,{method,cache:'no-store',headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error||'تعذر إتمام طلب الدومين');
+    return data;
+  },
   async session(): Promise<{user: User; store: Store | null; subscription: Subscription | null} | null> {
     const res = await fetch(`${API_BASE}/auth/session`, { cache: 'no-store' });
     if (res.status === 401) return null;

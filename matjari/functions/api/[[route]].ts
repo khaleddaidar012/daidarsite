@@ -2,8 +2,9 @@ import { currentActor, publicUser, newSession, passwordHash, passwordMatches, di
 import { type EcoEnv, type EcoDB } from '../../../shared/ecosystem';
 import { syncStoreResource } from '../../lib/ecosystem';
 import { displayStorePlan, effectiveStoreStatus, storeIsAvailable } from '../../lib/store-status';
+import { domainRoutes, type DomainEnv } from '../../lib/domains';
 // Cloudflare Pages Function with Cloudflare D1 Binding
-export interface Env extends EcoEnv {
+export interface Env extends EcoEnv, DomainEnv {
   DB: EcoDB;
   READ_ONLY_PREVIEW?: string;
 }
@@ -78,6 +79,9 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       if (Number(request.headers.get('Content-Length') || 0) > 2097152) return fail('حجم البيانات كبير جداً', 413);
     }
     const actor = delegatedActor || await currentActor(db, request, env);
+    if(path==='domain-store'&&method==='GET')return new Response(JSON.stringify({store_id:null}),{headers});
+    const domainResponse = await domainRoutes(request, env, actor, path, decodePaymentProof);
+    if (domainResponse) return domainResponse;
     if(path==='auth/create-store'&&method==='POST'){
       if(!actor)return fail('سجل الدخول أولاً',401);
       if(actor.store_id||actor.role!=='merchant')return fail('الحساب لديه متجر بالفعل',409);
@@ -114,6 +118,7 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       if(actor.role!=='merchant'||!actor.store_id)return fail('طلب الاشتراك متاح لصاحب المتجر فقط');
       const body=await request.json() as any;
       const features: unknown=body.features;
+      if(Array.isArray(features)&&features.includes('custom_domain'))return fail('طلب الدومين متاح الآن من قسم دومين المتجر بسعره الفعلي',400);
       if(!Array.isArray(features)||features.length>Object.keys(subscriptionFeatureCatalog).length||!features.includes('main_store')||features.some((feature:unknown)=>typeof feature!=='string'||!Object.prototype.hasOwnProperty.call(subscriptionFeatureCatalog,feature)))return fail('راجع اختيارات الاشتراك',400);
       const uniqueFeatures=[...new Set(features as SubscriptionFeature[])];
       const proof=decodePaymentProof(body.proof);
