@@ -2,6 +2,14 @@
 // on the configured first-party origin; never accept hostnames from query input.
 export async function onRequest(context:any) {
  const {env,request}=context;
+ const shortUrl=new URL(request.url);
+ if((['daidarsoluations.com','www.daidarsoluations.com','daidarsite2.pages.dev'].includes(shortUrl.hostname)||shortUrl.hostname.endsWith('.daidarsite2.pages.dev'))&&/^\/s\/[a-z0-9-]+\/?$/.test(shortUrl.pathname)){
+  const slug=shortUrl.pathname.split('/')[2],db=env.ECOSYSTEM_STORE_DB;
+  const row=db?await db.prepare('SELECT store_id FROM store_short_links WHERE slug=? UNION ALL SELECT id AS store_id FROM stores WHERE id=? LIMIT 1').bind(slug,slug).first():null;
+  if(!row)return new Response('Store not found',{status:404});
+  shortUrl.pathname='/ar/hub/stores/';shortUrl.search='';
+  return context.next(new Request(shortUrl,request));
+ }
  if(env.DOMAIN_ROUTING_ENABLED!=='1')return context.next();
  const url=new URL(request.url);
  const primary=new Set(['daidarsoluations.com','www.daidarsoluations.com','daidarsite2.pages.dev']);

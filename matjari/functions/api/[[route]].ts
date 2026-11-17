@@ -3,6 +3,7 @@ import { type EcoEnv, type EcoDB } from '../../../shared/ecosystem';
 import { syncStoreResource } from '../../lib/ecosystem';
 import { displayStorePlan, effectiveStoreStatus, storeIsAvailable } from '../../lib/store-status';
 import { domainRoutes, type DomainEnv } from '../../lib/domains';
+import {shortLinkRoutes} from '../../lib/short-links';
 // Cloudflare Pages Function with Cloudflare D1 Binding
 export interface Env extends EcoEnv, DomainEnv {
   DB: EcoDB;
@@ -79,6 +80,8 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       if (Number(request.headers.get('Content-Length') || 0) > 2097152) return fail('حجم البيانات كبير جداً', 413);
     }
     const actor = delegatedActor || await currentActor(db, request, env);
+    const shortResponse=await shortLinkRoutes(request,db,actor,path);
+    if(shortResponse)return shortResponse;
     if(path==='domain-store'&&method==='GET')return new Response(JSON.stringify({store_id:null}),{headers});
     const domainResponse = await domainRoutes(request, env, actor, path, decodePaymentProof);
     if (domainResponse) return domainResponse;

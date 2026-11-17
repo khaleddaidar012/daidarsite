@@ -7,7 +7,7 @@ import {SubscriptionCheckout} from './SubscriptionCheckout';
 import {DomainManager} from './DomainManager';
 import {useLanguage} from '../context/LanguageContext';
 import EcosystemPanel from '../../../shared/EcosystemPanel';
-import { storefrontUrl } from '../services/storefront-url';
+import { storefrontUrl,preferredStorefrontUrl } from '../services/storefront-url';
 import {Package,ShoppingBag,Settings,ExternalLink,Copy,Check,LogOut,RefreshCw,MessageCircle,Home,CreditCard,Globe} from 'lucide-react';
 interface Props{user:User;initialStore:Store|null;subscription:Subscription|null;onLogout:()=>void;onPreviewStore:(id:string)=>void;onBackToHome?:()=>void}
 type Tab='overview'|'products'|'inventory'|'finance'|'orders'|'settings'|'subscription'|'domains';
@@ -28,7 +28,9 @@ export const StoreOwnerDashboard:React.FC<Props>=({user,initialStore,subscriptio
  const effectiveStatus=store?.effective_status||(store?.is_active!==1?'awaiting_activation':!subscription?'unsubscribed':!['active','trial'].includes(subscription.status)?subscription.status:!Number.isFinite(start)||!Number.isFinite(end)?'awaiting_activation':start>Date.now()?'scheduled':end<Date.now()?'expired':subscription.status);
  const active=!!store&&['active','trial'].includes(effectiveStatus);
  const status=!store?text('لا يوجد متجر بعد','No store yet'):effectiveStatus==='active'||effectiveStatus==='trial'?text('متجرك فعال','Store active'):effectiveStatus==='expired'?text('الاشتراك منتهي','Subscription expired'):effectiveStatus==='suspended'?text('المتجر موقوف','Store suspended'):effectiveStatus==='scheduled'?text('الاشتراك لم يبدأ بعد','Subscription has not started'):text('بانتظار تفعيل المتجر والاشتراك','Store and subscription pending activation');
- const storeUrl=store?storefrontUrl(store.id):'';
+ const [preferredUrl,setPreferredUrl]=useState('');
+ useEffect(()=>{setPreferredUrl('');if(store)void preferredStorefrontUrl(store.id).then(setPreferredUrl)},[store?.id]);
+ const storeUrl=preferredUrl||(store?storefrontUrl(store.id):'');
  const support='https://wa.me/201061532875?text='+encodeURIComponent('مرحباً، أحتاج مساعدة بخصوص متجر '+(store?.name||user.username)+(store?' ('+store.id+')':''));
  const tabs:{id:Tab;label:string;Icon:typeof Home;soon?:boolean}[]=[{id:'overview',label:text('متجري','Overview'),Icon:Home},{id:'products',label:text('المنتجات','Products'),Icon:Package},{id:'orders',label:text('الطلبات','Orders'),Icon:ShoppingBag},{id:'settings',label:text('بيانات المتجر','Store details'),Icon:Settings},{id:'subscription',label:text('الاشتراك والدعم','Subscription & support'),Icon:CreditCard},{id:'inventory',label:text('إدارة المخزون','Inventory management'),Icon:Package,soon:true},{id:'finance',label:text('إدارة الحسابات المالية','Financial accounts'),Icon:CreditCard,soon:true}];
  const orderStatuses:{value:OrderStatus;label:string}[]=[{value:'new',label:t('order_status_new')},{value:'contacted',label:t('order_status_contacted')},{value:'preparing',label:t('order_status_preparing')},{value:'shipped',label:t('order_status_shipped')},{value:'delivered',label:t('order_status_delivered')},{value:'cancelled',label:t('order_status_cancelled')}];

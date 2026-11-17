@@ -72,6 +72,13 @@ async function test(){
  assert.equal((await data(await call('admin/domains/existing?store_id=s1','GET',undefined,admin))).links.length,1);
  await data(await call('admin/domains/existing','POST',{domain:'demo-shop.com',store_id:'s1',action:'verify'},admin));
  assert.equal((await call('admin/domains/existing','POST',{domain:'demo-shop.com',store_id:'s2',action:'verify'},admin)).status,409);
+ const short1=(await data(await call('short-link?store_id=s1'))).slug;
+ await data(await call('admin/domains/short-link','PUT',{store_id:'s1',slug:'kha-fashion'},admin));
+ assert.equal((await data(await call('short-link?slug='+short1))).store_id,'s1');
+ assert.equal((await data(await call('short-link?slug=kha-fashion'))).store_id,'s1');
+ assert.equal((await call('admin/domains/short-link','PUT',{store_id:'s2',slug:'kha-fashion'},admin)).status,409);
+ assert.equal((await call('admin/domains/short-link','PUT',{store_id:'s1',slug:'evil'},merchant)).status,403);
+ assert.equal((await data(await call('short-link?store_id=s1'))).domain,'demo-shop.com');
  assert.ok(!calls.some(c=>c.method==='POST'&&c.url.endsWith('/registrar/registrations')),'Never auto-purchase a domain');
  const route=async(hostname,pathname,method='GET',body)=>{let forwarded;const request=new Request('https://'+hostname+pathname,{method,headers:{Cookie:'private=secret',Authorization:'private','Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const response=await middleware({request,env:{...env,ECOSYSTEM_STORE_DB:DB},next:async req=>{forwarded=req||request;return new Response('next')}});return{response,forwarded}};
  assert.equal((await route('unknown.example','/')).response.status,404);

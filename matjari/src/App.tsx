@@ -35,6 +35,18 @@ export const App: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(true);
 
+  useEffect(()=>{
+    if(view!=='storefront')return;
+    const title=document.title;document.title=storefrontStore?.name||'متجر إلكتروني';
+    const icons=Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="icon"],link[rel="shortcut icon"],link[rel="apple-touch-icon"]'));
+    const saved=icons.map(icon=>({icon,href:icon.href}));
+    const generic='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#0284c7"/><path d="M14 27h36l-5-13H19zM18 30v21h28V30M28 51V37h9v14" fill="white"/></svg>');
+    const href=storefrontStore?.logo_data||generic;
+    saved.forEach(({icon})=>{icon.href=href});
+    const created=icons.length?null:document.createElement('link');if(created){created.rel='icon';created.href=href;document.head.appendChild(created)}
+    return()=>{document.title=title;saved.forEach(({icon,href})=>{icon.href=href});created?.remove()};
+  },[view,storefrontStore?.name,storefrontStore?.logo_data]);
+
   // Helper to safely navigate and keep URL synchronized with browser history
   const navigateTo = (newView: AppView, params?: { storeId?: string }) => {
     setView(newView);
@@ -84,6 +96,14 @@ export const App: React.FC = () => {
       try {
         setIsLoading(true);
         // Custom domains resolve the store on the server, never from an editable URL.
+        const shortSlug=window.location.pathname.match(/^\/s\/([a-z0-9-]+)\/?$/)?.[1];
+        if(shortSlug){
+          const response=await fetch('/api/store/short-link?slug='+encodeURIComponent(shortSlug),{cache:'no-store'});
+          if(!response.ok)throw new Error('المتجر غير موجود');
+          const mapping=await response.json();
+          const [store,products]=await Promise.all([api.getStore(mapping.store_id),api.getProducts(mapping.store_id)]);
+          setStorefrontStore(store);setStorefrontProducts(products);setStorefrontPreview(false);setView('storefront');setIsLoading(false);return;
+        }
         const domainResponse = await fetch('/api/store/domain-store', {cache:'no-store'});
         if(domainResponse.ok){
           const mapping=await domainResponse.json();

@@ -4,7 +4,7 @@ import { MerchantDetail, SubscriptionPaymentRequest, EmployeeStoreRenewalRequest
 import { api as defaultApi, createStoreApi } from '../services/api';
 import EcosystemAdmin from '../../../shared/EcosystemAdmin';
 import EcosystemPanel from '../../../shared/EcosystemPanel';
-import { storefrontUrl } from '../services/storefront-url';
+import { storefrontUrl,preferredStorefrontUrl } from '../services/storefront-url';
 import { DomainManager } from './DomainManager';
 import {
   Store as StoreIcon,
@@ -142,7 +142,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   const reviewEmployeeRenewal=async(id:string,status:'approved'|'rejected')=>{try{setReviewingRequestId(id);setEmployeeRenewalError('');await api.reviewEmployeeStoreRenewalRequest(id,status);await Promise.all([loadEmployeeRenewalRequests(),status==='approved'?Promise.all([loadMerchants(),loadPaymentRequests()]):Promise.resolve()])}catch(err:any){setEmployeeRenewalError(err.message||'تعذرت مراجعة طلب التجديد')}finally{setReviewingRequestId(null)}};
 
   const handleCopyStoreLink = async (storeId: string) => {
-    const url = storefrontUrl(storeId, storeBaseUrl);
+    const url = await preferredStorefrontUrl(storeId);
     try {
       await navigator.clipboard.writeText(url);
     } catch {
