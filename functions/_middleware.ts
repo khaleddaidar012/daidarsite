@@ -38,9 +38,9 @@ export async function onRequest(context:any) {
   }
   return new Response('Not found',{status:404});
  }
- if(url.pathname.startsWith('/matjari/')||url.pathname.startsWith('/_next/')||url.pathname==='/favicon.ico')return context.next();
- if(url.pathname==='/'||url.pathname==='/ar/hub/stores/'||url.pathname==='/en/hub/stores/'){
-  url.pathname='/ar/hub/stores/';url.search='';url.searchParams.set('view','storefront');url.searchParams.set('store_id',mapping.store_id);
+ if(url.pathname.startsWith('/.well-known/')||url.pathname.startsWith('/matjari/')||url.pathname.startsWith('/_next/')||url.pathname==='/favicon.ico')return context.next();
+ if(url.pathname==='/'||/^\/(ar|en)\/hub\/stores\/?$/.test(url.pathname)){
+  url.pathname='/ar/hub/stores';url.search='';url.searchParams.set('view','storefront');url.searchParams.set('store_id',mapping.store_id);
   return context.next(new Request(url,request));
  }
  return new Response('Not found',{status:404});

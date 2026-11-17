@@ -86,7 +86,9 @@ async function test(){
  assert.equal((await (await route('demo-shop.com','/api/store/domain-store')).response.json()).store_id,'s1');
  const publicStore=await route('demo-shop.com','/api/store/store?id=s2&preview=1');assert.equal(new URL(publicStore.forwarded.url).searchParams.get('id'),'s1');assert.equal(publicStore.forwarded.headers.get('Cookie'),null);
  const order=await route('demo-shop.com','/api/store/orders','POST',{store_id:'s2'});assert.equal((await order.forwarded.json()).store_id,'s1');
- assert.equal(new URL((await route('demo-shop.com','/')).forwarded.url).pathname,'/ar/hub/stores/');
+ assert.equal(new URL((await route('demo-shop.com','/')).forwarded.url).pathname,'/ar/hub/stores');
+ assert.equal((await route('demo-shop.com','/ar/hub/stores')).response.status,200);
+ assert.equal((await route('demo-shop.com','/.well-known/acme-challenge/test')).response.status,200);
  assert.equal((await route('daidarsoluations.com','/admin')).response.status,200);
  console.log('Domain tests passed: pricing snapshots, authorization, CSRF, receipts, duplicates, manual purchase, DNS conflicts, retries, activation, and custom host isolation.');
 }
