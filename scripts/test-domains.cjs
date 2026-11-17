@@ -63,6 +63,15 @@ async function test(){
  await data(await call(`admin/domains/requests/${q.id}/link`,'POST',{},admin));assert.equal(dns.length,1);
  pagesStatus='active';await data(await call(`admin/domains/requests/${q.id}/verify`,'POST',{},admin));
  assert.equal(sqlite.prepare('SELECT status FROM domain_requests WHERE id=?').get(q.id).status,'active');
+ assert.equal((await call('admin/domains/existing','POST',{domain:'demo-shop.com',store_id:'s1',action:'link'},merchant)).status,403);
+ assert.equal((await call('admin/domains/existing','POST',{domain:'daidarsoluations.com',store_id:'s1',action:'link'},admin)).status,400);
+ assert.equal((await call('admin/domains/existing','POST',{domain:'demo-shop.com',store_id:'s2',action:'link'},admin)).status,409);
+ const originalStatus=sqlite.prepare('SELECT status FROM domain_requests WHERE id=?').get(q.id).status;
+ await data(await call('admin/domains/existing','POST',{domain:'demo-shop.com',store_id:'s1',source_request_id:q.id,action:'link'},admin));
+ assert.equal(sqlite.prepare('SELECT status FROM domain_requests WHERE id=?').get(q.id).status,originalStatus);
+ assert.equal((await data(await call('admin/domains/existing?store_id=s1','GET',undefined,admin))).links.length,1);
+ await data(await call('admin/domains/existing','POST',{domain:'demo-shop.com',store_id:'s1',action:'verify'},admin));
+ assert.equal((await call('admin/domains/existing','POST',{domain:'demo-shop.com',store_id:'s2',action:'verify'},admin)).status,409);
  assert.ok(!calls.some(c=>c.method==='POST'&&c.url.endsWith('/registrar/registrations')),'Never auto-purchase a domain');
  const route=async(hostname,pathname,method='GET',body)=>{let forwarded;const request=new Request('https://'+hostname+pathname,{method,headers:{Cookie:'private=secret',Authorization:'private','Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const response=await middleware({request,env:{...env,ECOSYSTEM_STORE_DB:DB},next:async req=>{forwarded=req||request;return new Response('next')}});return{response,forwarded}};
  assert.equal((await route('unknown.example','/')).response.status,404);

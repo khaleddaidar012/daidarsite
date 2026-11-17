@@ -43,6 +43,55 @@ export async function domainRoutes(request:Request,env:DomainEnv,actor:Actor|nul
   if(admin?actor.role!=='super_admin':actor.role!=='merchant'||!actor.store_id)return json({error:'غير مسموح'},403);
   const db=env.DB,method=request.method;
   const settings=async()=>await db.prepare('SELECT * FROM domain_settings WHERE id=1').first();
+  if(admin&&path==='admin/domains/existing') {
+   if(method==='GET') {
+    const storeId=new URL(request.url).searchParams.get('store_id');
+    if(!storeId)reject('اختر المتجر');
+    const rows=await db.prepare('SELECT domain,status,source_request_id FROM store_domain_links WHERE store_id=? ORDER BY created_at DESC').bind(storeId).all();
+    return json({links:rows.results});
+   }
+   if(method==='POST') {
+    const b=await request.json() as any,name=domainName(b.domain);
+    if(!['link','verify'].includes(b.action)||typeof b.store_id!=='string')reject('راجع بيانات الربط');
+    if(!await db.prepare('SELECT id FROM stores WHERE id=?').bind(b.store_id).first())reject('المتجر غير موجود',404);
+    if(b.source_request_id){
+     const source=await db.prepare('SELECT store_id FROM domain_requests WHERE id=?').bind(b.source_request_id).first();
+     if(!source||source.store_id!==b.store_id)reject('الطلب لا يخص هذا المتجر',409);
+    }
+    if(!env.DOMAIN_PAGES_PROJECT||env.DOMAIN_ROUTING_ENABLED!=='1')reject('إعداد توجيه الدومينات لم يكتمل',503);
+    // Never map the application origin, or its www alias, to a tenant.
+    if(['daidarsoluations.com','www.daidarsoluations.com'].includes(name)||name.endsWith('.pages.dev'))reject('هذا العنوان محجوز للمنصة');
+    const paid=await db.prepare("SELECT store_id FROM domain_requests WHERE domain=? AND status IN ('pending','approved','purchased','linking','active')").bind(name).first();
+    const previous=await db.prepare('SELECT store_id FROM store_domain_links WHERE domain=?').bind(name).first();
+    if((paid&&paid.store_id!==b.store_id)||(previous&&previous.store_id!==b.store_id))reject('الدومين مرتبط بمتجر آخر',409);
+    const base=`${account(env)}/pages/projects/${encodeURIComponent(env.DOMAIN_PAGES_PROJECT)}/domains`;
+    if(b.action==='link') {
+     // Look for the longest active parent zone owned by the configured account.
+     let zone:any=null;const labels=name.split('.');
+     for(let i=0;i<labels.length-1;i++){
+      const parent=labels.slice(i).join('.');
+      const zones=await cloudflare(env,`zones?name=${encodeURIComponent(parent)}&account.id=${encodeURIComponent(env.DOMAIN_CF_ACCOUNT_ID||'')}`);
+      zone=zones?.find((z:any)=>z.name===parent&&z.status==='active');if(zone)break;
+     }
+     if(!zone)reject('الدومين أو نطاقه الأب غير فعال في حساب Cloudflare',409);
+     const records=await cloudflare(env,`zones/${zone.id}/dns_records?name=${encodeURIComponent(name)}&per_page=100`);
+     const target=`${env.DOMAIN_PAGES_PROJECT}.pages.dev`;
+     const addresses=records.filter((r:any)=>['A','AAAA','CNAME'].includes(r.type));
+     if(addresses.some((r:any)=>r.type!=='CNAME'||r.content!==target))reject('يوجد DNS مختلف؛ راجعه يدويًا قبل الربط',409);
+     // Claim atomically before external changes; retries resume the same mapping.
+     await db.prepare('INSERT INTO store_domain_links(domain,store_id,source_request_id,created_by) VALUES(?,?,?,?) ON CONFLICT(domain) DO NOTHING').bind(name,b.store_id,b.source_request_id||null,actor.id).run();
+     const claimed=await db.prepare('SELECT store_id FROM store_domain_links WHERE domain=?').bind(name).first();
+     if(claimed.store_id!==b.store_id)reject('الدومين مرتبط بمتجر آخر',409);
+     let attached=await cloudflare(env,`${base}/${encodeURIComponent(name)}`,'GET',undefined,true);
+     if(!attached)await cloudflare(env,base,'POST',{name});
+     if(!addresses.length)await cloudflare(env,`zones/${zone.id}/dns_records`,'POST',{type:'CNAME',name,content:target,proxied:true,ttl:1});
+    }else if(!previous)reject('اربط الدومين أولًا',409);
+    const linked=await cloudflare(env,`${base}/${encodeURIComponent(name)}`);
+    const status=linked?.status==='active'?'active':'linking';
+    await db.prepare('UPDATE store_domain_links SET status=?,updated_at=CURRENT_TIMESTAMP WHERE domain=? AND store_id=?').bind(status,name,b.store_id).run();
+    return json({success:true,status});
+   }
+  }
   if(path==='admin/domains/settings') {
    if(method==='GET')return json({settings:await settings(),connected:!!(env.DOMAIN_CF_ACCOUNT_ID&&env.DOMAIN_CF_API_TOKEN),routing:env.DOMAIN_ROUTING_ENABLED==='1',project:env.DOMAIN_PAGES_PROJECT||''});
    if(method==='PUT') {
@@ -69,6 +118,7 @@ export async function domainRoutes(request:Request,env:DomainEnv,actor:Actor|nul
   if(path==='domains/quote'&&method==='POST') {
    await rateLimit(db,request,'domain-quote:'+actor.id,10,60000);
    const name=domainName((await request.json() as any).domain),s=await settings();
+   if(await db.prepare('SELECT domain FROM store_domain_links WHERE domain=?').bind(name).first())reject('هذا الدومين مرتبط بالفعل بمتجر',409);
    if(!s)reject('التسعير لم يُضبط بعد',503);
    const candidate=await check(env,name),total=pricePiasters(candidate.pricing.registration_cost,s.usd_egp,s.margin_egp);
    if(await db.prepare("SELECT id FROM domain_requests WHERE domain=? AND status IN ('pending','approved','purchased','linking','active')").bind(name).first())reject('يوجد طلب قائم لهذا الدومين',409);

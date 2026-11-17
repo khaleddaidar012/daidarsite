@@ -1,3 +1,4 @@
+import {ExistingDomainLink} from './ExistingDomainLink';
 import React, { useState, useEffect } from 'react';
 import { MerchantDetail, SubscriptionPaymentRequest, EmployeeStoreRenewalRequest } from '../types';
 import { api as defaultApi, createStoreApi } from '../services/api';
@@ -435,6 +436,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         </div>
       </header>
 
+      {selectedMerchantForView&&<div role="dialog" aria-modal="true" aria-label={isArabic?'إعدادات دومين المتجر':'Store domain settings'} className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4" onClick={()=>setSelectedMerchantForView(null)}><div className="max-h-[90vh] w-full max-w-2xl space-y-4 overflow-auto rounded-2xl bg-white p-5" onClick={e=>e.stopPropagation()}><div className="flex items-center justify-between gap-3"><h2 className="font-black text-slate-900">{selectedMerchantForView.store.name}</h2><button autoFocus onClick={()=>setSelectedMerchantForView(null)} className="rounded-lg border px-3 py-2 text-sm text-slate-900">{isArabic?'إغلاق':'Close'}</button></div><ExistingDomainLink api={api} storeId={selectedMerchantForView.store.id}/></div></div>}
       {/* 2. MAIN DASHBOARD CONTENT */}
       <main className="max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
         {!embedded&&<EcosystemPanel system="store" ar={isArabic}/>}
@@ -991,6 +993,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                             </button>
 
                             {/* Copy Store URL Quick Action */}
+                            <button type="button" onClick={()=>setSelectedMerchantForView(m)} className="rounded-xl border px-3 py-2 text-xs font-bold text-sky-700">{isArabic?'إعدادات الدومين':'Domain settings'}</button>
                             <button
                               onClick={() => handleCopyStoreLink(m.store.id)}
                               className={`p-1.5 rounded-xl border font-bold text-[11px] flex items-center transition-all cursor-pointer active:scale-95 ${

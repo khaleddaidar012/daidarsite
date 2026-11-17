@@ -10,7 +10,7 @@ export async function onRequest(context:any) {
  const db=env.ECOSYSTEM_STORE_DB;
  if(!db)return new Response('Store unavailable',{status:503});
  let mapping:any;
- try{mapping=await db.prepare("SELECT store_id FROM domain_requests WHERE domain=? AND status IN ('linking','active')").bind(url.hostname).first()}catch{return new Response('Store unavailable',{status:503})}
+ try{mapping=await db.prepare("SELECT store_id FROM store_domain_links WHERE domain=? AND status IN ('linking','active') UNION ALL SELECT store_id FROM domain_requests WHERE domain=? AND status IN ('linking','active') LIMIT 1").bind(url.hostname,url.hostname).first()}catch{return new Response('Store unavailable',{status:503})}
  if(!mapping)return new Response('Domain not connected',{status:404});
  if(url.pathname==='/api/store/domain-store')return Response.json({store_id:mapping.store_id},{headers:{'Cache-Control':'no-store'}});
  if(url.pathname.startsWith('/api/')) {

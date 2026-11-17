@@ -79,7 +79,7 @@ export async function ecosystemAdministration(request:Request,env:Env):Promise<R
     if(path.startsWith('store/')){
       if(!env.ECOSYSTEM_STORE_DB)return json({error:'مصدر المتاجر غير مربوط'},503);
       const localPath=path.slice(6);
-      const domainAdminPath=/^admin\/domains\/(?:settings|requests(?:\/[a-zA-Z0-9-]+\/(?:proof|review|check|purchased|link|verify))?)$/.test(localPath);
+      const domainAdminPath=/^admin\/domains\/(?:existing|settings|requests(?:\/[a-zA-Z0-9-]+\/(?:proof|review|check|purchased|link|verify))?)$/.test(localPath);
       if(!domainAdminPath&&!/^admin\/(?:merchants(?:\/[a-zA-Z0-9-]+\/(?:toggle-status|renew-subscription))?|subscription-requests(?:\/[a-zA-Z0-9-]+\/(?:proof|review))?|employee-renewal-requests(?:\/[a-zA-Z0-9-]+\/(?:proof|review))?)$/.test(localPath)&&!['admin/analytics','d1-status'].includes(localPath))return json({error:'عملية غير متاحة من هذه الواجهة'},404);
       if(request.method==='DELETE')return json({error:'الحذف الدائم غير متاح في لوحة المنظومة؛ استخدم الإيقاف للحفاظ على البيانات'},405);
       const target=new URL('/api/'+localPath,request.url);target.search=new URL(request.url).search;
