@@ -123,7 +123,7 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       if(actor.role!=='merchant'||!actor.store_id)return fail('طلب الاشتراك متاح لصاحب المتجر فقط');
       const body=await request.json() as any;
       const features: unknown=body.features;
-      if(Array.isArray(features)&&features.some(f=>!['main_store','protection_bundle','whatsapp_management'].includes(String(f))))return fail('اختيار غير متاح حاليًا؛ حدّث الصفحة وراجع الباقات',400);
+      if(Array.isArray(features)&&features.some(f=>!['main_store','protection_bundle'].includes(String(f))))return fail('اختيار غير متاح حاليًا؛ حدّث الصفحة وراجع الباقات',400);
       if(Array.isArray(features)&&features.includes('custom_domain'))return fail('طلب الدومين متاح الآن من قسم دومين المتجر بسعره الفعلي',400);
       if(!Array.isArray(features)||features.length>Object.keys(subscriptionFeatureCatalog).length||!features.includes('main_store')||features.some((feature:unknown)=>typeof feature!=='string'||!Object.prototype.hasOwnProperty.call(subscriptionFeatureCatalog,feature)))return fail('راجع اختيارات الاشتراك',400);
       const uniqueFeatures=[...new Set(features as SubscriptionFeature[])];

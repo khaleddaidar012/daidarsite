@@ -49,9 +49,9 @@ async function test(){
  const login=await call('auth/login','POST',{username:'merchant1',password:reg('x').password});await data(login);
  const r2=await call('auth/register','POST',reg('merchant2'));const b=await data(r2),c2=session(r2);
  const receipt='data:image/png;base64,iVBORw0KGgo=';
- for(const feature of ['inventory','financial_accounts','backups','phone_notifications'])assert.equal((await call('subscription-requests','POST',{features:['main_store',feature],proof:receipt},c1)).status,400);
+ for(const feature of ['inventory','financial_accounts','backups','phone_notifications','whatsapp_management'])assert.equal((await call('subscription-requests','POST',{features:['main_store',feature],proof:receipt},c1)).status,400);
  const bundle=await call('subscription-requests','POST',{features:['main_store','protection_bundle'],proof:receipt,due_now:1},c1);assert.equal(bundle.status,201);const bundleData=await bundle.json();assert.equal(bundleData.request.due_now,450);sqlite.prepare('DELETE FROM subscription_payment_requests WHERE id=?').run(bundleData.request.id);
- const plans=load('matjari/lib/subscription-plans.ts');assert.equal(plans.storePlanName(['main_store']),'الباقة الأساسية');assert.equal(plans.storePlanName(['main_store','protection_bundle','whatsapp_management']),'الباقة المتكاملة');
+ const plans=load('matjari/lib/subscription-plans.ts');assert.equal(plans.storePlanName(['main_store']),'الباقة الأساسية');assert.equal(plans.storePlanName(['main_store','protection_bundle']),'باقة الحماية والمتابعة');
  assert.equal(displayStorePlan({price:450,notes:JSON.stringify({features:['main_store','protection_bundle']})}),'باقة الحماية والمتابعة');
  assert.equal((await call('subscription-requests','POST',{features:['main_store','custom_domain'],proof:'bad'},c1)).status,400);
  assert.equal((await call('subscription-requests','POST',{features:['main_store','made_up'],proof:receipt},c1)).status,400);
