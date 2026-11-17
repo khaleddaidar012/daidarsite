@@ -1,4 +1,5 @@
-export type StoreSubscription = { status?: string; start_date?: string | null; end_date?: string | null; plan_name?: string; price?: number | string } | null | undefined
+import {storePlanName} from './subscription-plans';
+export type StoreSubscription = { status?: string; start_date?: string | null; end_date?: string | null; plan_name?: string; price?: number | string; notes?:string } | null | undefined
 
 function dayStart(value: string | null | undefined) {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? Date.parse(`${value}T00:00:00.000Z`) : Number.NaN
@@ -27,7 +28,9 @@ export function storeIsAvailable(status: string) {
 
 export function displayStorePlan(subscription: StoreSubscription) {
   if (!subscription) return 'غير محدد'
-  if (Number(subscription.price || 0) === 0) return 'اشتراك مجاني'
-  if (subscription.plan_name && subscription.plan_name !== 'بانتظار التفعيل') return subscription.plan_name
-  return 'اشتراك المتجر'
+  try{const notes=JSON.parse(subscription.notes||'{}');if(Array.isArray(notes.features)&&notes.features.length)return storePlanName(notes.features)}catch{}
+  if(subscription.plan_name?.includes('واتساب'))return storePlanName(['main_store','whatsapp_management']);
+  if(subscription.plan_name?.includes('نسخ')||subscription.plan_name?.includes('إشعارات'))return storePlanName(['main_store','backups']);
+
+  return storePlanName(['main_store']);
 }

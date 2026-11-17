@@ -4,6 +4,7 @@ import { syncStoreResource } from '../../lib/ecosystem';
 import { displayStorePlan, effectiveStoreStatus, storeIsAvailable } from '../../lib/store-status';
 import { domainRoutes, type DomainEnv } from '../../lib/domains';
 import {shortLinkRoutes} from '../../lib/short-links';
+import {storePlanName} from '../../lib/subscription-plans';
 // Cloudflare Pages Function with Cloudflare D1 Binding
 export interface Env extends EcoEnv, DomainEnv {
   DB: EcoDB;
@@ -14,6 +15,7 @@ export const onRequest = ({request,env}:{request:Request;env:Env}) => handleStor
 
 const subscriptionFeatureCatalog = {
   main_store: { label: 'المتجر الرئيسي', monthly: 350, annual: 0 },
+  protection_bundle: { label: 'الحماية والمتابعة — نسخ احتياطي وإشعارات', monthly: 100, annual: 0 },
   custom_domain: { label: 'دومين للمتجر', monthly: 0, annual: 600 },
   backups: { label: 'نسخ احتياطي', monthly: 50, annual: 0 },
   whatsapp_management: { label: 'إدارة المتجر عن طريق واتساب', monthly: 75, annual: 0 },
@@ -121,6 +123,7 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       if(actor.role!=='merchant'||!actor.store_id)return fail('طلب الاشتراك متاح لصاحب المتجر فقط');
       const body=await request.json() as any;
       const features: unknown=body.features;
+      if(Array.isArray(features)&&features.some(f=>!['main_store','protection_bundle','whatsapp_management'].includes(String(f))))return fail('اختيار غير متاح حاليًا؛ حدّث الصفحة وراجع الباقات',400);
       if(Array.isArray(features)&&features.includes('custom_domain'))return fail('طلب الدومين متاح الآن من قسم دومين المتجر بسعره الفعلي',400);
       if(!Array.isArray(features)||features.length>Object.keys(subscriptionFeatureCatalog).length||!features.includes('main_store')||features.some((feature:unknown)=>typeof feature!=='string'||!Object.prototype.hasOwnProperty.call(subscriptionFeatureCatalog,feature)))return fail('راجع اختيارات الاشتراك',400);
       const uniqueFeatures=[...new Set(features as SubscriptionFeature[])];
@@ -198,7 +201,7 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
         if(!features.length)return fail('مزايا طلب العميل غير صالحة؛ راجع الطلب الأصلي.',409);
         const monthlyTotal=Number(sourcePayment.monthly_total)||0;
         const annualTotal=Number(sourcePayment.annual_total)||0;
-        const planName=features.map(feature=>subscriptionFeatureCatalog[feature].label).join(' + ');
+        const planName=storePlanName(features);
         const notes=JSON.stringify({features,annual_domain_fee:annualTotal,annual_domain_until:annualTotal?new Date(Date.now()+365*86400000).toISOString().slice(0,10):null,payment_request_id:sourcePayment.id});
         const paymentReviewToken=crypto.randomUUID();
         await db.batch([
@@ -250,7 +253,7 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       if(!Array.isArray(features)||!features.includes('main_store')||features.some(feature=>!Object.prototype.hasOwnProperty.call(subscriptionFeatureCatalog,feature)))return fail('خيارات الطلب غير صالحة',409);
       const monthlyTotal=features.reduce((sum,feature)=>sum+subscriptionFeatureCatalog[feature].monthly,0);
       const annualTotal=features.reduce((sum,feature)=>sum+subscriptionFeatureCatalog[feature].annual,0);
-      const planName=features.map(feature=>subscriptionFeatureCatalog[feature].label).join(' + ');
+      const planName=storePlanName(features);
       const notes=JSON.stringify({features,annual_domain_fee:annualTotal,annual_domain_until:annualTotal?new Date(Date.now()+365*86400000).toISOString().slice(0,10):null,payment_request_id:payRequest.id});
       const subId='sub-'+crypto.randomUUID();
       const reviewToken=crypto.randomUUID();

@@ -11,7 +11,7 @@ import { ExploreStoresView } from './components/ExploreStoresView';
 import { CartDrawer } from './components/CartDrawer';
 import { Footer } from './components/Footer';
 import { useLanguage } from './context/LanguageContext';
-import { storefrontUrl } from './services/storefront-url';
+import { storefrontUrl,openStorePreview } from './services/storefront-url';
 
 export type AppView = 'landing' | 'login' | 'merchant_login' | 'super_admin' | 'store_owner' | 'storefront' | 'explore_stores';
 const integratedWithHub = import.meta.env.VITE_MATJARI_HUB_INTEGRATED === '1';
@@ -244,7 +244,7 @@ export const App: React.FC = () => {
 
   // Preview Store in Public Storefront (Opens in new tab)
   const handlePreviewStore = async (storeId: string) => {
-    window.open(storefrontUrl(storeId, undefined, true), '_blank', 'noopener,noreferrer');
+    await openStorePreview(storeId);
   };
 
   // Open storefront inline (from landing page card clicks)

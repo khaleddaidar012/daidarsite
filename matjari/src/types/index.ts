@@ -26,7 +26,7 @@ export interface Subscription {
   updated_at?: string;
 }
 
-export type SubscriptionFeatureKey = 'main_store' | 'custom_domain' | 'backups' | 'whatsapp_management' | 'phone_notifications';
+export type SubscriptionFeatureKey = 'main_store' | 'protection_bundle' | 'custom_domain' | 'backups' | 'whatsapp_management' | 'phone_notifications';
 export type SubscriptionPaymentStatus = 'pending' | 'approved' | 'rejected';
 export interface SubscriptionPaymentRequest {
   id: string;
