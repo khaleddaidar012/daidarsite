@@ -83,6 +83,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     totalProducts: 0,
     monthMap: {},
   });
+  const [domainPendingCount,setDomainPendingCount]=useState<number|null>(null);
+  const [paymentRequestsLoaded,setPaymentRequestsLoaded]=useState(false);
   const [paymentRequests,setPaymentRequests]=useState<SubscriptionPaymentRequest[]>([]);
   const [paymentRequestError,setPaymentRequestError]=useState('');
   const [employeeRenewalRequests,setEmployeeRenewalRequests]=useState<EmployeeStoreRenewalRequest[]>([]);
@@ -126,7 +128,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     loadMerchants();
   }, []);
 
-  const loadPaymentRequests=async()=>{try{setPaymentRequestError('');setPaymentRequests(await api.getSubscriptionPaymentRequests())}catch(err:any){setPaymentRequestError(err.message||'تعذر تحميل طلبات الاشتراك')}};
+  const pendingPaymentCount=paymentRequestsLoaded&&!paymentRequestError?paymentRequests.filter(request=>request.status==='pending').length:null;
+  const scrollToRequests=(id:string)=>document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'});
+  const loadPaymentRequests=async()=>{try{setPaymentRequestError('');setPaymentRequests(await api.getSubscriptionPaymentRequests());setPaymentRequestsLoaded(true)}catch(err:any){setPaymentRequestError(err.message||'تعذر تحميل طلبات الاشتراك')}};
   const loadEmployeeRenewalRequests=async()=>{try{setEmployeeRenewalError('');setEmployeeRenewalRequests(await api.getEmployeeStoreRenewalRequests())}catch(err:any){setEmployeeRenewalError(err.message||'تعذر تحميل طلبات التجديد')}};
   useEffect(()=>{void loadPaymentRequests()},[]);
   useEffect(()=>{void loadEmployeeRenewalRequests()},[]);
@@ -447,7 +451,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                 <button type="button" onClick={()=>void loadMerchants()} disabled={isLoading} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/20 px-4 py-2.5 text-sm font-bold text-white hover:bg-white/10 disabled:opacity-50"><RefreshCw size={16} className={isLoading?'animate-spin':''}/>{isArabic ? 'تحديث البيانات' : 'Refresh data'}</button>
               </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <button type="button" onClick={()=>scrollToRequests('domain-requests')} className="rounded-2xl border border-cyan-200/20 bg-cyan-200/10 p-5 text-start transition hover:bg-white/10"><Globe size={20} className="mb-3 text-cyan-200"/><span className="block text-sm font-bold">{isArabic?'طلبات الدومينات':'Domain requests'}</span><strong className="mt-2 block text-4xl font-black">{domainPendingCount===null?'—':domainPendingCount.toLocaleString(isArabic?'ar-EG':'en-US')}</strong><span className="mt-3 block text-xs text-slate-300">{isArabic?'طلبات تحتاج مراجعة أو استكمال الربط ←':'Review requests and connections →'}</span></button>
               <button type="button" onClick={()=>openStores('pending')} className="rounded-2xl border border-amber-200/20 bg-amber-200/10 p-5 text-start transition hover:bg-amber-200/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">
                 <Clock size={20} className="mb-3 text-amber-200"/><span className="block text-sm font-bold text-amber-100">{isArabic ? 'بانتظار التفعيل' : 'Awaiting activation'}</span><strong className="mt-2 block text-4xl font-black">{isLoading?'—':pendingStores.toLocaleString(isArabic?'ar-EG':'en-US')}</strong><span className="mt-3 block text-xs text-slate-300">{isArabic ? 'مراجعة المتاجر الجديدة ←' : 'Review new stores →'}</span>
               </button>
@@ -495,8 +500,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
             )}
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 xl:grid-cols-5 gap-3 sm:gap-4">
             
+            <button type="button" onClick={()=>scrollToRequests('subscription-payment-requests-title')} className="rounded-3xl border border-violet-200 bg-white p-4 text-start transition hover:-translate-y-1 sm:p-5 dark:bg-slate-900"><div className="flex items-center justify-between gap-2"><span className="text-xs font-bold text-slate-500">{isArabic?'اشتراكات محتاجة تأكيد':'Subscriptions awaiting confirmation'}</span><CheckCircle size={18} className="text-violet-600"/></div><strong className="mt-3 block text-3xl font-black text-violet-600">{pendingPaymentCount===null?'—':pendingPaymentCount.toLocaleString(isArabic?'ar-EG':'en-US')}</strong><span className="mt-1 block text-[11px] text-slate-500">{isArabic?'إيصالات دفع بانتظار مراجعتك':'Payment receipts awaiting review'}</span></button>
             {/* Card 1: Total Stores */}
             <div
               onClick={() => setStatusFilter('all')}
@@ -712,7 +718,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
           )}
         </div>
 
-        <DomainManager admin apiClient={api}/>
+        <div id="domain-requests" className="scroll-mt-6"><DomainManager admin apiClient={api} onPendingCountChange={setDomainPendingCount}/></div>
         <section aria-labelledby="subscription-payment-requests-title" className="space-y-4 rounded-3xl border border-slate-200/90 bg-white p-4 shadow-xl shadow-sky-500/5 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 id="subscription-payment-requests-title" className="text-lg font-black text-slate-900 dark:text-white">{isArabic?'طلبات الاشتراك وإيصالات التحويل':'Subscription requests and transfer receipts'}</h2><p className="mt-1 text-xs text-slate-500">{isArabic?'راجع الإيصال يدويًا قبل اعتماد الدفع وتفعيل المتجر.':'Verify each transfer receipt before approving payment and activating the store.'}</p></div><button type="button" onClick={()=>void loadPaymentRequests()} className="rounded-xl border px-3 py-2 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800">{isArabic?'تحديث الطلبات':'Refresh requests'}</button></div>
           {paymentRequestError&&<p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{paymentRequestError}</p>}
