@@ -1,7 +1,12 @@
 import { hash, json, type Env } from './store'
 export type WorkWindow = { start: string; end: string }
 export type WeeklyWorkWindows = Record<string, WorkWindow[]>
-export type Employee = { id: string; name: string; job_title: string; email: string; active: number; password_hash: string; created_at: number; manage_projects: number; manage_hub_subscriptions: number; manage_store_subscriptions: number; create_store: number; view_ecosystem_stats: number; track_projects: number; view_d1_usage: number; add_passwords: number; view_passwords: number; monthly_salary_piasters: number; weekly_days_off: string; view_absences: number; view_due: number; max_daily_hours: number; max_monthly_hours: number; weekly_work_windows: string; work_schedule_locked: number; work_schedule_effective_day: string }
+export type Employee = { payroll_hourly_rate_piasters?: number; id: string; name: string; job_title: string; email: string; active: number; password_hash: string; created_at: number; manage_projects: number; manage_hub_subscriptions: number; manage_store_subscriptions: number; create_store: number; view_ecosystem_stats: number; track_projects: number; view_d1_usage: number; add_passwords: number; view_passwords: number; monthly_salary_piasters: number; weekly_days_off: string; view_absences: number; view_due: number; max_daily_hours: number; max_monthly_hours: number; weekly_work_windows: string; work_schedule_locked: number; work_schedule_effective_day: string }
+export async function withHourlyRates(env: Env, employees: Employee[], month: string): Promise<Employee[]> {
+  const rates = await env.DB!.prepare('SELECT employee_id,rate_piasters FROM employee_hourly_rates r WHERE month=(SELECT MAX(month) FROM employee_hourly_rates WHERE employee_id=r.employee_id AND month<=?)').bind(month).all<{employee_id:string;rate_piasters:number}>()
+  const byId = new Map(rates.results.map(r => [r.employee_id,r.rate_piasters]))
+  return employees.map(e => ({...e,payroll_hourly_rate_piasters:byId.get(e.id)}))
+}
 export type Attendance = { id: string; employee_id: string; day: string; check_in: number; check_out: number | null; accomplishments?: string }
 export type PayrollAdjustment = { due_piasters: number; adjustment_piasters: number | null }
 export function adjustedPayrollDue(base: number, adjustment?: PayrollAdjustment | null) {
@@ -112,7 +117,8 @@ export function calculatePayroll(employees: Employee[], attendance: Attendance[]
     const daysOff = new Set(weeklyDaysOff)
     const createdDay = cairoDay(employee.created_at)
     const effectiveDay = employee.work_schedule_effective_day || ''
-    const scheduleDayAccrual = employee.work_schedule_locked === 1 && /^\d{4}-\d{2}-\d{2}$/.test(effectiveDay) && effectiveDay <= monthEnd
+    const hourlyMode = employee.payroll_hourly_rate_piasters !== undefined
+    const scheduleDayAccrual = !hourlyMode && employee.work_schedule_locked === 1 && /^\d{4}-\d{2}-\d{2}$/.test(effectiveDay) && effectiveDay <= monthEnd
     const accrualStartDay = scheduleDayAccrual && effectiveDay > createdDay ? effectiveDay : createdDay
     let scheduledDays = 0, eligibleScheduledDays = 0, elapsedWorkdays = 0, absentDays = 0
     const absentDates: string[] = []
@@ -131,20 +137,20 @@ export function calculatePayroll(employees: Employee[], attendance: Attendance[]
     const monthly = employee.monthly_salary_piasters || 0
     const maxDaily = Number.isFinite(employee.max_daily_hours) && employee.max_daily_hours > 0 ? employee.max_daily_hours : 4
     const maxMonthly = Number.isFinite(employee.max_monthly_hours) && employee.max_monthly_hours > 0 ? employee.max_monthly_hours : 104
-    const hourlyRate = monthly / maxMonthly
+    const hourlyRate = employee.payroll_hourly_rate_piasters ?? monthly / maxMonthly
     const byDay = new Map<string, number>()
     for (const record of attendance.filter(r => r.employee_id === employee.id && r.day >= monthStart && r.day <= cutoff)) {
-      const end = record.check_out ?? (record.day === today ? now : record.check_in)
+      const end = record.check_out ?? ((hourlyMode || record.day === today) ? now : record.check_in)
       const hours = Math.max(0, (end - record.check_in) / 3600000)
       byDay.set(record.day, (byDay.get(record.day) || 0) + hours)
     }
-    const actualHours = Array.from(byDay.values()).reduce((sum, hours) => sum + Math.min(hours, maxDaily), 0)
+    const actualHours = Array.from(byDay.values()).reduce((sum, hours) => sum + (hourlyMode ? hours : Math.min(hours, maxDaily)), 0)
     const leaveHours = requests.filter(r => r.employee_id === employee.id && r.type === 'leave' && r.status === 'approved' && r.day >= monthStart && r.day <= cutoff && r.day >= createdDay && !daysOff.has(new Date(`${r.day}T00:00:00Z`).getUTCDay())).length * maxDaily
-    const paidHours = scheduleDayAccrual ? eligibleScheduledDays ? Math.min(maxMonthly, elapsedWorkdays / eligibleScheduledDays * maxMonthly) : 0 : Math.min(maxMonthly, actualHours + leaveHours)
-    const earned = scheduleDayAccrual ? (eligibleScheduledDays ? monthly * elapsedWorkdays / eligibleScheduledDays : 0) : Math.min(monthly, hourlyRate * paidHours)
+    const paidHours = hourlyMode ? actualHours : scheduleDayAccrual ? eligibleScheduledDays ? Math.min(maxMonthly, elapsedWorkdays / eligibleScheduledDays * maxMonthly) : 0 : Math.min(maxMonthly, actualHours + leaveHours)
+    const earned = hourlyMode ? hourlyRate * actualHours : scheduleDayAccrual ? (eligibleScheduledDays ? monthly * elapsedWorkdays / eligibleScheduledDays : 0) : Math.min(monthly, hourlyRate * paidHours)
     const dailyRate = scheduleDayAccrual ? (eligibleScheduledDays ? monthly / eligibleScheduledDays : 0) : hourlyRate * maxDaily
-    const deduction = scheduleDayAccrual ? 0 : Math.max(0, Math.min(monthly, (maxMonthly - paidHours) * hourlyRate))
-    return { employee_id: employee.id, name: employee.name, job_title: employee.job_title, active: employee.active, monthly_salary_piasters: monthly, weekly_days_off: Array.from(daysOff), scheduled_days: scheduledDays, elapsed_workdays: elapsedWorkdays, attended_days: attendanceByEmployee.get(employee.id)?.size || 0, approved_leave_days: requests.filter(r => r.employee_id === employee.id && r.type === 'leave' && r.status === 'approved' && r.day >= monthStart && r.day <= cutoff).length, absent_days: absentDays, absent_dates: absentDates, daily_rate_piasters: Math.round(dailyRate), hourly_rate_piasters: Math.round(hourlyRate), max_daily_hours: maxDaily, max_monthly_hours: maxMonthly, actual_hours: Math.min(maxMonthly, actualHours), paid_hours: paidHours, deduction_piasters: Math.round(deduction / 100) * 100, due_piasters: Math.max(0, Math.round(earned / 100) * 100) }
+    const deduction = hourlyMode || scheduleDayAccrual ? 0 : Math.max(0, Math.min(monthly, (maxMonthly - paidHours) * hourlyRate))
+    return { employee_id: employee.id, name: employee.name, job_title: employee.job_title, active: employee.active, monthly_salary_piasters: monthly, weekly_days_off: Array.from(daysOff), scheduled_days: scheduledDays, elapsed_workdays: elapsedWorkdays, attended_days: attendanceByEmployee.get(employee.id)?.size || 0, approved_leave_days: requests.filter(r => r.employee_id === employee.id && r.type === 'leave' && r.status === 'approved' && r.day >= monthStart && r.day <= cutoff).length, absent_days: absentDays, absent_dates: absentDates, daily_rate_piasters: Math.round(dailyRate), hourly_rate_piasters: Math.round(hourlyRate), max_daily_hours: maxDaily, max_monthly_hours: maxMonthly, actual_hours: hourlyMode ? actualHours : Math.min(maxMonthly, actualHours), paid_hours: paidHours, deduction_piasters: Math.round(deduction / 100) * 100, due_piasters: Math.max(0, hourlyMode ? Math.round(earned) : Math.round(earned / 100) * 100) }
   })
 }
 export async function adminEmployees(request: Request, env: Env, path: string) {
@@ -195,7 +201,7 @@ export async function adminEmployees(request: Request, env: Env, path: string) {
       env.DB!.prepare('SELECT id,employee_id,day,check_in,check_out FROM attendance_shifts WHERE day>=? AND day<=?').bind(month + '-01', month + '-31').all<Attendance>(),
       env.DB!.prepare("SELECT employee_id,day,type,status FROM employee_requests WHERE type='leave' AND status='approved' AND day>=? AND day<=?").bind(month + '-01', month + '-31').all<{ employee_id: string; day: string; type: string; status: string }>(),
     ])
-    const payroll = calculatePayroll(employees.results, attendance.results, requests.results, month)
+    const payroll = calculatePayroll(await withHourlyRates(env,employees.results,month), attendance.results, requests.results, month)
     if (!payroll) return json({ error: 'شهر غير صحيح' }, 400)
     const adjustments = await env.DB!.prepare('SELECT employee_id,due_piasters,adjustment_piasters,note,updated_by,updated_at FROM employee_payroll_adjustments WHERE month=?').bind(month).all<PayrollAdjustment & { employee_id: string; note: string; updated_by: string; updated_at: number }>()
     const byEmployee = new Map(adjustments.results.map(row => [row.employee_id, row]))
@@ -214,12 +220,12 @@ export async function adminEmployees(request: Request, env: Env, path: string) {
     }
     const relative = body.adjustment_piasters !== undefined
     const amount = relative ? body.adjustment_piasters : body.due_piasters
-    if ((relative && body.due_piasters !== undefined) || !Number.isSafeInteger(amount) || Math.abs(amount as number) > 10000000000 || (!relative && (amount as number) < 0) || (amount as number) % 100 !== 0 || (body.note !== undefined && (typeof body.note !== 'string' || body.note.length > 500))) return json({ error: 'أدخل زيادة أو خصمًا بالجنيه الصحيح، مع ملاحظة اختيارية.' }, 422)
+    if ((relative && body.due_piasters !== undefined) || !Number.isSafeInteger(amount) || Math.abs(amount as number) > 10000000000 || (!relative && (amount as number) < 0)  || (body.note !== undefined && (typeof body.note !== 'string' || body.note.length > 500))) return json({ error: 'أدخل زيادة أو خصمًا بالجنيه والقروش، مع ملاحظة اختيارية.' }, 422)
     const [attendance, requests] = await Promise.all([
       env.DB!.prepare('SELECT id,employee_id,day,check_in,check_out FROM attendance_shifts WHERE employee_id=? AND day>=? AND day<=?').bind(employee.id, body.month+'-01', body.month+'-31').all<Attendance>(),
       env.DB!.prepare("SELECT employee_id,day,type,status FROM employee_requests WHERE employee_id=? AND type='leave' AND status='approved' AND day>=? AND day<=?").bind(employee.id,body.month+'-01',body.month+'-31').all<{employee_id:string;day:string;type:string;status:string}>(),
     ])
-    const base = calculatePayroll([employee],attendance.results,requests.results,body.month)![0].due_piasters
+    const base = calculatePayroll(await withHourlyRates(env,[employee],body.month),attendance.results,requests.results,body.month)![0].due_piasters
     // Older clients submit a target total. Preserve its difference, never freeze future accrual.
     const delta = relative ? amount as number : (amount as number)-base
     const snapshot = Math.max(0,base+delta)
@@ -230,7 +236,7 @@ export async function adminEmployees(request: Request, env: Env, path: string) {
   if (path !== 'employees') return json({ error: 'غير مسموح' }, 405)
   if (request.method === 'GET') {
     const rows = await env.DB!.prepare('SELECT id, name, job_title, email, active, manage_projects, manage_hub_subscriptions, manage_store_subscriptions, create_store, view_ecosystem_stats, track_projects, view_d1_usage, add_passwords, view_passwords, monthly_salary_piasters, weekly_days_off, view_absences, view_due,max_daily_hours,max_monthly_hours,weekly_work_windows,work_schedule_locked,work_schedule_effective_day FROM employees ORDER BY created_at').all<Employee>()
-    return json({ employees: rows.results.map(row => ({ ...row, weekly_days_off: parseDaysOff(row.weekly_days_off), weekly_work_windows: parseWorkWindows(row.weekly_work_windows), work_schedule_locked: row.work_schedule_locked === 1 })) })
+    return json({ employees: (await withHourlyRates(env,rows.results,cairoDay().slice(0,7))).map(row => ({ ...row, weekly_days_off: parseDaysOff(row.weekly_days_off), weekly_work_windows: parseWorkWindows(row.weekly_work_windows), work_schedule_locked: row.work_schedule_locked === 1 })) })
   }
   if (request.method === 'DELETE') {
     const raw = await request.text()
@@ -275,6 +281,7 @@ export async function adminEmployees(request: Request, env: Env, path: string) {
     const viewD1Usage = body.view_d1_usage ?? existing?.view_d1_usage ?? 0
     const viewAbsences = body.view_absences ?? existing?.view_absences ?? 1
     const viewDue = body.view_due ?? existing?.view_due ?? 0
+    if (body.hourly_rate_piasters !== undefined && (!Number.isSafeInteger(body.hourly_rate_piasters) || body.hourly_rate_piasters < 0 || body.hourly_rate_piasters > 100000000)) return json({error:'سعر الساعة غير صحيح'},422)
     const salary = body.monthly_salary_piasters ?? existing?.monthly_salary_piasters ?? 0
     const maxDaily = body.max_daily_hours ?? existing?.max_daily_hours ?? 4
     const maxMonthly = body.max_monthly_hours ?? existing?.max_monthly_hours ?? 104
@@ -282,8 +289,11 @@ export async function adminEmployees(request: Request, env: Env, path: string) {
     const workWindows = JSON.stringify(body.weekly_work_windows ?? parseWorkWindows(existing?.weekly_work_windows || '{}'))
     const scheduleLocked = body.work_schedule_locked === undefined ? (existing?.work_schedule_locked || 0) : Number(body.work_schedule_locked === true || body.work_schedule_locked === 1)
     const scheduleEffectiveDay = body.work_schedule_effective_day ?? existing?.work_schedule_effective_day ?? ''
-    await env.DB!.prepare('INSERT INTO employees(id,name,job_title,email,password_hash,active,created_at,manage_projects,manage_hub_subscriptions,manage_store_subscriptions,create_store,view_ecosystem_stats,track_projects,view_d1_usage,monthly_salary_piasters,weekly_days_off,view_absences,view_due,max_daily_hours,max_monthly_hours,add_passwords,view_passwords,weekly_work_windows,work_schedule_locked,work_schedule_effective_day) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,job_title=excluded.job_title,email=excluded.email,password_hash=excluded.password_hash,active=excluded.active,manage_projects=excluded.manage_projects,manage_hub_subscriptions=excluded.manage_hub_subscriptions,manage_store_subscriptions=excluded.manage_store_subscriptions,create_store=excluded.create_store,view_ecosystem_stats=excluded.view_ecosystem_stats,track_projects=excluded.track_projects,view_d1_usage=excluded.view_d1_usage,monthly_salary_piasters=excluded.monthly_salary_piasters,weekly_days_off=excluded.weekly_days_off,view_absences=excluded.view_absences,view_due=excluded.view_due,max_daily_hours=excluded.max_daily_hours,max_monthly_hours=excluded.max_monthly_hours,add_passwords=excluded.add_passwords,view_passwords=excluded.view_passwords,weekly_work_windows=excluded.weekly_work_windows,work_schedule_locked=excluded.work_schedule_locked,work_schedule_effective_day=excluded.work_schedule_effective_day')
-      .bind(id, body.name.trim(), body.job_title.trim(), email, credential, active, existing?.created_at || Date.now(), manageProjects, manageHubSubscriptions, manageStoreSubscriptions, createStore, viewEcosystemStats, trackProjects, viewD1Usage, salary, daysOff, viewAbsences, viewDue, maxDaily, maxMonthly, body.add_passwords ?? existing?.add_passwords ?? 0, body.view_passwords ?? existing?.view_passwords ?? 0, workWindows, scheduleLocked, scheduleEffectiveDay).run()
+    const saveEmployee = env.DB!.prepare('INSERT INTO employees(id,name,job_title,email,password_hash,active,created_at,manage_projects,manage_hub_subscriptions,manage_store_subscriptions,create_store,view_ecosystem_stats,track_projects,view_d1_usage,monthly_salary_piasters,weekly_days_off,view_absences,view_due,max_daily_hours,max_monthly_hours,add_passwords,view_passwords,weekly_work_windows,work_schedule_locked,work_schedule_effective_day) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,job_title=excluded.job_title,email=excluded.email,password_hash=excluded.password_hash,active=excluded.active,manage_projects=excluded.manage_projects,manage_hub_subscriptions=excluded.manage_hub_subscriptions,manage_store_subscriptions=excluded.manage_store_subscriptions,create_store=excluded.create_store,view_ecosystem_stats=excluded.view_ecosystem_stats,track_projects=excluded.track_projects,view_d1_usage=excluded.view_d1_usage,monthly_salary_piasters=excluded.monthly_salary_piasters,weekly_days_off=excluded.weekly_days_off,view_absences=excluded.view_absences,view_due=excluded.view_due,max_daily_hours=excluded.max_daily_hours,max_monthly_hours=excluded.max_monthly_hours,add_passwords=excluded.add_passwords,view_passwords=excluded.view_passwords,weekly_work_windows=excluded.weekly_work_windows,work_schedule_locked=excluded.work_schedule_locked,work_schedule_effective_day=excluded.work_schedule_effective_day')
+      .bind(id, body.name.trim(), body.job_title.trim(), email, credential, active, existing?.created_at || Date.now(), manageProjects, manageHubSubscriptions, manageStoreSubscriptions, createStore, viewEcosystemStats, trackProjects, viewD1Usage, salary, daysOff, viewAbsences, viewDue, maxDaily, maxMonthly, body.add_passwords ?? existing?.add_passwords ?? 0, body.view_passwords ?? existing?.view_passwords ?? 0, workWindows, scheduleLocked, scheduleEffectiveDay)
+    const statements = [saveEmployee]
+    if (body.hourly_rate_piasters !== undefined || !existing) statements.push(env.DB!.prepare('INSERT INTO employee_hourly_rates(employee_id,month,rate_piasters,updated_at) VALUES(?,?,?,?) ON CONFLICT(employee_id,month) DO UPDATE SET rate_piasters=excluded.rate_piasters,updated_at=excluded.updated_at').bind(id,cairoDay().slice(0,7),body.hourly_rate_piasters ?? Math.round(salary/maxMonthly),Date.now()))
+    await env.DB!.batch(statements)
     if (!active || body.password || email !== existing?.email) await env.DB!.prepare('DELETE FROM employee_sessions WHERE employee_id = ?').bind(id).run()
     return json({ success: true })
   }

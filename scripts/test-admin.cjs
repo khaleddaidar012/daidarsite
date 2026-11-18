@@ -162,6 +162,7 @@ async function test() {
   sqlite.exec(fs.readFileSync('migrations/0020_employee_work_schedules.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0021_employee_shift_change_requests.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0022_relative_payroll_adjustments.sql', 'utf8'))
+  sqlite.exec(fs.readFileSync('migrations/0023_hourly_payroll_rates.sql', 'utf8'))
   for (const path of ['employees', 'attendance', 'employee-requests']) assert.equal((await call(path)).status, 401)
   const employeePassword = 'employee-test-password'
   const schedule = []
@@ -229,7 +230,7 @@ async function test() {
   assert.equal(employeeLib.adjustedPayrollDue(10000,{due_piasters:62000,adjustment_piasters:null}),62000);
   assert.equal(employeeLib.adjustedPayrollDue(10000,null),10000);
   const payrollMonth = employeeLib.cairoDay().slice(0, 7)
-  assert.equal((await call('payroll', 'POST', { employee_id: employeeList[0].id, month: payrollMonth, due_piasters: 288550 }, cookie)).status, 422)
+  assert.equal((await call('payroll', 'POST', { employee_id: employeeList[0].id, month: payrollMonth, due_piasters: 288550.5 }, cookie)).status, 422)
   assert.equal((await call('payroll', 'POST', { employee_id: employeeList[0].id, month: payrollMonth, due_piasters: 288500, note: 'مكافأة اختبار' }, cookie)).status, 200)
   const savedPayroll = (await (await call('payroll', 'GET', undefined, cookie)).json()).payroll.find(row => row.employee_id === employeeList[0].id)
   assert.equal(savedPayroll.due_piasters, 288500)
@@ -237,7 +238,7 @@ async function test() {
   assert.equal(savedPayroll.manual_due_piasters,null);
   assert.equal(savedPayroll.adjustment_piasters,288500-savedPayroll.calculated_due_piasters);
   assert.equal((await call('payroll','POST',{employee_id:employeeList[0].id,month:payrollMonth,adjustment_piasters:7500,due_piasters:62000},cookie)).status,422);
-  assert.equal((await call('payroll','POST',{employee_id:employeeList[0].id,month:payrollMonth,adjustment_piasters:7550},cookie)).status,422);
+  assert.equal((await call('payroll','POST',{employee_id:employeeList[0].id,month:payrollMonth,adjustment_piasters:7550.5},cookie)).status,422);
   const relativeRequest={employee_id:employeeList[0].id,month:payrollMonth,adjustment_piasters:7500,note:'زيادة مستمرة'};
   await call('payroll','POST',relativeRequest,cookie);await call('payroll','POST',relativeRequest,cookie);
   const relativePayroll=(await(await call('payroll','GET',undefined,cookie)).json()).payroll.find(r=>r.employee_id===employeeList[0].id);
@@ -451,9 +452,18 @@ async function test() {
   assert.equal(hiddenAbsencesVisibleDue.payroll.absent_days, undefined)
   assert.equal(typeof hiddenAbsencesVisibleDue.payroll.due_piasters, 'number')
   await call('payroll','POST',{employee_id:employeeList[0].id,month:payrollMonth,adjustment_piasters:7500},cookie);
+  const lockBeforeRateEdit=sqlite.prepare('SELECT work_schedule_locked FROM employees WHERE id=?').get(employeeList[0].id).work_schedule_locked;
+  const rateForm={id:employeeList[0].id,name:employeeList[0].name,job_title:employeeList[0].job_title,email:employeeList[0].email,hourly_rate_piasters:3500};
+  assert.equal((await call('employees','POST',{...rateForm,hourly_rate_piasters:-1},cookie)).status,422);
+  assert.equal((await call('employees','POST',{...rateForm,hourly_rate_piasters:3500.5},cookie)).status,422);
+  assert.equal((await call('employees','POST',rateForm,cookie)).status,200);
+  assert.equal((await call('employees','POST',rateForm,cookie)).status,200);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM employee_hourly_rates WHERE employee_id=? AND month=?').get(employeeList[0].id,payrollMonth).n,1,'rate retries replace the current-month rate');
+  assert.equal(sqlite.prepare('SELECT work_schedule_locked FROM employees WHERE id=?').get(employeeList[0].id).work_schedule_locked,lockBeforeRateEdit,'rate editing preserves attendance schedule lock');
+  assert.equal((await call('payroll','POST',{employee_id:employeeList[0].id,month:payrollMonth,adjustment_piasters:7550},cookie)).status,200,'bonuses accept piasters');
   const ownWithBonus=await(await employeeCall('attendance?month='+payrollMonth,'GET',undefined,employeeCookie)).json();
   const adminWithBonus=(await(await call('payroll','GET',undefined,cookie)).json()).payroll.find(r=>r.employee_id===employeeList[0].id);
-  assert.equal(ownWithBonus.payroll.due_piasters,adminWithBonus.due_piasters);assert.equal(adminWithBonus.adjustment_piasters,7500);
+  assert.equal(ownWithBonus.payroll.due_piasters,adminWithBonus.due_piasters);assert.equal(adminWithBonus.adjustment_piasters,7550);assert.equal(ownWithBonus.payroll.hourly_rate_piasters,3500);assert.equal(ownWithBonus.payroll.actual_hours,adminWithBonus.actual_hours);assert.equal(adminWithBonus.calculated_due_piasters,Math.round(adminWithBonus.actual_hours*3500));
   await call('payroll','POST',{employee_id:employeeList[0].id,month:payrollMonth,clear:true},cookie);
 
   assert.equal((await employeeCall('d1-usage', 'GET', undefined, employeeCookie)).status, 503)
