@@ -99,9 +99,6 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   const [newWhatsapp, setNewWhatsapp] = useState('');
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [newPlanName, setNewPlanName] = useState('الباقة السنوية الاحترافية');
-  const [newDuration, setNewDuration] = useState(12);
-  const [newPrice, setNewPrice] = useState(1200);
 
   const logoBase=typeof window==='undefined'?'/':new URL('.',window.location.href).pathname;
   const logoSrc = embedded?'/icon.png':isDark
@@ -173,9 +170,6 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         whatsapp_number: newWhatsapp.trim(),
         username: newUsername.trim(),
         password: newPassword.trim(),
-        plan_name: newPlanName,
-        duration_months: newDuration,
-        price: newPrice,
       });
 
       setMessage({ type: 'success', text: isArabic ? `تم إنشاء حساب متجر «${newStoreName}» بنجاح!` : `Store account "${newStoreName}" created successfully!` });
@@ -1109,64 +1103,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-                <div>
-                  <label className="block text-xs font-extrabold text-[#0e1f38] dark:text-white mb-1">
-                    {t('username_label')} <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={newUsername}
-                    onChange={(e) => setNewUsername(e.target.value)}
-                    placeholder={t('username_example')}
-                    className="w-full px-4 py-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:border-[#0084d6] font-mono text-start placeholder:text-slate-400 dark:placeholder:text-slate-400"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-extrabold text-[#0e1f38] dark:text-white mb-1">
-                    {t('password_label')} <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full px-4 py-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:border-[#0084d6] font-mono text-start placeholder:text-slate-400 dark:placeholder:text-slate-400"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-                <div>
-                  <label className="block text-xs font-extrabold text-[#0e1f38] dark:text-white mb-1">
-                    {t('subscription_duration')}
-                  </label>
-                  <select
-                    value={newDuration}
-                    onChange={(e) => setNewDuration(Number(e.target.value))}
-                    className="w-full px-4 py-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-[#0084d6] dark:text-sky-400"
-                  >
-                    <option value={1}>{t('trial_month')}</option>
-                    <option value={6}>{t('semi_annual')}</option>
-                    <option value={12}>{t('full_year')}</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-extrabold text-[#0e1f38] dark:text-white mb-1">
-                    {t('subscription_price')}
-                  </label>
-                  <input
-                    type="number"
-                    value={newPrice}
-                    onChange={(e) => setNewPrice(Number(e.target.value))}
-                    className="w-full px-4 py-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:border-[#0084d6]"
-                  />
-                </div>
-              </div>
+              <p className="text-sm text-slate-500">{isArabic ? 'يُنشأ المتجر غير مفعّل. يبدأ الاشتراك بعد تقديم الطلب وموافقة الإدارة.' : 'Stores start inactive until an admin approves the subscription request.'}</p>
 
               <div className="pt-4 flex gap-2.5">
                 <button

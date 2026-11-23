@@ -60,6 +60,16 @@ async function test(){
  assert.equal((await call('subscription-requests','POST',{features:['main_store'],proof:receipt},c2)).status,201);
  const adminHash=await auth.passwordHash('Owner secure password');sqlite.prepare("INSERT INTO users(id,username,password,role) VALUES('owner','owner',?,'super_admin')").run(adminHash);
  const ar=await call('auth/login','POST',{username:'owner',password:'Owner secure password'});await data(ar);const ac=session(ar);
+ const created=await data(await call('admin/merchants','POST',{store_name:'New employee store',activity_type:'عام',whatsapp_number:'01000000000',username:'employee-inactive',password:'eight123',price:1200,duration_months:12,is_active:1},ac));
+ assert.equal(created.merchant.store.is_active,0);assert.equal(created.merchant.user.is_active,1);assert.equal(created.merchant.subscription.status,'awaiting_activation');assert.equal(created.merchant.subscription.price,0);assert.equal(created.merchant.subscription.start_date,created.merchant.subscription.end_date);
+ const inactiveLogin=await call('auth/login','POST',{username:'employee-inactive',password:'eight123'});await data(inactiveLogin);const inactiveCookie=session(inactiveLogin);
+ assert.equal((await call('store?id='+created.merchant.store.id)).status,404);assert.equal((await call('auth/activate-free','POST',{},inactiveCookie)).status,403);
+ sqlite.prepare("INSERT INTO employee_store_renewal_requests(id,store_id,employee_id,employee_name,employee_email,months,proof_mime,proof_base64,status) VALUES(?,?,?,?,?,3,'image/png','iVBORw0KGgo=','pending')").run('initial-subscription',created.merchant.store.id,'employee-test','موظف','employee@example.com');
+ assert.equal(sqlite.prepare('SELECT is_active FROM stores WHERE id=?').get(created.merchant.store.id).is_active,0);
+ assert.equal((await call('admin/employee-renewal-requests/initial-subscription/review','POST',{status:'approved'},ac)).status,200);
+ const initialSub=sqlite.prepare('SELECT * FROM subscriptions WHERE store_id=?').get(created.merchant.store.id);assert.equal(initialSub.status,'active');assert.equal(initialSub.price,1050);assert.equal(initialSub.plan_name,'الباقة الأساسية');assert.equal(sqlite.prepare('SELECT is_active FROM stores WHERE id=?').get(created.merchant.store.id).is_active,1);
+ const approvedEnd=initialSub.end_date;assert.equal((await call('admin/employee-renewal-requests/initial-subscription/review','POST',{status:'approved'},ac)).status,409);assert.equal(sqlite.prepare('SELECT end_date FROM subscriptions WHERE store_id=?').get(created.merchant.store.id).end_date,approvedEnd);
+
  assert.equal((await call('admin/subscription-requests','GET',undefined,c1)).status,403);
  const paymentQueue=await data(await call('admin/subscription-requests','GET',undefined,ac));assert.equal(paymentQueue.requests.length,2);assert.equal(paymentQueue.requests.find(x=>x.id===paymentBody.request.id).store_name,'متجر merchant1');
  assert.equal((await call(`admin/subscription-requests/${paymentBody.request.id}/proof`,'GET',undefined,c1)).status,403);
@@ -112,8 +122,8 @@ async function test(){
  assert.equal((await call('orders','POST',(({store_id,...withoutStore})=>withoutStore)(order))).status,400);
  sqlite.prepare("UPDATE subscriptions SET plan_name='اشتراك مجاني',status='awaiting_activation',price=0 WHERE store_id=?").run(b.store.id);
  sqlite.prepare('UPDATE stores SET is_active=0 WHERE id=?').run(b.store.id);
- const selfActivation=await data(await call('auth/activate-free','POST',{},c2));assert.equal(selfActivation.success,true);
- const freeStoreSession=await data(await call('auth/session','GET',undefined,c2));assert.equal(freeStoreSession.store.is_active,1);assert.equal(freeStoreSession.subscription.plan_name,'الباقة الأساسية');assert.equal(freeStoreSession.subscription.status,'active');
+ assert.equal((await call('auth/activate-free','POST',{},c2)).status,403);
+ const freeStoreSession=await data(await call('auth/session','GET',undefined,c2));assert.equal(freeStoreSession.store.is_active,0);assert.equal(freeStoreSession.subscription.plan_name,'الباقة الأساسية');assert.equal(freeStoreSession.subscription.status,'awaiting_activation');
  const originalSub=sqlite.prepare('SELECT start_date,end_date FROM subscriptions WHERE store_id=?').get(a.store.id);
  for(const [start,end] of [['2099-01-01','2099-12-31'],['2020-01-01','2020-12-31'],['invalid','invalid']]){sqlite.prepare('UPDATE subscriptions SET start_date=?,end_date=? WHERE store_id=?').run(start,end,a.store.id);assert.equal((await call('orders','POST',order)).status,403);assert.equal((await call('products','POST',{store_id:a.store.id,name:'ممنوع',price:50},c1)).status,403);}
  sqlite.prepare('UPDATE subscriptions SET start_date=?,end_date=? WHERE store_id=?').run(originalSub.start_date,originalSub.end_date,a.store.id);

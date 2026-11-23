@@ -300,9 +300,9 @@ async function test() {
   assert.match(downloadedCustomerReceipt.headers.get('content-disposition'), /attachment/)
   assert.equal((await downloadedCustomerReceipt.arrayBuffer()).byteLength, 8)
   assert.equal((await employeeCall('store-admin', 'POST', { store_name: 'متجر اختبار', activity_type: 'عام', whatsapp_number: '01000000000', username: 'store-test', password: 'store-password', plan_name: 'غير موثوق', duration_months: 1, price: 1 }, employeeCookie)).status, 200)
-  assert.equal(delegatedStoreCalls.at(-1).body.plan_name, 'الباقة السنوية الاحترافية')
-  assert.equal(delegatedStoreCalls.at(-1).body.duration_months, 12)
-  assert.equal(delegatedStoreCalls.at(-1).body.price, 1200)
+  assert.equal(delegatedStoreCalls.at(-1).body.plan_name, undefined)
+  assert.equal(delegatedStoreCalls.at(-1).body.duration_months, undefined)
+  assert.equal(delegatedStoreCalls.at(-1).body.price, undefined)
   assert.equal((await employeeCall('store-admin/store-test/renew-subscription', 'POST', { months: 13 }, employeeCookie)).status, 422)
   const delegatedCountBeforeRenewal = delegatedStoreCalls.length
   const oversizedCustomerReceiptRenewal = await employeeCall('store-admin/store-test/renew-subscription', 'POST', { months: 3, receipt_source: 'customer_receipt' }, employeeCookie)

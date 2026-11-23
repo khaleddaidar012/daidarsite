@@ -106,17 +106,8 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       const store=await db.prepare('SELECT * FROM stores WHERE id=?').bind(actor.store_id).first() as any;
       const subscription=await db.prepare('SELECT * FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(actor.store_id).first() as any;
       if(!store||!subscription)return fail('بيانات المتجر أو الاشتراك غير موجودة',404);
-      const isFree=Number(subscription.price)===0&&['active','awaiting_activation'].includes(subscription.status);
-      if(!isFree)return fail('التفعيل الذاتي متاح للاشتراك المجاني فقط',403);
       if(store.is_active===1&&subscription.status==='active')return new Response(JSON.stringify({success:true,alreadyActive:true}),{headers});
-      if(store.is_active===1)return fail('حالة المتجر لا تسمح بالتفعيل الآن',409);
-      await db.batch([
-        db.prepare("UPDATE subscriptions SET status='active',plan_name='اشتراك مجاني',start_date=date('now'),end_date=date('now','+1 year'),updated_at=datetime('now') WHERE id=? AND status IN ('active','awaiting_activation') AND price=0").bind(subscription.id),
-        db.prepare("UPDATE stores SET is_active=1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND is_active=0").bind(actor.store_id),
-        db.prepare("UPDATE users SET is_active=1,updated_at=CURRENT_TIMESTAMP WHERE store_id=?").bind(actor.store_id)
-      ]);
-      await syncStoreResource(env,actor.store_id);
-      return new Response(JSON.stringify({success:true}),{headers});
+      return fail('أرسل طلب اشتراك؛ يتم التفعيل بعد مراجعة الإدارة والموافقة عليه',403);
     }
     if(path==='subscription-requests'&&method==='POST'){
       if(!actor)return fail('يرجى تسجيل الدخول',401);
@@ -220,8 +211,8 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       const subId=existingSub?.id||'sub-'+crypto.randomUUID();
       await db.batch([
         db.prepare("UPDATE employee_store_renewal_requests SET status='approved',review_token=?,reviewed_by=?,reviewed_at=datetime('now') WHERE id=? AND status='pending'").bind(reviewToken,actor!.id,renewal.id),
-        db.prepare("UPDATE subscriptions SET end_date=date(CASE WHEN end_date>date('now') THEN end_date ELSE date('now') END,'+'||?||' month'),status='active',updated_at=datetime('now') WHERE id=? AND EXISTS(SELECT 1 FROM employee_store_renewal_requests WHERE id=? AND status='approved' AND review_token=?)").bind(months,subId,renewal.id,reviewToken),
-        db.prepare("INSERT INTO subscriptions(id,store_id,plan_name,status,start_date,end_date,price,created_at,updated_at) SELECT ?,?,'الباقة المجددة','active',date('now'),date('now','+'||?||' month'),1000,datetime('now'),datetime('now') WHERE NOT EXISTS(SELECT 1 FROM subscriptions WHERE store_id=?) AND EXISTS(SELECT 1 FROM employee_store_renewal_requests WHERE id=? AND status='approved' AND review_token=?)").bind(subId,renewal.store_id,months,renewal.store_id,renewal.id,reviewToken),
+        db.prepare("UPDATE subscriptions SET start_date=CASE WHEN status='awaiting_activation' THEN date('now') ELSE start_date END,plan_name=CASE WHEN status='awaiting_activation' THEN 'الباقة الأساسية' ELSE plan_name END,price=CASE WHEN status='awaiting_activation' THEN 350*? ELSE price END,end_date=date(CASE WHEN status='active' AND end_date>date('now') THEN end_date ELSE date('now') END,'+'||?||' month'),status='active',updated_at=datetime('now') WHERE id=? AND EXISTS(SELECT 1 FROM employee_store_renewal_requests WHERE id=? AND status='approved' AND review_token=?)").bind(months,months,subId,renewal.id,reviewToken),
+        db.prepare("INSERT INTO subscriptions(id,store_id,plan_name,status,start_date,end_date,price,created_at,updated_at) SELECT ?,?,'الباقة الأساسية','active',date('now'),date('now','+'||?||' month'),350*?,datetime('now'),datetime('now') WHERE NOT EXISTS(SELECT 1 FROM subscriptions WHERE store_id=?) AND EXISTS(SELECT 1 FROM employee_store_renewal_requests WHERE id=? AND status='approved' AND review_token=?)").bind(subId,renewal.store_id,months,months,renewal.store_id,renewal.id,reviewToken),
         db.prepare("UPDATE stores SET is_active=1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND EXISTS(SELECT 1 FROM employee_store_renewal_requests WHERE id=? AND status='approved' AND review_token=?)").bind(renewal.store_id,renewal.id,reviewToken),
         db.prepare("UPDATE users SET is_active=1,updated_at=CURRENT_TIMESTAMP WHERE store_id=? AND EXISTS(SELECT 1 FROM employee_store_renewal_requests WHERE id=? AND status='approved' AND review_token=?)").bind(renewal.store_id,renewal.id,reviewToken),
       ]);
@@ -443,9 +434,6 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
           currency = 'ج.م',
           username,
           password,
-          plan_name = 'الباقة السنوية الاحترافية',
-          duration_months = 12,
-          price = 1200,
         } = body;
 
         if (typeof username !== 'string' || !username.trim() || username.length > 80 || typeof password !== 'string' || password.length < 8 || password.length > 256 || !store_name || !activity_type || !whatsapp_number) return fail('راجع بيانات التاجر وكلمة المرور (٨ أحرف على الأقل)', 400);
@@ -459,21 +447,20 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
         const userId = 'usr-' + crypto.randomUUID();
         const subId = 'sub-' + crypto.randomUUID();
 
-        await db.prepare(`
+        await db.batch([db.prepare(`
           INSERT INTO stores (id, name, activity_type, whatsapp_number, currency, bio, is_active)
-          VALUES (?, ?, ?, ?, ?, '', 1)
-        `).bind(storeId, store_name, activity_type, whatsapp_number, currency).run();
+          VALUES (?, ?, ?, ?, ?, '', 0)
+        `).bind(storeId, store_name, activity_type, whatsapp_number, currency),
 
-        await db.prepare(`
+        db.prepare(`
           INSERT INTO users (id, username, password, role, store_id, is_active)
           VALUES (?, ?, ?, 'merchant', ?, 1)
-        `).bind(userId, username.trim(), hashedPassword, storeId).run();
+        `).bind(userId, username.trim(), hashedPassword, storeId),
 
-        const months = Number(duration_months) || 12;
-        await db.prepare(`
+        db.prepare(`
           INSERT INTO subscriptions (id, store_id, plan_name, status, start_date, end_date, price)
-          VALUES (?, ?, ?, 'active', date('now'), date('now', '+' || ? || ' month'), ?)
-        `).bind(subId, storeId, plan_name, months, Number(price) || 0).run();
+          VALUES (?, ?, 'بانتظار التفعيل', 'awaiting_activation', date('now'), date('now'), 0)
+        `).bind(subId, storeId)]);
 
         const createdStore = await db.prepare('SELECT * FROM stores WHERE id = ?').bind(storeId).first();
         const createdUser = await db.prepare('SELECT id, username, role, is_active FROM users WHERE id = ?').bind(userId).first();

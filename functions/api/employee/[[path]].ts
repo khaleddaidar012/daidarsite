@@ -93,7 +93,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       const body = await request.clone().json().catch(() => null) as Record<string, unknown> | null
       if (!body || typeof body.store_name !== 'string' || typeof body.activity_type !== 'string' || typeof body.whatsapp_number !== 'string' || typeof body.username !== 'string' || typeof body.password !== 'string') return json({ error: 'راجع بيانات المتجر وبيانات حساب الدخول.' }, 422)
       const target = new URL('/api/admin/merchants', request.url)
-      const safeRequest = new Request(target, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, plan_name: 'الباقة السنوية الاحترافية', duration_months: 12, price: 1200 }) })
+      const safeRequest = new Request(target, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ store_name: body.store_name, activity_type: body.activity_type, whatsapp_number: body.whatsapp_number, username: body.username, password: body.password }) })
       const result = await handleStoreRequest(safeRequest, { ...env, DB: env.ECOSYSTEM_STORE_DB, READ_ONLY_PREVIEW: 'false' }, { id: employee.id, username: employee.email, email: employee.email, role: 'super_admin', store_id: null, is_active: 1, password: '' })
       if (result.ok) await recordAdminNotification(env, { actor: employee.name, eventType: 'store_created_by_employee', title: 'إنشاء متجر', detail: `${employee.name} أنشأ متجرًا من لوحة الموظفين`, target: 'hub' })
       return result
