@@ -8,7 +8,7 @@ export async function onRequest(context:any) {
   if(/^shop-\d+$/.test(slug))return new Response('Store not found',{status:404});
   const row=db?await db.prepare('SELECT store_id FROM store_short_links WHERE slug=? UNION ALL SELECT id AS store_id FROM stores WHERE id=? LIMIT 1').bind(slug,slug).first():null;
   if(!row)return new Response('Store not found',{status:404});
-  shortUrl.pathname='/ar/hub/stores/';shortUrl.search='';
+  shortUrl.pathname='/ar/hub/stores';shortUrl.search='';
   return context.next(new Request(shortUrl,request));
  }
  if(env.DOMAIN_ROUTING_ENABLED!=='1')return context.next();

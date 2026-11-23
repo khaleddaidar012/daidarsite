@@ -85,6 +85,7 @@ async function test(){
  assert.equal((await data(await call('short-link?store_id=s1'))).domain,'demo-shop.com');
  assert.ok(!calls.some(c=>c.method==='POST'&&c.url.endsWith('/registrar/registrations')),'Never auto-purchase a domain');
  const route=async(hostname,pathname,method='GET',body)=>{let forwarded;const request=new Request('https://'+hostname+pathname,{method,headers:{Cookie:'private=secret',Authorization:'private','Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const response=await middleware({request,env:{...env,ECOSYSTEM_STORE_DB:DB},next:async req=>{forwarded=req||request;return new Response('next')}});return{response,forwarded}};
+ const shortRoute=await route('daidarsoluations.com','/s/kha-fashion');assert.equal(shortRoute.response.status,200);assert.equal(new URL(shortRoute.forwarded.url).pathname,'/ar/hub/stores');
  assert.equal((await route('daidarsoluations.com','/s/shop-17')).response.status,404);
  assert.equal((await route('unknown.example','/')).response.status,404);
  assert.equal((await route('demo-shop.com','/api/admin/settings')).response.status,404);
