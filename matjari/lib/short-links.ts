@@ -7,6 +7,7 @@ export async function shortLinkRoutes(request:Request,db:EcoDB,actor:Actor|null|
  if(admin&&actor?.role!=='super_admin')return json({error:'غير مسموح'},403);
  if(request.method==='GET'){
   const slug=url.searchParams.get('slug'),id=url.searchParams.get('store_id');
+  if(slug&&/^shop-\d+$/.test(slug))return json({error:'المتجر غير موجود'},404);
   let row=slug?await db.prepare('SELECT store_id,slug FROM store_short_links WHERE slug=?').bind(slug).first():id?await db.prepare('SELECT store_id,slug FROM store_short_links WHERE store_id=? AND is_primary=1').bind(id).first():null;
   if(!row&&id){const store=await db.prepare('SELECT id FROM stores WHERE id=?').bind(id).first();if(store)row={store_id:id,slug:id}}
   if(!row)return json({error:'المتجر غير موجود'},404);
@@ -18,7 +19,7 @@ export async function shortLinkRoutes(request:Request,db:EcoDB,actor:Actor|null|
   if(typeof b.slug!=='string'||!/^([a-z0-9][a-z0-9-]{1,46}[a-z0-9])$/.test(b.slug)||typeof b.store_id!=='string')return json({error:'اكتب اسم رابط من 3 إلى 48 حرفًا إنجليزيًا صغيرًا أو رقمًا أو شرطة'},400);
   if(!await db.prepare('SELECT id FROM stores WHERE id=?').bind(b.store_id).first())return json({error:'المتجر غير موجود'},404);
   const existing=await db.prepare('SELECT store_id FROM store_short_links WHERE slug=?').bind(b.slug).first();
-  if(/^shop-\d+$/.test(b.slug)&&!existing)return json({error:'هذا النمط محجوز لروابط المتاجر التلقائية'},400);
+  if(/^shop-\d+$/.test(b.slug))return json({error:'استخدم اسم متجر أو رمزًا غير ترتيبي للرابط'},400);
   if(existing&&existing.store_id!==b.store_id)return json({error:'اسم الرابط مستخدم لمتجر آخر'},409);
   try{await db.batch([
    db.prepare('UPDATE store_short_links SET is_primary=0 WHERE store_id=?').bind(b.store_id),

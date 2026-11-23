@@ -5,6 +5,7 @@ export async function onRequest(context:any) {
  const shortUrl=new URL(request.url);
  if((['daidarsoluations.com','www.daidarsoluations.com','daidarsite2.pages.dev'].includes(shortUrl.hostname)||shortUrl.hostname.endsWith('.daidarsite2.pages.dev'))&&/^\/s\/[a-z0-9-]+\/?$/.test(shortUrl.pathname)){
   const slug=shortUrl.pathname.split('/')[2],db=env.ECOSYSTEM_STORE_DB;
+  if(/^shop-\d+$/.test(slug))return new Response('Store not found',{status:404});
   const row=db?await db.prepare('SELECT store_id FROM store_short_links WHERE slug=? UNION ALL SELECT id AS store_id FROM stores WHERE id=? LIMIT 1').bind(slug,slug).first():null;
   if(!row)return new Response('Store not found',{status:404});
   shortUrl.pathname='/ar/hub/stores/';shortUrl.search='';

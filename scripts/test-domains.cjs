@@ -2,6 +2,8 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 function load(file,deps={}){const m={exports:{}};new Function('require','module','exports',ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(n=>deps[n]||(n.startsWith('.')?load(path.resolve(path.dirname(file),n)+'.ts'):require(n)),m,m.exports);return m.exports}
 const sqlite=new DatabaseSync(':memory:');sqlite.exec('PRAGMA foreign_keys=ON');
 for(const f of fs.readdirSync('matjari/migrations').filter(f=>f.endsWith('.sql')).sort())sqlite.exec(fs.readFileSync('matjari/migrations/'+f,'utf8'));
+const migrationCheck=new DatabaseSync(':memory:');for(const f of fs.readdirSync('matjari/migrations').filter(f=>f.endsWith('.sql')&&f<'0008').sort())migrationCheck.exec(fs.readFileSync('matjari/migrations/'+f,'utf8'));
+ migrationCheck.exec("INSERT INTO stores(id,name,activity_type) VALUES('old','Old','test'),('custom','Custom','test'); UPDATE store_short_links SET slug='boutique' WHERE store_id='custom'");migrationCheck.exec(fs.readFileSync('matjari/migrations/0008_opaque_store_short_links.sql','utf8'));assert.match(migrationCheck.prepare("SELECT slug FROM store_short_links WHERE store_id='old'").get().slug,/^m-[a-f0-9]{12}$/);assert.equal(migrationCheck.prepare("SELECT slug FROM store_short_links WHERE store_id='custom'").get().slug,'boutique');assert.equal(migrationCheck.prepare("SELECT count(*) n FROM store_short_links WHERE slug LIKE 'shop-%'").get().n,0);migrationCheck.close();
 const DB={prepare(sql){let args=[];return{bind(...values){args=values;return this},async first(){return sqlite.prepare(sql).get(...args)||null},async all(){return{results:sqlite.prepare(sql).all(...args)}},async run(){return sqlite.prepare(sql).run(...args)}}},async batch(statements){sqlite.exec('BEGIN');try{const out=[];for(const s of statements)out.push(await s.run());sqlite.exec('COMMIT');return out}catch(e){sqlite.exec('ROLLBACK');throw e}}};
 sqlite.exec("INSERT INTO stores(id,name,activity_type) VALUES('s1','First','test'),('s2','Second','test'); INSERT INTO users(id,username,password,role,store_id) VALUES('u1','first','test','merchant','s1'),('u2','second','test','merchant','s2'),('admin','admin','test','super_admin',NULL)");
 const {handleStoreRequest}=load('matjari/functions/api/[[route]].ts');
@@ -72,7 +74,9 @@ async function test(){
  assert.equal((await data(await call('admin/domains/existing?store_id=s1','GET',undefined,admin))).links.length,1);
  await data(await call('admin/domains/existing','POST',{domain:'demo-shop.com',store_id:'s1',action:'verify'},admin));
  assert.equal((await call('admin/domains/existing','POST',{domain:'demo-shop.com',store_id:'s2',action:'verify'},admin)).status,409);
- const short1=(await data(await call('short-link?store_id=s1'))).slug;
+ const short1=(await data(await call('short-link?store_id=s1'))).slug;assert.match(short1,/^m-[a-f0-9]{12}$/);
+ assert.equal((await call('short-link?slug=shop-1')).status,404);
+ assert.equal((await call('admin/domains/short-link','PUT',{store_id:'s1',slug:'shop-17'},admin)).status,400);
  await data(await call('admin/domains/short-link','PUT',{store_id:'s1',slug:'kha-fashion'},admin));
  assert.equal((await data(await call('short-link?slug='+short1))).store_id,'s1');
  assert.equal((await data(await call('short-link?slug=kha-fashion'))).store_id,'s1');
@@ -81,6 +85,7 @@ async function test(){
  assert.equal((await data(await call('short-link?store_id=s1'))).domain,'demo-shop.com');
  assert.ok(!calls.some(c=>c.method==='POST'&&c.url.endsWith('/registrar/registrations')),'Never auto-purchase a domain');
  const route=async(hostname,pathname,method='GET',body)=>{let forwarded;const request=new Request('https://'+hostname+pathname,{method,headers:{Cookie:'private=secret',Authorization:'private','Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const response=await middleware({request,env:{...env,ECOSYSTEM_STORE_DB:DB},next:async req=>{forwarded=req||request;return new Response('next')}});return{response,forwarded}};
+ assert.equal((await route('daidarsoluations.com','/s/shop-17')).response.status,404);
  assert.equal((await route('unknown.example','/')).response.status,404);
  assert.equal((await route('demo-shop.com','/api/admin/settings')).response.status,404);
  assert.equal((await (await route('demo-shop.com','/api/store/domain-store')).response.json()).store_id,'s1');
