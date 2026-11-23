@@ -2,6 +2,8 @@ import { BASIC_ACTIVITIES, BASIC_MONTHLY_PRICE, normalizeTransferPhone, validTra
 import { hash, json, sameOrigin, type Env } from '../../lib/store'
 import { ecoLogin, ecoLogout, ecoRead, ecoRevokeLocal, ecoUser, ecosystem } from '../../../shared/ecosystem'
 import { hubAdapter, hubEcoUser } from '../../lib/ecosystem'
+import {passwordMatches,newSession,type Actor} from '../../../matjari/lib/auth'
+import {syncStoreResource} from '../../../matjari/lib/ecosystem'
 
 const encoder = new TextEncoder()
 const DAY = 86400000
@@ -84,7 +86,9 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
     }
     if (path === 'login' && request.method === 'POST') {
       const body = await readBody(request)
-      const email = str(body.email, 254).toLowerCase()
+      const identifier = str(body.email, 254)
+      const email = identifier.toLowerCase()
+      const password = str(body.password, 256, false)
       const ipKey = await hash(request.headers.get('CF-Connecting-IP') || 'unknown')
       const bucket = Math.floor(now / 900000)
       const limitKey = `hub:${ipKey}:${bucket}`
@@ -92,7 +96,28 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       const attempts = await env.DB.prepare('SELECT attempts FROM login_attempts WHERE key=?').bind(limitKey).first<{ attempts: number }>()
       if ((attempts?.attempts || 0) > 8) return json({ error: 'محاولات كثيرة. حاول بعد 15 دقيقة.' }, 429)
       const user = await env.DB.prepare('SELECT id,password_hash,active FROM hub_users WHERE email=? COLLATE NOCASE').bind(email).first<{ id: string; password_hash: string | null; active: number }>()
-      if (!user?.active || !user.password_hash || !await verify(user.password_hash, str(body.password, 256, false))) return json({ error: 'البريد أو كلمة المرور غير صحيحة.' }, 401)
+      const hubMatch=!!user?.password_hash&&await verify(user.password_hash,password)
+      const storeMatches:Actor[]=[]
+      if(identifier&&password&&env.ECOSYSTEM_DB&&env.ECOSYSTEM_STORE_DB){
+        const candidates=await env.ECOSYSTEM_STORE_DB.prepare("SELECT * FROM users WHERE role='merchant' AND (username=? OR (length(email)>0 AND email=? COLLATE NOCASE)) LIMIT 3").bind(identifier,email).all<Actor>()
+        for(const candidate of candidates.results||[])if(await passwordMatches(password,candidate.password))storeMatches.push(candidate)
+      }
+      // Never guess which owner to use or merge accounts by a matching email.
+      if(storeMatches.length>1)return json({error:'بيانات الدخول تطابق أكثر من حساب. استخدم اسم مستخدم المتجر المميز أو راجع الإدارة لربط الحسابات بأمان.'},409)
+      if(hubMatch&&storeMatches.length){
+        const hubLink=await env.ECOSYSTEM_DB!.prepare("SELECT user_id FROM ec_links WHERE system='hub' AND local_id=?").bind(user!.id).first()
+        const storeLink=await env.ECOSYSTEM_DB!.prepare("SELECT user_id FROM ec_links WHERE system='store' AND local_id=?").bind(storeMatches[0].id).first()
+        if(!hubLink||!storeLink||hubLink.user_id!==storeLink.user_id)return json({error:'بيانات الدخول تطابق أكثر من حساب. استخدم اسم مستخدم المتجر المميز أو راجع الإدارة لربط الحسابات بأمان.'},409)
+        storeMatches.length=0 // Already explicitly linked; use the existing Hub identity.
+      }
+      if(storeMatches.length===1){
+        const merchant=storeMatches[0]
+        if(merchant.is_active!==1)return json({error:'الحساب موقوف. تواصل مع الإدارة.'},403)
+        const cookie=await newSession(env.ECOSYSTEM_STORE_DB!,merchant,env,request,body.link_identity===true)
+        if(merchant.store_id)await syncStoreResource({...env,DB:env.ECOSYSTEM_STORE_DB!},merchant.store_id)
+        return json({success:true,loginSystem:'store'},200,{'Set-Cookie':cookie})
+      }
+      if(!hubMatch||!user?.active)return json({error:'البريد الإلكتروني / اسم المستخدم أو كلمة المرور غير صحيحة.'},401)
       return await sessionResponse(request, env, user.id, now, body.link_identity===true)
     }
     if (path === 'password-reset' && request.method === 'POST') {

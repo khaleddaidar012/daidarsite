@@ -607,19 +607,6 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
               </button>
             </div>
 
-            {/* Bottom Bar: Clean Status Matching Site Tints */}
-            <div className="p-2.5 rounded-2xl bg-[#f0f7ff] dark:bg-slate-800/80 border border-sky-100 dark:border-slate-700/80 flex items-center justify-between text-[11px] font-bold text-[#0084d6] dark:text-sky-400 px-3.5">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span className="text-slate-700 dark:text-slate-300 text-[10px]">
-                  {isArabic ? 'متجر سحابي مستقل متصل بواتساب' : 'Cloud Store with WhatsApp'}
-                </span>
-              </div>
-              <span className="text-[10px] font-black hover:underline flex items-center gap-1">
-                <span>{isArabic ? 'تصفح المتجر' : 'Visit Store'}</span>
-                <span>↗</span>
-              </span>
-            </div>
 
           </div>
 
