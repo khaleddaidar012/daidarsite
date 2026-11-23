@@ -22,7 +22,7 @@ export async function preferredStorefrontUrl(storeId:string){
 
 export async function openStorePreview(storeId:string,baseUrl?:string){
  const tab=window.open('about:blank','_blank');if(tab)tab.opener=null;
- let target=storefrontUrl(storeId,baseUrl,true);
- try{const res=await fetch('/api/store/short-link?store_id='+encodeURIComponent(storeId),{cache:'no-store'});if(res.ok){const data=await res.json();if(data.domain)target='https://'+data.domain+'/'}}catch{}
+ let target=storefrontUrl(storeId);
+ try{target=await preferredStorefrontUrl(storeId)}catch{}
  if(tab)tab.location.replace(target);
 }

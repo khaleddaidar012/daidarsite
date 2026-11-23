@@ -698,12 +698,12 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
         await rateLimit(db,request,'orders',30,60000);
         const body = await request.json() as any;
         const id = 'ord-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
-        const { store_id, customer_name, customer_phone, customer_address = '', items, total_price } = body;
+        const { store_id, customer_name, customer_phone, customer_address = '', notes = '', items, total_price } = body;
         if(typeof store_id!=='string'||!store_id.trim())return fail('تعذر تحديد المتجر المطلوب',400);
         const storeAccess=await getStoreAccess(db,store_id);
         if(!storeAccess)return fail('المتجر غير متاح',404);
         if(!storeIsAvailable(storeAccess.status))return fail('المتجر لا يستقبل طلبات حاليًا',403);
-        if (typeof customer_name !== 'string' || !customer_name.trim() || customer_name.length>160 || typeof customer_phone !== 'string' || !customer_phone || customer_phone.length>30 || String(customer_address).length>1000 || !Array.isArray(items) || !items.length || items.length>50) return fail('راجع بيانات الطلب',400);
+        if (typeof customer_name !== 'string' || !customer_name.trim() || customer_name.length>160 || typeof customer_phone !== 'string' || !customer_phone || customer_phone.length>30 || typeof customer_address !== 'string' || customer_address.length>1000 || typeof notes !== 'string' || notes.length>2000 || !Array.isArray(items) || !items.length || items.length>50) return fail('راجع بيانات الطلب',400);
         let calculatedTotal = 0;
         const verifiedItems = [];
         for (const item of items) {
@@ -715,9 +715,9 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
         }
 
         await db.prepare(`
-          INSERT INTO orders (id, store_id, customer_name, customer_phone, customer_address, items_json, total_price, status)
-          VALUES (?, ?, ?, ?, ?, ?, ?, 'new')
-        `).bind(id, store_id, customer_name, customer_phone, customer_address, JSON.stringify(verifiedItems), calculatedTotal/100).run();
+          INSERT INTO orders (id, store_id, customer_name, customer_phone, customer_address, items_json, total_price, status, notes)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?)
+        `).bind(id, store_id, customer_name, customer_phone, customer_address, JSON.stringify(verifiedItems), calculatedTotal/100, notes.trim()).run();
 
         return new Response(JSON.stringify({ success: true, orderId: id }), { headers });
       }

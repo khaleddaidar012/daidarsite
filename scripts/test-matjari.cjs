@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),ts=require('typescript'),{DatabaseSync}=require('node:sqlite');
 function load(file,deps={}){const m={exports:{}};new Function('require','module','exports',ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(n=>deps[n]||(n.startsWith('.')&&fs.existsSync(require('node:path').resolve(require('node:path').dirname(file),n)+'.ts')?load(require('node:path').resolve(require('node:path').dirname(file),n)+'.ts'):require(n)),m,m.exports);return m.exports}
 const sqlite=new DatabaseSync(':memory:');sqlite.exec('PRAGMA foreign_keys=ON');
-for(const file of ['0001_initial_schema.sql','0002_auth_sessions.sql','0003_subscription_payment_requests.sql','0004_employee_store_renewal_requests.sql'])sqlite.exec(fs.readFileSync('matjari/migrations/'+file,'utf8'));
+for(const file of ['0001_initial_schema.sql','0002_auth_sessions.sql','0003_subscription_payment_requests.sql','0004_employee_store_renewal_requests.sql','0009_order_notes.sql'])sqlite.exec(fs.readFileSync('matjari/migrations/'+file,'utf8'));
 const DB={prepare(sql){let args=[];return{bind(...values){args=values;return this},async first(){return sqlite.prepare(sql).get(...args)||null},async all(){return{results:sqlite.prepare(sql).all(...args)}},async run(){return sqlite.prepare(sql).run(...args)}}},async batch(statements){sqlite.exec('BEGIN');try{const out=[];for(const s of statements)out.push(await s.run());sqlite.exec('COMMIT');return out}catch(e){sqlite.exec('ROLLBACK');throw e}}};
 const auth=load('matjari/lib/auth.ts'),{onRequest}=load('matjari/functions/api/[[route]].ts',{'../../lib/auth':auth});
 const {effectiveStoreStatus,displayStorePlan}=load('matjari/lib/store-status.ts');
@@ -10,6 +10,11 @@ const call=(path,method='GET',body,cookie='',origin='https://test.example',ip='1
 const data=async r=>{assert.equal(r.status,200,await r.clone().text());return r.json()};
 const session=r=>r.headers.get('set-cookie').split(';')[0];
 async function test(){
+ const urls=load('matjari/src/services/storefront-url.ts');let openedTarget='';const priorWindow=global.window,priorFetch=global.fetch;
+ global.window={location:{origin:'https://test.example',pathname:'/ar/hub/stores'},open:()=>({opener:null,location:{replace:v=>{openedTarget=v}}})};
+ global.fetch=async()=>Response.json({slug:'m-random123',domain:null});
+ try{const copied=await urls.preferredStorefrontUrl('store-test');await urls.openStorePreview('store-test');assert.equal(openedTarget,copied);assert.equal(new URL(openedTarget).pathname,'/s/m-random123');assert.equal(new URL(openedTarget).search,'');global.fetch=async()=>Response.json({slug:'m-random123',domain:'shop.example.com'});await urls.openStorePreview('store-test');assert.equal(openedTarget,'https://shop.example.com/')}finally{global.fetch=priorFetch;global.window=priorWindow}
+
  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM users').get().n,0);
  const now=Date.parse('2026-11-07T12:00:00Z');
  assert.equal(effectiveStoreStatus(1,1,{status:'active',start_date:'2026-11-01',end_date:'2026-11-30'},now),'active');
@@ -85,9 +90,9 @@ async function test(){
  assert.equal((await call('orders?store_id='+a.store.id,'GET',undefined,c2)).status,403);
  assert.equal((await call('stats?store_id='+a.store.id,'GET',undefined,c2)).status,403);
  assert.equal((await call('store','POST',{id:a.store.id,name:'اختراق'},c2)).status,403);
- const order={store_id:a.store.id,customer_name:'عميل تجريبي',customer_phone:'01000000000',items:[{product:{id:p.product.id,price:0},quantity:2}],total_price:0};
+ const order={store_id:a.store.id,customer_name:'عميل تجريبي',customer_phone:'01000000000',customer_address:'دمياط - العنوان التفصيلي',notes:'اتصل قبل الوصول',items:[{product:{id:p.product.id,price:0},quantity:2}],total_price:0};
  const placedOrder=await data(await call('orders','POST',order));
- const orders=await data(await call('orders','GET',undefined,c1));assert.equal(orders.orders[0].total_price,100);
+ const orders=await data(await call('orders','GET',undefined,c1));assert.equal(orders.orders[0].total_price,100);assert.equal(orders.orders[0].notes,'اتصل قبل الوصول');assert.equal(orders.orders[0].customer_address,order.customer_address);assert.equal(JSON.parse(orders.orders[0].items_json)[0].product.name,'منتج');assert.equal((await call('orders','POST',{...order,notes:'x'.repeat(2001)})).status,400);
  assert.equal(orders.orders[0].id,placedOrder.orderId);assert.equal(orders.orders[0].status,'new');
  assert.equal((await call(`orders?id=${placedOrder.orderId}&store_id=${a.store.id}`,'PUT',{status:'contacted'},c2)).status,403);
  assert.equal((await call(`orders?id=${placedOrder.orderId}&store_id=${a.store.id}`,'PUT',{status:'unknown'},c1)).status,400);

@@ -139,6 +139,7 @@ export interface StoreOrder {
   customer_phone: string;
   customer_address?: string;
   items_json: string;
+  notes?: string;
   total_price: number;
   status: OrderStatus | 'completed_via_whatsapp';
   created_at: string;
