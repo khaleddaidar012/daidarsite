@@ -48,20 +48,22 @@ export function parseWorkWindows(value: unknown): WeeklyWorkWindows {
     const result: WeeklyWorkWindows = {}
     for (const [day, rawWindows] of Object.entries(parsed)) {
       if (!/^[0-6]$/.test(day) || !Array.isArray(rawWindows)) continue
-      const windows = rawWindows.filter((window): window is WorkWindow => !!window && typeof window === 'object' && typeof (window as WorkWindow).start === 'string' && typeof (window as WorkWindow).end === 'string' && validTime((window as WorkWindow).start) && validTime((window as WorkWindow).end) && (window as WorkWindow).start < (window as WorkWindow).end)
+      const windows = rawWindows.filter((window): window is WorkWindow => !!window && typeof window === 'object' && typeof (window as WorkWindow).start === 'string' && typeof (window as WorkWindow).end === 'string' && validTime((window as WorkWindow).start) && validWindowEnd((window as WorkWindow).end) && (window as WorkWindow).start < (window as WorkWindow).end)
       if (windows.length) result[day] = windows
     }
     return result
   } catch { return {} }
 }
 function validTime(value: string) { return /^([01]\d|2[0-3]):[0-5]\d$/.test(value) }
+// 24:00 is the exclusive end of this calendar day, never a valid start time.
+function validWindowEnd(value: string) { return value === '24:00' || validTime(value) }
 export function validWorkWindows(value: unknown): value is WeeklyWorkWindows {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   for (const [day, windows] of Object.entries(value)) {
     if (!/^[0-6]$/.test(day) || !Array.isArray(windows) || windows.length > 4) return false
     let previousEnd = -1
     for (const window of windows) {
-      if (!window || typeof window !== 'object' || !validTime(String((window as WorkWindow).start)) || !validTime(String((window as WorkWindow).end))) return false
+      if (!window || typeof window !== 'object' || !validTime(String((window as WorkWindow).start)) || !validWindowEnd(String((window as WorkWindow).end))) return false
       const start = (window as WorkWindow).start, end = (window as WorkWindow).end
       if (start >= end) return false
       const startMinutes = Number(start.slice(0, 2)) * 60 + Number(start.slice(3))
