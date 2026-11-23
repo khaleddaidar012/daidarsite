@@ -55,3 +55,15 @@
 `due_piasters` يبقى لقطة توافق تاريخية. السجلات القديمة التي يكون فيها `adjustment_piasters IS NULL` تحافظ على الإجمالي القديم ولا تُحوّل عشوائيًا لأن نية التعديل وقاعدة الحساب القديمة قد لا تكون معروفتين. يمكن تعديلها من الإدارة إلى زيادة/خصم أو إلغاؤها. العميل القديم الذي يرسل إجماليًا يستمر مدعومًا؛ الخادم يحوّله إلى فرق عن الحساب الأساسي وقت الحفظ، فلا يوقف تراكم الأيام التالية.
 
 لتصحيح تسوية خالد المعروفة في نوفمبر، تُحوّل إلى زيادة 75 جنيه مستقلة بعملية إنتاج محددة ومراجعة، دون تحويل تسويات موظفين آخرين. اختبارات الإدارة تغطي زيادة اليوم التالي، تكرار الحفظ، توافق العميل القديم، الخصم دون الصفر، خصوصية الموظف وتطابق حساب الموظف والإدارة. لا يغير الإصلاح قواعد الحضور أو أيام الراحة أو توقيت استحقاق يوم العمل.
+
+## Hourly payroll from November 2026
+
+Apply migrations/0023_hourly_payroll_rates.sql once before deploying the updated functions. Back up employees, attendance_shifts and employee_payroll_adjustments first. It seeds each existing employee's implied hourly rate from their salary/hour limit, rounded once to piasters; no attendance, salary or work windows are deleted. Set Khaled sarhhan's explicit rate to 3500 piasters following the user's instruction.
+
+The latest rate effective on/before the report month determines hourly payroll. Changes in the employee editor apply from the current Cairo month. Prior months without an effective rate retain legacy calculations. Subsequent-month rate edits do not rewrite earlier rates.
+
+Hourly payroll uses recorded actual hours, including ongoing overnight shifts, without daily/monthly salary caps or automatic paid-leave hours. Work-window check-in restrictions remain independent. Money rounds once to the nearest piaster. Historical legacy calculations remain capped and rounded as before.
+
+Admin monthly bonuses/deductions accept signed integer piasters, replace on retry, and do not carry to the next month. Employee pay visibility still requires view_due; both employee and admin use the same effective rate and bonus. Replacing the old 75 EGP with a top-up to 1000 EGP must use a fixed bonus computed at an explicit timestamp, not a frozen total or an extra 75. A running shift can increase the total immediately afterwards.
+
+Validation: node scripts/test-admin.cjs; node scripts/test-hourly-payroll.cjs; npm run build.

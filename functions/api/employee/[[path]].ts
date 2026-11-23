@@ -2,7 +2,7 @@ import { passwordVault } from '../../lib/password-vault'
 import { staffChat } from '../../lib/staff-chat'
 import { workProjects } from '../../lib/work-projects'
 import { hash, json, sameOrigin, verifyPassword, type Env } from '../../lib/store'
-import { adjustedPayrollDue, type PayrollAdjustment, cairoDay, cairoTime, calculatePayroll, checkInSchedule, employeeSession, monthlyAttendance, parseWorkWindows, safeEmployee, validCalendarDay, type Employee, type Attendance } from '../../lib/employees'
+import { withHourlyRates, adjustedPayrollDue, type PayrollAdjustment, cairoDay, cairoTime, calculatePayroll, checkInSchedule, employeeSession, monthlyAttendance, parseWorkWindows, safeEmployee, validCalendarDay, type Employee, type Attendance } from '../../lib/employees'
 import { manageProjects } from '../../lib/projects'
 import { adminHub } from '../../lib/hub-admin'
 import { d1UsageResponse } from '../../lib/d1-usage'
@@ -278,7 +278,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       let payrollView: { absent_days?: number; absent_dates?: string[]; due_piasters?: number; actual_hours?: number; paid_hours?: number; max_daily_hours?: number; max_monthly_hours?: number; hourly_rate_piasters?: number } | null = null
       {
         const approvedLeaves = await env.DB.prepare("SELECT employee_id,day,type,status FROM employee_requests WHERE employee_id=? AND type='leave' AND status='approved' AND day>=? AND day<=?").bind(employee.id, month + '-01', month + '-31').all<{ employee_id: string; day: string; type: string; status: string }>()
-        const calculated = calculatePayroll([employee], rows, approvedLeaves.results, month)
+        const calculated = calculatePayroll(await withHourlyRates(env,[employee],month), rows, approvedLeaves.results, month)
         const ownPayroll = calculated?.[0]
         if (ownPayroll) {
           payrollView = {}
@@ -286,7 +286,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
           payrollView.paid_hours = ownPayroll.paid_hours
           payrollView.max_daily_hours = ownPayroll.max_daily_hours
           payrollView.max_monthly_hours = ownPayroll.max_monthly_hours
-          payrollView.hourly_rate_piasters = ownPayroll.hourly_rate_piasters
+          if (employee.view_due) payrollView.hourly_rate_piasters = ownPayroll.hourly_rate_piasters
           if (employee.view_absences) { payrollView.absent_days = ownPayroll.absent_days; payrollView.absent_dates = ownPayroll.absent_dates }
           if (employee.view_due) {
             const adjustment = await env.DB.prepare('SELECT due_piasters,adjustment_piasters FROM employee_payroll_adjustments WHERE employee_id=? AND month=?').bind(employee.id, month).first<PayrollAdjustment>()
