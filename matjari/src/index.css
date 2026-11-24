@@ -116,18 +116,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .free-activation-shine::after { animation: none; }
-  .landing-progress-bar { animation: none !important; width: 100% !important; }
   .landing-card-enter { animation: none !important; }
   .landing-cta-shine::after { animation: none !important; }
-}
-
-@keyframes landingProgress {
-  from { width: 0%; }
-  to { width: 100%; }
-}
-
-.landing-progress-bar {
-  animation: landingProgress 4.6s linear forwards;
 }
 
 @keyframes landingFadeUp {

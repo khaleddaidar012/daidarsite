@@ -44,6 +44,7 @@ interface HeroLandingViewProps {
 
 interface FeatureSlide {
   id: string;
+  shortLabel: string;
   badge: string;
   title: string;
   description: string;
@@ -82,6 +83,7 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
   const featureSlides: FeatureSlide[] = [
     {
       id: 'always-open',
+      shortLabel: isArabic ? 'شغال 24/7' : 'Open 24/7',
       badge: isArabic ? 'متاح 24/7 بدون توقف' : 'Always open · 24/7',
       title: isArabic ? 'شغال 24 ساعة / 7 أيام' : 'Open 24 hours / 7 days',
       description: isArabic
@@ -98,6 +100,7 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
     },
     {
       id: 'wider-reach',
+      shortLabel: isArabic ? 'عملاء أكثر' : 'More reach',
       badge: isArabic ? 'انتشار أوسع لنشاطك' : 'Wider online reach',
       title: isArabic ? 'الوصول لنسبة عملاء أكبر' : 'Reach more customers',
       description: isArabic
@@ -114,6 +117,7 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
     },
     {
       id: 'more-products',
+      shortLabel: isArabic ? 'منتجات أكثر' : 'More products',
       badge: isArabic ? 'عرض منظم وجذاب' : 'Clear organized catalog',
       title: isArabic ? 'نسبة عرض منتجات أكثر' : 'Showcase more products',
       description: isArabic
@@ -456,19 +460,19 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
               </div>
 
               {/* Primary Advertising Headline */}
-              <div className="space-y-2.5">
-                <h1 className="text-3xl sm:text-4xl lg:text-[3.1rem] font-black text-[#0e1f38] dark:text-white tracking-tight leading-[1.22]">
+              <div className="space-y-2">
+                <h1 className="text-3xl sm:text-4xl lg:text-[2.95rem] font-black text-[#0e1f38] dark:text-white tracking-tight leading-[1.45]">
                   {isArabic ? (
                     <>
-                      امتلك متجرك الإلكتروني{' '}
-                      <span className="block mt-1 bg-gradient-to-l from-[#0084d6] via-[#0275be] to-[#0e4a86] dark:from-sky-400 dark:to-cyan-300 bg-clip-text text-transparent">
+                      <span className="block">امتلك متجرك الإلكتروني</span>
+                      <span className="block pt-1 pb-1.5 bg-gradient-to-l from-[#0084d6] via-[#0275be] to-[#0e4a86] dark:from-sky-400 dark:to-cyan-300 bg-clip-text text-transparent">
                         ابتداءً من 350 جنيه شهريًا
                       </span>
                     </>
                   ) : (
                     <>
-                      Own your online store{' '}
-                      <span className="block mt-1 bg-gradient-to-r from-[#0084d6] via-[#0275be] to-[#0e4a86] dark:from-sky-400 dark:to-cyan-300 bg-clip-text text-transparent">
+                      <span className="block">Own your online store</span>
+                      <span className="block pt-1 pb-1.5 bg-gradient-to-r from-[#0084d6] via-[#0275be] to-[#0e4a86] dark:from-sky-400 dark:to-cyan-300 bg-clip-text text-transparent">
                         starting from 350 EGP/month
                       </span>
                     </>
@@ -530,19 +534,19 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
                   },
                   {
                     icon: CheckCircle2,
-                    label: isArabic ? 'استقبال الطلبات مباشرة على المتجر' : 'Direct orders on your store',
+                    label: isArabic ? 'الطلبات مباشرة على المتجر' : 'Direct orders on your store',
                   },
                   {
                     icon: CheckCircle2,
-                    label: isArabic ? 'إدارة سهلة للمنتجات والأسعار' : 'Easy product & price control',
+                    label: isArabic ? 'إدارة سهلة لمتجرك' : 'Easy store management',
                   },
                 ].map(({ icon: Icon, label }) => (
                   <div
                     key={label}
-                    className="flex items-center gap-2 rounded-xl bg-white/80 dark:bg-slate-900/70 border border-slate-200/70 dark:border-slate-800 px-3 py-2.5"
+                    className="flex items-center justify-center sm:justify-start gap-2 rounded-xl bg-white/85 dark:bg-slate-900/75 border border-slate-200/80 dark:border-slate-800 px-3 py-2.5 min-h-[44px]"
                   >
                     <Icon className="w-4 h-4 text-[#0084d6] shrink-0" aria-hidden="true" />
-                    <span className="leading-snug">{label}</span>
+                    <span className="leading-snug whitespace-nowrap">{label}</span>
                   </div>
                 ))}
               </div>
@@ -681,9 +685,9 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
                             </p>
                           </div>
 
-                          <div className="mt-3.5 pt-3 border-t border-slate-200/70 dark:border-slate-800 flex items-center justify-between gap-2 text-[11px] font-bold text-[#0084d6] dark:text-sky-400">
-                            <span className="truncate">{slide.detailTag}</span>
-                            <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+                          <div className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white/90 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 px-3 py-2 text-[11px] font-bold text-[#0084d6] dark:text-sky-400 w-fit">
+                            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                            <span>{slide.detailTag}</span>
                           </div>
                         </div>
                       </article>
@@ -691,41 +695,34 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
                   })}
                 </div>
 
-                {/* Progress & Slide Selector Pills */}
-                <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 flex-1" role="tablist" aria-label={isArabic ? 'اختيار الميزة' : 'Choose feature slide'}>
-                    {featureSlides.map((slide, idx) => {
-                      const isCurrent = idx === activeSlide;
-                      return (
-                        <button
-                          key={slide.id}
-                          type="button"
-                          role="tab"
-                          aria-selected={isCurrent}
-                          aria-label={slide.title}
-                          onClick={() => setActiveSlide(idx)}
-                          className={`relative h-2 rounded-full overflow-hidden transition-all duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0084d6] ${
-                            isCurrent
-                              ? 'flex-1 bg-sky-100 dark:bg-slate-800'
-                              : 'w-8 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600'
-                          }`}
-                        >
-                          {isCurrent && (
-                            <span
-                              key={`${slide.id}-${activeSlide}-${autoPlayActive ? 'run' : 'stop'}`}
-                              className={`block h-full rounded-full bg-[#0084d6] ${
-                                autoPlayActive ? 'landing-progress-bar' : 'w-full'
-                              }`}
-                            />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 shrink-0">
-                    {featureSlides[activeSlide].title}
-                  </span>
+                {/* Clean Interactive 3-Tab Feature Switcher (No Loading Bar) */}
+                <div
+                  className="mt-4 grid grid-cols-3 gap-2"
+                  role="tablist"
+                  aria-label={isArabic ? 'اختيار الميزة' : 'Choose feature slide'}
+                >
+                  {featureSlides.map((slide, idx) => {
+                    const isCurrent = idx === activeSlide;
+                    const TabIcon = slide.Icon;
+                    return (
+                      <button
+                        key={slide.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={isCurrent}
+                        aria-label={slide.title}
+                        onClick={() => setActiveSlide(idx)}
+                        className={`min-h-[42px] px-2.5 py-2 rounded-xl text-[11px] sm:text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0084d6] ${
+                          isCurrent
+                            ? 'bg-[#0e1f38] dark:bg-[#0084d6] text-white shadow-md shadow-slate-900/15'
+                            : 'bg-slate-100/90 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-[#e6f4fe] hover:text-[#0084d6] dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <TabIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                        <span className="truncate">{slide.shortLabel}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
