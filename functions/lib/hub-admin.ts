@@ -1,5 +1,6 @@
 import { json, type Env } from './store'
 import { catalog as defaultCatalog } from '../api/hub/[[path]]'
+import { ecoPublish } from '../../shared/ecosystem'
 const DAY = 86400000
 
 export async function adminHub(request: Request, env: Env, path: string, actor = 'admin') {
@@ -98,25 +99,30 @@ export async function adminHub(request: Request, env: Env, path: string, actor =
   if (path === 'hub-orders' && request.method === 'POST') {
     const body = await request.json() as Record<string, unknown>
     const id = text(body.id, 64), action = text(body.action, 32), reason = text(body.reason, 1500)
+    if (!id || !['approve', 'reject', 'request-info'].includes(action)) return json({ error: 'بيانات الإجراء غير صحيحة.' }, 422)
     const order = await db.prepare('SELECT * FROM hub_orders WHERE id=?').bind(id).first<{ id: string; user_id: string; snapshot: string; status: string; order_number: string }>()
     if (!order) return json({ error: 'الطلب غير موجود.' }, 404)
     if (!['under_review', 'needs_info', 'awaiting_transfer'].includes(order.status)) return json({ error: 'تم اتخاذ إجراء على الطلب مسبقًا.' }, 409)
     const snapshot = parse(order.snapshot)
-    if(['consultation','system-management'].includes(String(snapshot.kind))){
-      const next=action==='approve'?'approved':action==='reject'?'rejected':action==='request-info'?'needs_info':null;
-      if(!next)return json({error:'إجراء غير صالح'},422);
-      await db.batch([
-        db.prepare("UPDATE hub_orders SET status=?,reviewed_at=?,updated_at=?,admin_note=? WHERE id=? AND status IN ('under_review','needs_info')").bind(next,now,now,reason,id),
-        db.prepare('INSERT INTO hub_audit(id,actor,action,entity_id,data,created_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),actor,'service_request_'+action,id,JSON.stringify({requestOnly:true,paymentConfirmed:false}),now)
-      ]);
-      return json({success:true,status:next,requestOnly:true});
+    if (['consultation', 'system-management'].includes(String(snapshot.kind))) {
+      if (action === 'reject' && reason.length < 4) return json({ error: 'اكتب سبب الرفض الذي سيظهر للعميل.' }, 422)
+      if (action === 'request-info' && reason.length < 4) return json({ error: 'اكتب المعلومات المطلوبة من العميل.' }, 422)
+      const next = action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'needs_info'
+      const [updateResult] = await db.batch([
+        db.prepare("UPDATE hub_orders SET status=?,reviewed_at=?,updated_at=?,rejection_reason=?,admin_note=? WHERE id=? AND status IN ('under_review','needs_info','awaiting_transfer')").bind(next, now, now, action === 'reject' ? reason : null, action === 'reject' ? null : reason || null, id),
+      ]) as Array<{ meta?: { changes?: number }; changes?: number }>
+      const changed = updateResult?.meta?.changes ?? updateResult?.changes ?? 0
+      if (changed !== 1) return json({ error: 'تم اتخاذ إجراء على الطلب مسبقًا.' }, 409)
+      await db.prepare('INSERT INTO hub_audit(id,actor,action,entity_id,data,created_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(), actor, 'service_request_' + action, id, JSON.stringify({ requestOnly: true, paymentConfirmed: false, reason }), now).run()
+      return json({ success: true, status: next, requestOnly: true })
     }
     if (action === 'approve') {
       if (snapshot.paymentMode === 'demo') return json({ error: 'هذا طلب تجريبي؛ لا يمكن اعتماده كدفعة حقيقية.' }, 409)
       const release = await db.prepare('SELECT id FROM hub_releases WHERE published=1 ORDER BY created_at DESC LIMIT 1').first()
-      if (!release) return json({ error: 'لا يمكن اعتماد طلب تجاري قبل نشر إصدار قابل للتسليم.' }, 409)
+      if (!release) return json({ error: 'لا يمكن اعتماد طلب تجاري قبل نشر إصدار قابل للتسليم من قسم «إصدارات التحميل».' }, 409)
+      const productId = text(snapshot.productId, 64) || 'daidar-flow'
       const renewalId = typeof snapshot.renewalSubscriptionId === 'string' ? snapshot.renewalSubscriptionId : ''
-      const renewal = renewalId ? await db.prepare('SELECT id,status,expires_at FROM hub_subscriptions WHERE id=? AND user_id=? AND product_id=?').bind(renewalId, order.user_id, snapshot.productId).first<{ id: string; status: string; expires_at: number | null }>() : null
+      const renewal = renewalId ? await db.prepare('SELECT id,status,expires_at FROM hub_subscriptions WHERE id=? AND user_id=? AND product_id=?').bind(renewalId, order.user_id, productId).first<{ id: string; status: string; expires_at: number | null }>() : null
       if (renewalId && !renewal) return json({ error: 'الاشتراك المطلوب تجديده غير موجود.' }, 409)
       const subId = renewal?.id || crypto.randomUUID()
       const expiryBase = renewal?.status === 'active' && renewal.expires_at && renewal.expires_at > now ? renewal.expires_at : now
@@ -124,24 +130,34 @@ export async function adminHub(request: Request, env: Env, path: string, actor =
       const attempt = crypto.randomUUID()
       await db.batch([
         db.prepare("INSERT OR IGNORE INTO hub_approval_effects(order_id,attempt_token,subscription_id,processed_at) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM hub_orders WHERE id=? AND status IN ('under_review','needs_info','awaiting_transfer'))").bind(id, attempt, subId, now, id),
-        db.prepare("UPDATE hub_orders SET status='approved',reviewed_at=?,updated_at=? WHERE id=? AND status IN ('under_review','needs_info','awaiting_transfer') AND EXISTS(SELECT 1 FROM hub_approval_effects WHERE order_id=? AND attempt_token=?)").bind(now, now, id, id, attempt),
+        db.prepare("UPDATE hub_orders SET status='approved',reviewed_at=?,updated_at=?,rejection_reason=NULL WHERE id=? AND status IN ('under_review','needs_info','awaiting_transfer') AND EXISTS(SELECT 1 FROM hub_approval_effects WHERE order_id=? AND attempt_token=?)").bind(now, now, id, id, attempt),
         renewal
-          ? db.prepare("UPDATE hub_subscriptions SET snapshot=?,status=CASE WHEN status='active' AND expires_at>? THEN 'active' ELSE 'awaiting_activation' END,starts_at=CASE WHEN status='active' AND expires_at>? THEN starts_at ELSE NULL END,expires_at=CASE WHEN status='active' AND expires_at>? THEN ? ELSE NULL END WHERE id=? AND EXISTS(SELECT 1 FROM hub_approval_effects WHERE order_id=? AND attempt_token=?)").bind(JSON.stringify(snapshot), now, now, now, renewedUntil, subId, id, attempt)
-          : db.prepare("INSERT OR IGNORE INTO hub_subscriptions(id,user_id,source_order_id,product_id,snapshot,status,starts_at,expires_at,allowed_devices,created_at) SELECT ?,?,?,?,?,'awaiting_activation',NULL,NULL,1,? WHERE EXISTS(SELECT 1 FROM hub_approval_effects WHERE order_id=? AND attempt_token=?)").bind(subId, order.user_id, id, snapshot.productId, JSON.stringify(snapshot), now, id, attempt),
-        db.prepare("INSERT INTO hub_audit(id,actor,action,entity_id,data,created_at) SELECT ?, ?,'approve_order',?,?,? WHERE EXISTS(SELECT 1 FROM hub_approval_effects WHERE order_id=? AND attempt_token=?)").bind(crypto.randomUUID(), actor, id, JSON.stringify({ orderNumber: order.order_number, subscriptionId: subId, period: snapshot.period, renewal: !!renewal, renewedUntil }), now, id, attempt),
+          ? db.prepare("UPDATE hub_subscriptions SET snapshot=?,status=CASE WHEN status='active' AND expires_at>? THEN 'active' ELSE 'awaiting_activation' END,starts_at=CASE WHEN status='active' AND expires_at>? THEN starts_at ELSE NULL END,expires_at=CASE WHEN status='active' AND expires_at>? THEN ? ELSE NULL END WHERE id=? AND EXISTS(SELECT 1 FROM hub_approval_effects WHERE order_id=? AND attempt_token=?)").bind(order.snapshot, now, now, now, renewedUntil, subId, id, attempt)
+          : db.prepare("INSERT OR IGNORE INTO hub_subscriptions(id,user_id,source_order_id,product_id,snapshot,status,starts_at,expires_at,allowed_devices,created_at) SELECT ?,?,?,?,?,'awaiting_activation',NULL,NULL,1,? WHERE EXISTS(SELECT 1 FROM hub_approval_effects WHERE order_id=? AND attempt_token=?)").bind(subId, order.user_id, id, productId, order.snapshot, now, id, attempt),
+        db.prepare("INSERT INTO hub_audit(id,actor,action,entity_id,data,created_at) SELECT ?,?,'approve_order',?,?,? WHERE EXISTS(SELECT 1 FROM hub_approval_effects WHERE order_id=? AND attempt_token=?)").bind(crypto.randomUUID(), actor, id, JSON.stringify({ orderNumber: order.order_number, subscriptionId: subId, period: snapshot.period, renewal: !!renewal, renewedUntil }), now, id, attempt),
       ])
-      const winner = await db.prepare('SELECT attempt_token FROM hub_approval_effects WHERE order_id=?').bind(id).first<{ attempt_token: string }>()
+      const winner = await db.prepare('SELECT attempt_token,subscription_id FROM hub_approval_effects WHERE order_id=?').bind(id).first<{ attempt_token: string; subscription_id: string }>()
       if (winner?.attempt_token !== attempt) return json({ error: 'تمت معالجة الطلب مسبقًا.' }, 409)
-      return json({ success: true, status: 'approved', subscriptionId: subId })
+      const verifiedOrder = await db.prepare('SELECT status FROM hub_orders WHERE id=?').bind(id).first<{ status: string }>()
+      const verifiedSub = await db.prepare('SELECT id,status,starts_at,expires_at FROM hub_subscriptions WHERE id=?').bind(subId).first<{ id: string; status: string; starts_at: number | null; expires_at: number | null }>()
+      if (verifiedOrder?.status !== 'approved' || !verifiedSub) return json({ error: 'تعذر تأكيد حفظ الموافقة؛ حدّث القائمة وتحقق قبل إعادة المحاولة.' }, 500)
+      if (env.ECOSYSTEM_DB) {
+        const link = await env.ECOSYSTEM_DB.prepare("SELECT user_id FROM ec_links WHERE system='hub' AND local_id=?").bind(order.user_id).first<{ user_id: string }>()
+        if (link?.user_id) {
+          await ecoPublish(env, productId === 'daidar-flow' ? 'flow' : 'hub', link.user_id, verifiedSub.id, verifiedSub.status, String(snapshot.period || snapshot.product || productId), verifiedSub.starts_at, verifiedSub.expires_at)
+        }
+      }
+      return json({ success: true, status: 'approved', subscriptionId: subId, subscriptionStatus: verifiedSub.status })
     }
-    if (action === 'reject' && reason.length < 4) return json({ error: 'اكتب سبب الرفض الذي سيظهر للعميل.' }, 422)
-    if (action === 'request-info' && reason.length < 4) return json({ error: 'اكتب المعلومات المطلوبة من العميل.' }, 422)
-    const status = action === 'reject' ? 'rejected' : action === 'request-info' ? 'needs_info' : ''
-    if (!status) return json({ error: 'الإجراء غير معروف.' }, 422)
-    await db.batch([
-      db.prepare('UPDATE hub_orders SET status=?,reviewed_at=?,updated_at=?,rejection_reason=?,admin_note=? WHERE id=?').bind(status, now, now, action === 'reject' ? reason : null, action === 'request-info' ? reason : null, id),
-      db.prepare('INSERT INTO hub_audit(id,actor,action,entity_id,data,created_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(), actor, action, id, JSON.stringify({ reason }), now),
-    ])
+    if (action === 'reject' && reason.length < 4) return json({ error: 'اكتب سبب الرفض (٤ أحرف على الأقل) ليظهر للعميل.' }, 422)
+    if (action === 'request-info' && reason.length < 4) return json({ error: 'اكتب المعلومات المطلوبة من العميل (٤ أحرف على الأقل).' }, 422)
+    const status = action === 'reject' ? 'rejected' : 'needs_info'
+    const [updateResult] = await db.batch([
+      db.prepare("UPDATE hub_orders SET status=?,reviewed_at=?,updated_at=?,rejection_reason=?,admin_note=? WHERE id=? AND status IN ('under_review','needs_info','awaiting_transfer')").bind(status, now, now, action === 'reject' ? reason : null, action === 'request-info' ? reason : null, id),
+    ]) as Array<{ meta?: { changes?: number }; changes?: number }>
+    const changed = updateResult?.meta?.changes ?? updateResult?.changes ?? 0
+    if (changed !== 1) return json({ error: 'تم اتخاذ إجراء على الطلب مسبقًا.' }, 409)
+    await db.prepare('INSERT INTO hub_audit(id,actor,action,entity_id,data,created_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(), actor, action, id, JSON.stringify({ reason }), now).run()
     return json({ success: true, status })
   }
   if (path === 'hub-catalog' && request.method === 'GET') {

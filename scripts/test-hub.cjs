@@ -139,6 +139,37 @@ async function test() {
   assert.equal(savedSub.status,'awaiting_activation')
   assert.equal(savedSub.expires_at,null)
   assert.equal((await adminCall('hub-orders','POST',{id:commercialOrder.id,action:'approve'},adminCookie)).status,409)
+  assert.equal((await adminCall('hub-orders','POST',{id:commercialOrder.id,action:'reject',reason:'لا يجب استبدال الموافقة'},adminCookie)).status,409)
+  assert.equal(sqlite.prepare('SELECT status FROM hub_orders WHERE id=?').get(commercialOrder.id).status,'approved')
+
+  // Test basic manual order approval after release is published, including request-info -> storage failure -> retry -> idempotent repeat, plus rejection & unauthorized guards
+  assert.equal((await adminCall('hub-orders','POST',{id:basicOrder.id,action:'approve'},userA)).status,401)
+  const csrfReq=req('admin','hub-orders','POST',{id:basicOrder.id,action:'approve'},adminCookie);csrfReq.headers.set('Origin','https://evil.example');assert.equal((await admin({ request:csrfReq, env })).status,403)
+  assert.equal((await adminCall('hub-orders','POST',{id:basicOrder.id,action:'request-info',reason:'قصير'},adminCookie)).status,200)
+  assert.equal(sqlite.prepare('SELECT status FROM hub_orders WHERE id=?').get(basicOrder.id).status,'needs_info')
+  assert.equal((await adminCall('hub-orders','POST',{id:basicOrder.id,action:'request-info',reason:'لا'},adminCookie)).status,422)
+  const realBatch=DB.batch
+  DB.batch=async()=>{throw new Error('Injected hub batch failure')}
+  assert.equal((await adminCall('hub-orders','POST',{id:basicOrder.id,action:'approve'},adminCookie)).status,500)
+  DB.batch=realBatch
+  assert.equal(sqlite.prepare('SELECT status FROM hub_orders WHERE id=?').get(basicOrder.id).status,'needs_info')
+  const basicApproved=await adminCall('hub-orders','POST',{id:basicOrder.id,action:'approve'},adminCookie)
+  assert.equal(basicApproved.status,200)
+  const basicApprovedBody=await basicApproved.json()
+  assert.equal(basicApprovedBody.status,'approved')
+  const basicSub=sqlite.prepare('SELECT * FROM hub_subscriptions WHERE id=?').get(basicApprovedBody.subscriptionId)
+  assert.equal(basicSub.status,'awaiting_activation')
+  assert.equal(JSON.parse(basicSub.snapshot).total,35000)
+  assert.equal(JSON.parse(basicSub.snapshot).period,'monthly')
+  assert.equal(sqlite.prepare("SELECT count(*) AS n FROM hub_audit WHERE entity_id=? AND action='approve_order'").get(basicOrder.id).n,1)
+  assert.equal((await adminCall('hub-orders','POST',{id:basicOrder.id,action:'approve'},adminCookie)).status,409)
+  assert.equal(sqlite.prepare("SELECT count(*) AS n FROM hub_audit WHERE entity_id=? AND action='approve_order'").get(basicOrder.id).n,1)
+
+  const rejectCandidate=await (await hubCall('orders','POST',{productId:'daidar-flow',activityId:'general',period:'monthly',devices:1,addons:[]},userB)).json()
+  assert.equal((await adminCall('hub-orders','POST',{id:rejectCandidate.order.id,action:'reject',reason:'لا'},adminCookie)).status,422)
+  assert.equal((await adminCall('hub-orders','POST',{id:rejectCandidate.order.id,action:'reject',reason:'التحويل غير مطابق'},adminCookie)).status,200)
+  assert.equal(sqlite.prepare('SELECT status,rejection_reason FROM hub_orders WHERE id=?').get(rejectCandidate.order.id).status,'rejected')
+  assert.equal((await adminCall('hub-orders','POST',{id:rejectCandidate.order.id,action:'approve'},adminCookie)).status,409)
 
   const pair=await crypto.subtle.generateKey({name:'Ed25519'},true,['sign','verify'])
   env.HUB_LICENSE_SIGNING_PRIVATE_JWK=JSON.stringify(await crypto.subtle.exportKey('jwk',pair.privateKey))
