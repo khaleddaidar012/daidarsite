@@ -93,4 +93,8 @@ declare module 'lucide-react' {
   export const Palette: LucideIcon;
   export const PanelLeft: LucideIcon;
   export const PanelRight: LucideIcon;
+  export const Pause: LucideIcon;
+  export const Play: LucideIcon;
+  export const BadgePercent: LucideIcon;
+  export const SlidersHorizontal: LucideIcon;
 }

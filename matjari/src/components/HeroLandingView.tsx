@@ -1,32 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Store, Product, User } from '../types';
-import { 
-  Plus, 
-  Menu, 
-  X, 
-  Moon, 
-  Sun, 
-  Globe, 
-  ChevronLeft, 
-  ChevronRight, 
-  Shield, 
-  ShoppingBag, 
-  Home, 
-  MessageCircle, 
+import {
+  Menu,
+  X,
+  Globe,
+  ChevronLeft,
+  ChevronRight,
+  Shield,
+  ShoppingBag,
+  Home,
+  MessageCircle,
   Sparkles,
-  ShoppingCart,
-  Star,
-  Search,
   CheckCircle2,
-  Heart,
-  Lock,
   ExternalLink,
-  ShieldCheck,
-  TrendingUp,
   Clock,
   Store as StoreIcon,
   LogOut,
-  LogIn
+  LogIn,
+  Users,
+  Layers,
+  BadgePercent,
+  Pause,
+  Play,
+  ArrowLeft,
+  ArrowRight,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -44,19 +42,31 @@ interface HeroLandingViewProps {
   onLogout?: () => void;
 }
 
+interface FeatureSlide {
+  id: string;
+  badge: string;
+  title: string;
+  description: string;
+  detailTag: string;
+  image: string;
+  imageAlt: string;
+  Icon: typeof Clock;
+  accentBg: string;
+  accentText: string;
+}
+
+const SLIDE_INTERVAL_MS = 4600;
+
 export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
   store,
-  products,
   currentUser,
   onOpenDashboard,
-  onOpenStorefront,
   onOpenSetup,
-  onExploreStores,
   onOpenMerchantLogin,
   onLogout,
 }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { isDark, toggleTheme } = useTheme();
+  const { isDark } = useTheme();
   const { t, toggleLang, isArabic } = useLanguage();
   const whatsappNumber = '201061532875';
   const displayPhone = '+20 10 61532875';
@@ -64,159 +74,201 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
     ? `${import.meta.env.BASE_URL}logo-dark.png`
     : `${import.meta.env.BASE_URL}logo.png`;
 
-  // Auto-rotating Showcase Slides matching site theme
-  const showcaseSlides = [
+  const whatsappMessage = isArabic
+    ? 'مرحبًا دعيدر للحلول البرمجية، أود الاستفسار عن إنشاء متجر إلكتروني (ابتداءً من 350 جنيه شهريًا).'
+    : 'Hello Daidar Solutions, I would like to inquire about creating an online store (starting from 350 EGP/month).';
+  const whatsappHref = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`;
+
+  const featureSlides: FeatureSlide[] = [
     {
-      storeId: 'store-elegance',
-      storeName: isArabic ? 'متجر الأناقة العصري' : 'Modern Elegance Store',
-      tagline: isArabic ? 'ساعات فاخرة وأزياء' : 'Luxury Watches & Fashion',
-      productName: isArabic ? 'ساعة كرونوغراف جلد كلاسيك' : 'Classic Chronograph Watch',
-      price: isArabic ? '٨٥٠ ج.م' : '850 EGP',
-      oldPrice: isArabic ? '١,٠٥٠ ج.م' : '1,050 EGP',
-      badge: isArabic ? 'الأكثر طلباً 🔥' : 'Best Seller 🔥',
-      image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80',
-      rating: '4.9 (124)',
-      avatar: '⌚',
-      domain: 'elegance.daidar.store',
+      id: 'always-open',
+      badge: isArabic ? 'متاح 24/7 بدون توقف' : 'Always open · 24/7',
+      title: isArabic ? 'شغال 24 ساعة / 7 أيام' : 'Open 24 hours / 7 days',
+      description: isArabic
+        ? 'متجرك مفتوح طوال اليوم، 7 أيام في الأسبوع — منتجاتك متاحة للعملاء في أي وقت ومن أي مكان.'
+        : 'Your store stays open all day, 7 days a week — your products are available to customers anytime.',
+      detailTag: isArabic ? 'رابط متجرك يعمل على الموبايل والكمبيوتر' : 'Works smoothly on mobile and desktop',
+      image: `${import.meta.env.BASE_URL}landing/feature-24-7.jpg`,
+      imageAlt: isArabic
+        ? 'جهاز كمبيوتر وهاتف ذكي يعرضان واجهة متجر إلكتروني حديث في إضاءة مسائية'
+        : 'Modern laptop and smartphone displaying a clean online store interface in evening lighting',
+      Icon: Clock,
+      accentBg: 'bg-sky-50 dark:bg-sky-950/70',
+      accentText: 'text-[#0084d6] dark:text-sky-400',
     },
     {
-      storeId: 'store-tech',
-      storeName: isArabic ? 'متجر الرياض تك' : 'Riyadh Tech Store',
-      tagline: isArabic ? 'أجهزة وإلكترونيات ذكية' : 'Smart Electronics & Tech',
-      productName: isArabic ? 'سماعات رأس برو اللاسلكية' : 'Pro Wireless Headphones',
-      price: isArabic ? '٥٤٠ ج.م' : '540 EGP',
-      oldPrice: isArabic ? '٧٢٠ ج.م' : '720 EGP',
-      badge: isArabic ? 'خصم 25% ⚡' : '25% OFF ⚡',
-      image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&q=80',
-      rating: '5.0 (98)',
-      avatar: '🎧',
-      domain: 'tech.daidar.store',
+      id: 'wider-reach',
+      badge: isArabic ? 'انتشار أوسع لنشاطك' : 'Wider online reach',
+      title: isArabic ? 'الوصول لنسبة عملاء أكبر' : 'Reach more customers',
+      description: isArabic
+        ? 'وسّع دائرة وصولك واوصل لعملاء محتملين أكثر أونلاين عبر رابط متجرك القابل للمشاركة على جميع منصاتك.'
+        : 'Expand your reach and connect with more potential customers online through your shareable store link.',
+      detailTag: isArabic ? 'شارك رابطك على واتساب وفيسبوك وإنستجرام' : 'Share easily on WhatsApp, Facebook, and Instagram',
+      image: `${import.meta.env.BASE_URL}landing/feature-reach.jpg`,
+      imageAlt: isArabic
+        ? 'هواتف ذكية وحقائب تسوق وطرود شحن حديثة تعبّر عن الوصول لعملاء أونلاين'
+        : 'Modern smartphones, shopping bags, and frosted parcels representing wide online customer reach',
+      Icon: Users,
+      accentBg: 'bg-emerald-50 dark:bg-emerald-950/60',
+      accentText: 'text-emerald-700 dark:text-emerald-400',
     },
     {
-      storeId: 'store-perfume',
-      storeName: isArabic ? 'بريق للعطور ومستحضرات التجميل' : 'Bariq Luxury Perfumes',
-      tagline: isArabic ? 'عطور شرقية وبخور فاخر' : 'Oriental Perfumes & Oud',
-      productName: isArabic ? 'عطر رويال بلاك عود 100ml' : 'Royal Black Oud 100ml',
-      price: isArabic ? '٦٢٠ ج.م' : '620 EGP',
-      oldPrice: isArabic ? '٨٥٠ ج.م' : '850 EGP',
-      badge: isArabic ? 'شحن مجاني 🚚' : 'Free Delivery 🚚',
-      image: 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=600&q=80',
-      rating: '4.9 (142)',
-      avatar: '✨',
-      domain: 'perfume.daidar.store',
+      id: 'more-products',
+      badge: isArabic ? 'عرض منظم وجذاب' : 'Clear organized catalog',
+      title: isArabic ? 'نسبة عرض منتجات أكثر' : 'Showcase more products',
+      description: isArabic
+        ? 'اعرض عددًا أكبر من منتجاتك بتصنيفات وصور واضحة وزوّد فرص ظهورها للعميل بدل ضياعها في الرسائل.'
+        : 'Display more of your products with clear categories and photos to make browsing effortless for customers.',
+      detailTag: isArabic ? 'تصنيفات مرتبة وأسعار واضحة وصور جذابة' : 'Structured categories, clear prices, and crisp photos',
+      image: `${import.meta.env.BASE_URL}landing/feature-catalog.jpg`,
+      imageAlt: isArabic
+        ? 'تشكيلة منتجات منظمة تشمل ساعة وسماعات وعطر ومحفظة على منصات عرض بيضاء وزرقاء'
+        : 'Curated retail products including a wristwatch, headphones, perfume bottle, and leather cardholder on clean studio plinths',
+      Icon: Layers,
+      accentBg: 'bg-indigo-50 dark:bg-indigo-950/60',
+      accentText: 'text-indigo-700 dark:text-indigo-400',
     },
   ];
 
   const [activeSlide, setActiveSlide] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isInteracting, setIsInteracting] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveSlide((prev) => (prev + 1) % showcaseSlides.length);
-    }, 3800);
-    return () => clearInterval(timer);
-  }, [showcaseSlides.length]);
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const sync = () => setPrefersReducedMotion(media.matches);
+    sync();
+    media.addEventListener?.('change', sync);
+    return () => media.removeEventListener?.('change', sync);
+  }, []);
 
-  const currentSlide = showcaseSlides[activeSlide];
+  const autoPlayActive = !isPaused && !isInteracting && !prefersReducedMotion;
 
+  useEffect(() => {
+    if (!autoPlayActive) return;
+    const timer = window.setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % featureSlides.length);
+    }, SLIDE_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [autoPlayActive, featureSlides.length]);
+
+  const goPrev = useCallback(() => {
+    setActiveSlide((prev) => (prev - 1 + featureSlides.length) % featureSlides.length);
+  }, [featureSlides.length]);
+
+  const goNext = useCallback(() => {
+    setActiveSlide((prev) => (prev + 1) % featureSlides.length);
+  }, [featureSlides.length]);
+
+  const PrimaryArrow = isArabic ? ArrowLeft : ArrowRight;
+
+  const handlePrimaryAuthAction = () => {
+    if (currentUser) {
+      onOpenDashboard();
+    } else {
+      onOpenSetup();
+    }
+  };
 
   return (
-    <div className="relative min-h-screen bg-[#f7fafe] dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col justify-between selection:bg-sky-100 selection:text-sky-900 overflow-x-hidden transition-colors font-cairo">
-      
+    <div
+      dir={isArabic ? 'rtl' : 'ltr'}
+      className="relative min-h-screen bg-[#f7fafe] dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col justify-between selection:bg-sky-100 selection:text-sky-900 overflow-x-hidden transition-colors font-cairo"
+    >
       {/* Dynamic Ambient Cloud Background */}
       <MotaryCleanBackground />
 
       {/* 1. TOP NAVBAR */}
-      <header
-        dir={isArabic ? 'rtl' : 'ltr'}
-        className="w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 sticky top-0 z-40 px-3 sm:px-6 lg:px-8 py-3 transition-colors shadow-2xs"
-      >
+      <header className="w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/70 dark:border-slate-800 sticky top-0 z-40 px-3 sm:px-6 lg:px-8 py-3 transition-colors shadow-2xs">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-          
-          {/* Right Area: Menu Button placed strictly at the far right + Logo */}
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0 order-first">
-            {/* The Menu Button at the FAR RIGHT */}
+          {/* Start Area: Menu Button + Brand */}
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <button
+              type="button"
               onClick={() => setIsSidebarOpen(true)}
-              className="px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-2xl bg-white dark:bg-slate-800 hover:bg-[#e6f4fe] dark:hover:bg-sky-950/60 border border-slate-200 dark:border-slate-700 text-[#0e1f38] dark:text-white hover:text-[#0084d6] dark:hover:text-sky-400 font-black text-xs sm:text-sm shadow-2xs flex items-center gap-2 transition-all cursor-pointer active:scale-95 shrink-0"
-              title={isArabic ? 'فتح القائمة الجانبية' : 'Open Menu'}
+              aria-label={isArabic ? 'فتح القائمة الجانبية' : 'Open navigation menu'}
+              className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl bg-white dark:bg-slate-800 hover:bg-[#e6f4fe] dark:hover:bg-sky-950/60 border border-slate-200 dark:border-slate-700 text-[#0e1f38] dark:text-white hover:text-[#0084d6] dark:hover:text-sky-400 font-black text-xs sm:text-sm shadow-2xs flex items-center gap-2 transition-all cursor-pointer active:scale-95 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0084d6]"
             >
-              <Menu className="w-5 h-5 text-[#0084d6]" />
-              <span>{isArabic ? 'القائمة' : 'Menu'}</span>
+              <Menu className="w-5 h-5 text-[#0084d6]" aria-hidden="true" />
+              <span className="hidden xs:inline sm:inline">{isArabic ? 'القائمة' : 'Menu'}</span>
             </button>
 
-            {/* Logo & Platform Info */}
-            <div className="flex items-center gap-2.5 cursor-pointer min-w-0" onClick={() => {}}>
+            <div className="flex items-center gap-2.5 min-w-0">
               <img
                 src={logoSrc}
-                alt="دعيدر للحلول البرمجية"
+                alt={isArabic ? 'دعيدر للحلول البرمجية' : 'Daidar Solutions'}
                 className="w-9 h-9 sm:w-10 sm:h-10 object-contain rounded-xl shadow-xs shrink-0 bg-white dark:bg-[#0b1628] border border-slate-100 dark:border-slate-800 p-0.5"
               />
               <div className="min-w-0">
-                <span className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-lg tracking-tight block truncate">
+                <span className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-base tracking-tight block truncate">
                   {t('daidar_solutions')}
                 </span>
-                <span className="text-[10px] sm:text-[11px] text-[#0084d6] dark:text-sky-400 font-bold block -mt-0.5 sm:-mt-1 truncate">
-                  {isArabic ? 'متجري · متجرك الإلكتروني' : 'Matjari · Your online store'}
+                <span className="text-[10px] sm:text-[11px] text-[#0084d6] dark:text-sky-400 font-bold block -mt-0.5 truncate">
+                  {isArabic ? 'متجري · متجرك الإلكتروني' : 'Matjari · Online Stores'}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Left Action Area: Language + Create Store CTA */}
+          {/* End Area: Language + Login/Dashboard CTA */}
           <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-            {/* Language Switcher */}
             <button
+              type="button"
               onClick={toggleLang}
-              className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors flex items-center gap-1"
+              className="px-2.5 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors flex items-center gap-1 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0084d6]"
             >
-              <Globe className="w-3.5 h-3.5 text-[#0084d6]" />
+              <Globe className="w-3.5 h-3.5 text-[#0084d6]" aria-hidden="true" />
               <span>{t('lang_switch')}</span>
             </button>
 
-            {/* User State / Create Store CTA */}
             {currentUser ? (
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <button
+                  type="button"
                   onClick={onOpenDashboard}
-                  className="px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl bg-[#0e1f38] dark:bg-sky-950/80 hover:bg-[#152a4a] text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-                  title={isArabic ? 'الدخول إلى لوحة التحكم' : 'Go to Dashboard'}
+                  className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl bg-[#0e1f38] dark:bg-sky-950/80 hover:bg-[#152a4a] text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0084d6]"
                 >
-                  <StoreIcon className="w-3.5 h-3.5 text-[#00b4d8]" />
-                  <span className="max-w-[100px] sm:max-w-[140px] truncate">{store?.name || currentUser.username}</span>
+                  <StoreIcon className="w-3.5 h-3.5 text-[#00b4d8]" aria-hidden="true" />
+                  <span className="max-w-[100px] sm:max-w-[140px] truncate">
+                    {store?.name || currentUser.username}
+                  </span>
                 </button>
                 {onLogout && (
                   <button
+                    type="button"
                     onClick={onLogout}
-                    className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                    title={isArabic ? 'تسجيل الخروج' : 'Logout'}
+                    aria-label={isArabic ? 'تسجيل الخروج' : 'Sign out'}
+                    className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+                    title={isArabic ? 'تسجيل الخروج' : 'Sign out'}
                   >
-                    <LogOut className="w-4 h-4" />
+                    <LogOut className="w-4 h-4" aria-hidden="true" />
                   </button>
                 )}
               </div>
             ) : (
               <button
+                type="button"
                 onClick={onOpenSetup}
-                className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl bg-[#0084d6] hover:bg-[#0074bd] active:scale-95 text-white font-bold text-xs sm:text-sm shadow-md shadow-sky-600/20 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+                className="px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl bg-[#0084d6] hover:bg-[#0074bd] active:scale-95 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-sky-600/20 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0084d6] focus-visible:ring-offset-2"
               >
-                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <span>{t('buy_store')}</span>
+                <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4" aria-hidden="true" />
+                <span>{isArabic ? 'تسجيل الدخول / التسجيل' : 'Sign in / Sign up'}</span>
               </button>
             )}
-
           </div>
-
         </div>
       </header>
 
-      {/* 2. MINIMALIST SMOOTH RIGHT-SIDE SIDEBAR DRAWER (بدون مربعات وبدون ردم - ناعمة وبسيطة) */}
+      {/* 2. SIDEBAR DRAWER */}
       <div
         dir={isArabic ? 'rtl' : 'ltr'}
+        aria-hidden={!isSidebarOpen}
         className={`fixed inset-0 z-50 overflow-hidden font-cairo transition-all duration-300 ease-in-out ${
           isSidebarOpen ? 'opacity-100 pointer-events-auto visible' : 'opacity-0 pointer-events-none invisible delay-200'
         }`}
       >
-        {/* Backdrop Fade with Blur */}
         <div
           className={`fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity duration-300 ease-in-out cursor-pointer ${
             isSidebarOpen ? 'opacity-100' : 'opacity-0'
@@ -224,20 +276,17 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
           onClick={() => setIsSidebarOpen(false)}
         />
 
-        {/* Drawer Panel - Positioned strictly on the RIGHT with smooth translateX slide */}
         <div className="fixed inset-y-0 right-0 max-w-full flex">
           <div
             className={`w-screen max-w-xs sm:max-w-sm bg-white dark:bg-[#0b1329] text-slate-800 dark:text-slate-100 shadow-2xl flex flex-col justify-between overflow-y-auto border-s border-slate-200/80 dark:border-slate-800 transform transition-transform duration-300 ease-in-out ${
               isSidebarOpen ? 'translate-x-0' : 'translate-x-full'
             }`}
           >
-            
-            {/* Header: Clean & Simple */}
             <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
                 <img
                   src={logoSrc}
-                  alt="دعيدر للحلول البرمجية"
+                  alt={isArabic ? 'دعيدر للحلول البرمجية' : 'Daidar Solutions'}
                   className="w-8 h-8 object-contain rounded-xl bg-white dark:bg-[#0b1628] border border-slate-200/80 dark:border-slate-800 p-0.5 shrink-0"
                 />
                 <span className="font-extrabold text-[#0e1f38] dark:text-white text-sm sm:text-base truncate">
@@ -246,18 +295,16 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
               </div>
 
               <button
+                type="button"
                 onClick={() => setIsSidebarOpen(false)}
+                aria-label={isArabic ? 'إغلاق القائمة' : 'Close menu'}
                 className="w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer"
-                title={isArabic ? 'إغلاق' : 'Close'}
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5" aria-hidden="true" />
               </button>
             </div>
 
-            {/* Drawer Menu Items: Clean, Flat List with smooth hover accent */}
             <div className="p-3 sm:p-4 space-y-1 flex-1 overflow-y-auto">
-              
-              {/* User Account Card in Drawer if Logged In */}
               {currentUser && (
                 <div className="p-3 mb-2 rounded-2xl bg-sky-50 dark:bg-sky-950/40 border border-sky-100 dark:border-sky-900/60 flex items-center justify-between">
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -269,528 +316,615 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
                         {store?.name || currentUser.username}
                       </span>
                       <span className="block text-[10px] font-bold text-[#0084d6] dark:text-sky-400">
-                        {currentUser.role === 'super_admin' ? 'Super Admin' : (isArabic ? 'متجر نشط' : 'Active Store')}
+                        {currentUser.role === 'super_admin'
+                          ? 'Super Admin'
+                          : isArabic
+                            ? 'مساحة صاحب المتجر'
+                            : 'Merchant Workspace'}
                       </span>
                     </div>
                   </div>
                   {onLogout && (
                     <button
+                      type="button"
                       onClick={() => {
                         setIsSidebarOpen(false);
                         onLogout();
                       }}
+                      aria-label={isArabic ? 'تسجيل الخروج' : 'Sign out'}
                       className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                      title={isArabic ? 'تسجيل الخروج' : 'Logout'}
                     >
-                      <LogOut className="w-4 h-4" />
+                      <LogOut className="w-4 h-4" aria-hidden="true" />
                     </button>
                   )}
                 </div>
               )}
 
-              {/* الرئيسية */}
               <button
-                onClick={() => {
-                  setIsSidebarOpen(false);
-                }}
-                className="w-full text-start px-3.5 py-3 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-[#e6f4fe] dark:hover:bg-sky-950/60 hover:text-[#0084d6] dark:hover:text-sky-400 font-bold text-sm flex items-center justify-between transition-colors duration-150 cursor-pointer group"
+                type="button"
+                onClick={() => setIsSidebarOpen(false)}
+                className="w-full text-start px-3.5 py-3 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-[#e6f4fe] dark:hover:bg-sky-950/60 hover:text-[#0084d6] dark:hover:text-sky-400 font-bold text-sm flex items-center justify-between transition-colors cursor-pointer group"
               >
                 <div className="flex items-center gap-3">
-                  <Home className="w-5 h-5 text-slate-400 group-hover:text-[#0084d6] dark:group-hover:text-sky-400 transition-colors" />
+                  <Home className="w-5 h-5 text-slate-400 group-hover:text-[#0084d6]" aria-hidden="true" />
                   <span>{t('home')}</span>
                 </div>
-                <span className="text-xs text-slate-300 group-hover:text-[#0084d6] dark:group-hover:text-sky-400 transition-colors">
+                <span className="text-xs text-slate-300 group-hover:text-[#0084d6]">
                   {isArabic ? '←' : '→'}
                 </span>
               </button>
 
-              {/* إنشاء متجر جديد */}
               <button
+                type="button"
                 onClick={() => {
                   setIsSidebarOpen(false);
                   onOpenSetup();
                 }}
-                className="w-full text-start px-3.5 py-3 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-[#e6f4fe] dark:hover:bg-sky-950/60 hover:text-[#0084d6] dark:hover:text-sky-400 font-bold text-sm flex items-center justify-between transition-colors duration-150 cursor-pointer group"
+                className="w-full text-start px-3.5 py-3 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-[#e6f4fe] dark:hover:bg-sky-950/60 hover:text-[#0084d6] dark:hover:text-sky-400 font-bold text-sm flex items-center justify-between transition-colors cursor-pointer group"
               >
                 <div className="flex items-center gap-3">
-                  <Plus className="w-5 h-5 text-slate-400 group-hover:text-[#0084d6] dark:group-hover:text-sky-400 transition-colors" />
-                  <span>{t('buy_store')}</span>
+                  <LogIn className="w-5 h-5 text-slate-400 group-hover:text-[#0084d6]" aria-hidden="true" />
+                  <span>{currentUser ? (isArabic ? 'مساحة متجري' : 'My Store Workspace') : isArabic ? 'تسجيل الدخول أو إنشاء حساب' : 'Sign in or create account'}</span>
                 </div>
-                <span className="text-xs text-slate-300 group-hover:text-[#0084d6] dark:group-hover:text-sky-400 transition-colors">
+                <span className="text-xs text-slate-300 group-hover:text-[#0084d6]">
                   {isArabic ? '←' : '→'}
                 </span>
               </button>
 
               <div className="my-2 border-t border-slate-100 dark:border-slate-800/80" />
 
-              {/* دخول أصحاب المتاجر */}
               <button
+                type="button"
                 onClick={() => {
                   setIsSidebarOpen(false);
-                  if (currentUser) {
-                    onOpenDashboard();
-                  } else {
-                    onOpenMerchantLogin();
-                  }
+                  if (currentUser) onOpenDashboard();
+                  else onOpenMerchantLogin();
                 }}
-                className="w-full text-start px-3.5 py-3 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-[#e6f4fe] dark:hover:bg-sky-950/60 hover:text-[#0084d6] dark:hover:text-sky-400 font-bold text-sm flex items-center justify-between transition-colors duration-150 cursor-pointer group"
+                className="w-full text-start px-3.5 py-3 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-[#e6f4fe] dark:hover:bg-sky-950/60 hover:text-[#0084d6] dark:hover:text-sky-400 font-bold text-sm flex items-center justify-between transition-colors cursor-pointer group"
               >
                 <div className="flex items-center gap-3">
-                  <ShoppingBag className="w-5 h-5 text-slate-400 group-hover:text-[#0084d6] dark:group-hover:text-sky-400 transition-colors" />
+                  <ShoppingBag className="w-5 h-5 text-slate-400 group-hover:text-[#0084d6]" aria-hidden="true" />
                   <span>{currentUser ? (isArabic ? 'لوحة تحكم متجري' : 'Store Dashboard') : t('merchant_portal')}</span>
                 </div>
-                <span className="text-xs text-slate-300 group-hover:text-[#0084d6] dark:group-hover:text-sky-400 transition-colors">
+                <span className="text-xs text-slate-300 group-hover:text-[#0084d6]">
                   {isArabic ? '←' : '→'}
                 </span>
               </button>
 
-              {/* لوحة الإدارة (الأدمن) */}
               <button
+                type="button"
                 onClick={() => {
                   setIsSidebarOpen(false);
                   onOpenDashboard();
                 }}
-                className="w-full text-start px-3.5 py-3 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-[#e6f4fe] dark:hover:bg-sky-950/60 hover:text-[#0084d6] dark:hover:text-sky-400 font-bold text-sm flex items-center justify-between transition-colors duration-150 cursor-pointer group"
+                className="w-full text-start px-3.5 py-3 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-[#e6f4fe] dark:hover:bg-sky-950/60 hover:text-[#0084d6] dark:hover:text-sky-400 font-bold text-sm flex items-center justify-between transition-colors cursor-pointer group"
               >
                 <div className="flex items-center gap-3">
-                  <Shield className="w-5 h-5 text-slate-400 group-hover:text-[#0084d6] dark:group-hover:text-sky-400 transition-colors" />
+                  <Shield className="w-5 h-5 text-slate-400 group-hover:text-[#0084d6]" aria-hidden="true" />
                   <span>{t('admin_portal')}</span>
                 </div>
-                <span className="text-xs text-slate-300 group-hover:text-[#0084d6] dark:group-hover:text-sky-400 transition-colors">
+                <span className="text-xs text-slate-300 group-hover:text-[#0084d6]">
                   {isArabic ? '←' : '→'}
                 </span>
               </button>
 
               <div className="my-2 border-t border-slate-100 dark:border-slate-800/80" />
 
-              {/* الدعم الفني عبر واتساب */}
               <a
-                href={`https://wa.me/${whatsappNumber}`}
+                href={whatsappHref}
                 target="_blank"
-                rel="noreferrer"
-                className="w-full text-start px-3.5 py-3 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-600 dark:hover:text-emerald-400 font-bold text-sm flex items-center justify-between transition-colors duration-150 cursor-pointer group"
+                rel="noopener noreferrer"
+                className="w-full text-start px-3.5 py-3 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-600 dark:hover:text-emerald-400 font-bold text-sm flex items-center justify-between transition-colors cursor-pointer group"
               >
                 <div className="flex items-center gap-3">
-                  <MessageCircle className="w-5 h-5 text-emerald-500" />
-                  <span>{isArabic ? 'الدعم الفني عبر واتساب' : 'WhatsApp Support'}</span>
+                  <MessageCircle className="w-5 h-5 text-emerald-500" aria-hidden="true" />
+                  <span>{isArabic ? 'استفسار عبر واتساب' : 'WhatsApp Inquiry'}</span>
                 </div>
-                <span className="text-xs text-slate-300 group-hover:text-emerald-600 transition-colors">
-                  ↗
-                </span>
+                <span className="text-xs text-slate-300 group-hover:text-emerald-600">↗</span>
               </a>
-
             </div>
 
-            {/* Footer: Language, Copyright */}
             <div className="p-3.5 sm:p-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={toggleLang}
-                  className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-[#e6f4fe] hover:text-[#0084d6] dark:hover:bg-slate-800 transition-colors flex items-center gap-1 cursor-pointer"
-                >
-                  <Globe className="w-3.5 h-3.5 text-[#0084d6]" />
-                  <span>{t('lang_switch')}</span>
-                </button>
-              </div>
-
+              <button
+                type="button"
+                onClick={toggleLang}
+                className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-[#e6f4fe] hover:text-[#0084d6] dark:hover:bg-slate-800 transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                <Globe className="w-3.5 h-3.5 text-[#0084d6]" aria-hidden="true" />
+                <span>{t('lang_switch')}</span>
+              </button>
               <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">
                 © {new Date().getFullYear()} دعيدر
               </span>
             </div>
-
           </div>
         </div>
       </div>
 
-      {/* 2. HERO SECTION */}
-      <section className="relative max-w-7xl mx-auto px-4 sm:px-8 py-8 sm:py-14 w-full flex-1 flex flex-col lg:flex-row items-center justify-between gap-10 lg:gap-14 overflow-hidden">
-        
-        {/* Ambient Floating Soft Glows */}
-        <div className="absolute top-10 end-10 w-96 h-96 bg-sky-400/10 dark:bg-sky-500/5 rounded-full blur-3xl pointer-events-none -z-10 animate-pulse"></div>
-        <div className="absolute bottom-10 start-10 w-80 h-80 bg-blue-600/10 dark:bg-blue-600/5 rounded-full blur-3xl pointer-events-none -z-10"></div>
-        
-        {/* Right Side: Headlines, Text, Buttons */}
-        <div className="w-full lg:w-1/2 text-start space-y-6">
-          
-          {/* Subtitle Badge */}
-          <div className="inline-block">
-            <span className="text-xs sm:text-sm font-extrabold text-[#0084d6] dark:text-sky-400 tracking-wide">
-              {t('hero_subtitle')}
-            </span>
-          </div>
-
-          {/* Main Headline */}
-          <div className="space-y-1">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-[#0e1f38] dark:text-white tracking-tight leading-tight">
-              {t('hero_title_1')}
-            </h1>
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-[#0084d6] dark:text-sky-400 tracking-tight leading-tight">
-              {t('hero_title_2')} ..
-            </h2>
-          </div>
-
-          {/* Description */}
-          <p className="text-sm sm:text-base lg:text-lg text-slate-600 dark:text-slate-200 font-medium leading-relaxed max-w-xl">
-            {t('hero_desc')}
-          </p>
-
-          {/* Action Buttons Side-by-Side */}
-          <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-3.5">
-            {/* Primary Blue Button: Create New Store */}
-            <button
-              onClick={currentUser ? onOpenDashboard : onOpenSetup}
-              className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-[#0084d6] hover:bg-[#0074bd] active:scale-95 text-white font-extrabold text-sm sm:text-base shadow-lg shadow-sky-600/25 flex items-center justify-center gap-2.5 transition-all cursor-pointer"
-            >
-              <span>{currentUser ? (isArabic ? '🏪 الانتقال للوحة التحكم' : 'Go to Dashboard') : `+ ${t('create_new_store')}`}</span>
-              <span>{isArabic ? '←' : '→'}</span>
-            </button>
-
-            {/* Dedicated Merchant Portal Button in Dark Navy */}
-            <button
-              onClick={currentUser ? onOpenDashboard : onOpenMerchantLogin}
-              className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-[#0e1f38] dark:bg-slate-800 hover:bg-[#152a4a] dark:hover:bg-slate-700 active:scale-95 text-white font-extrabold text-sm sm:text-base shadow-lg shadow-slate-900/15 flex items-center justify-center gap-2.5 transition-all cursor-pointer"
-            >
-              <ShoppingBag className="w-5 h-5 text-[#00b4d8]" />
-              <span>{currentUser ? (isArabic ? 'إدارة متجري' : 'My Store') : `${t('merchant_portal')} ↗`}</span>
-            </button>
-          </div>
-
-          {/* Three Bullet Points */}
-          <div className="pt-3 sm:pt-4 flex flex-wrap items-center gap-2.5 sm:gap-6 text-xs sm:text-sm font-bold text-slate-500 dark:text-slate-200">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#0084d6]"></span>
-              <span>{t('pro_sites')}</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#0084d6]"></span>
-              <span>{isArabic ? 'إدارة المنتجات والأسعار بسهولة' : 'Easy product and price management'}</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#0084d6]"></span>
-              <span>{t('whatsapp_order')}</span>
-            </span>
-          </div>
-
-          {/* Direct Support Phone */}
-          <div className="pt-1 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-300 font-medium">
-            <span>{t('support_inquiry')}</span>
-            <a 
-              href={`tel:${whatsappNumber}`}
-              className="font-bold text-slate-900 dark:text-white font-mono hover:text-[#0084d6] dark:hover:text-sky-400 dir-ltr transition-colors"
-            >
-              {displayPhone}
-            </a>
-          </div>
-
-        </div>
-
-        {/* Left Side: Auto-Rotating Showcase Card (Strictly in site's theme) */}
-        <div className="w-full lg:w-1/2 flex justify-center lg:justify-end">
-          
-          <div 
-            onClick={() => onOpenStorefront(currentSlide.storeId)}
-            className="w-full max-w-sm sm:max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-xl shadow-sky-500/5 p-4 sm:p-5 space-y-3.5 transition-all duration-300 hover:shadow-sky-500/15 cursor-pointer group select-none"
-          >
-            
-            {/* Top Bar: Store Header & Animated Slide Progress Indicators */}
-            <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
-              
-              {/* Store Identity */}
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#f0f7ff] dark:bg-slate-800 border border-sky-100 dark:border-slate-700 flex items-center justify-center text-lg shadow-2xs shrink-0 transition-transform duration-300 group-hover:scale-105">
-                  {currentSlide.avatar}
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <h3 className="font-black text-sm sm:text-base text-[#0e1f38] dark:text-white truncate">
-                      {currentSlide.storeName}
-                    </h3>
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 text-[9px] font-black shrink-0">
-                      <CheckCircle2 className="w-2.5 h-2.5" />
-                      {isArabic ? 'نموذج توضيحي' : 'Store example'}
-                    </span>
-                  </div>
-                  <span className="text-[10px] sm:text-[11px] text-[#0084d6] dark:text-sky-400 font-bold block truncate">
-                    {currentSlide.tagline}
-                  </span>
-                </div>
+      {/* 3. ADVERTISING HERO SECTION (RTL Right = Offer & CTA, Left = Auto-Rotating Feature Cards) */}
+      <main className="relative z-10 w-full flex-1 pb-24 sm:pb-16">
+        <section className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-10 sm:pt-12 sm:pb-14 lg:pt-16 lg:pb-16">
+          <div className="grid grid-cols-1 lg:grid-cols-12 items-center gap-10 lg:gap-12">
+            {/* Offer Column (Start side: Right in RTL, Left in LTR) */}
+            <div className="lg:col-span-6 text-start space-y-6 landing-card-enter">
+              {/* Offer Badge */}
+              <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-sky-200/80 bg-white/90 dark:border-sky-800/70 dark:bg-slate-900/90 px-3.5 py-1.5 shadow-2xs">
+                <span className="inline-flex h-2 w-2 rounded-full bg-[#0084d6]" aria-hidden="true" />
+                <span className="text-xs sm:text-sm font-extrabold text-[#0084d6] dark:text-sky-400">
+                  {isArabic ? 'متجرك الإلكتروني من دعيدر · ابدأ أونلاين بسهولة' : 'Daidar Online Store · Launch with confidence'}
+                </span>
               </div>
 
-              {/* Animated Slide Progress Bars in site's primary blue */}
-              <div className="flex items-center gap-1.5 shrink-0" title={isArabic ? 'المتاجر التفاعلية' : 'Showcase Stores'}>
-                {showcaseSlides.map((_, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveSlide(idx);
-                    }}
-                    className={`h-1.5 rounded-full transition-all duration-500 cursor-pointer ${
-                      activeSlide === idx
-                        ? 'w-7 bg-[#0084d6]'
-                        : 'w-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600'
-                    }`}
-                  />
+              {/* Primary Advertising Headline */}
+              <div className="space-y-2.5">
+                <h1 className="text-3xl sm:text-4xl lg:text-[3.1rem] font-black text-[#0e1f38] dark:text-white tracking-tight leading-[1.22]">
+                  {isArabic ? (
+                    <>
+                      امتلك متجرك الإلكتروني{' '}
+                      <span className="block mt-1 bg-gradient-to-l from-[#0084d6] via-[#0275be] to-[#0e4a86] dark:from-sky-400 dark:to-cyan-300 bg-clip-text text-transparent">
+                        ابتداءً من 350 جنيه شهريًا
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      Own your online store{' '}
+                      <span className="block mt-1 bg-gradient-to-r from-[#0084d6] via-[#0275be] to-[#0e4a86] dark:from-sky-400 dark:to-cyan-300 bg-clip-text text-transparent">
+                        starting from 350 EGP/month
+                      </span>
+                    </>
+                  )}
+                </h1>
+              </div>
+
+              {/* Short Clear Description */}
+              <p className="text-sm sm:text-base lg:text-lg text-slate-600 dark:text-slate-300 font-medium leading-relaxed max-w-xl">
+                {isArabic
+                  ? 'اعرض منتجاتك بصور وأسعار وتصنيفات واضحة، واستقبل طلبات عملائك مباشرة عبر واتساب من رابط خاص بمتجرك — بتكلفة شهرية أقل من إيجار متجر حقيقي.'
+                  : 'Present your products with clear photos, prices, and categories, and receive customer orders directly via WhatsApp from your own store link — at a lower cost than renting a physical shop.'}
+              </p>
+
+              {/* Prominent Primary CTA (Login / Sign up) + Secondary Inquiry */}
+              <div className="pt-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handlePrimaryAuthAction}
+                  className="landing-cta-shine min-h-[52px] w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-[#0084d6] hover:bg-[#0074bd] active:scale-[0.98] text-white font-black text-sm sm:text-base shadow-xl shadow-sky-600/25 flex items-center justify-center gap-2.5 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-300 dark:focus-visible:ring-sky-700"
+                >
+                  <LogIn className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  <span>
+                    {currentUser
+                      ? isArabic
+                        ? 'الانتقال إلى مساحة متجري'
+                        : 'Open my store workspace'
+                      : isArabic
+                        ? 'تسجيل الدخول أو إنشاء حساب'
+                        : 'Sign in or create account'}
+                  </span>
+                  <PrimaryArrow className="w-4 h-4 shrink-0" aria-hidden="true" />
+                </button>
+
+                <a
+                  href={whatsappHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="min-h-[52px] w-full sm:w-auto px-5 py-3.5 rounded-2xl bg-white dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-[#0e1f38] dark:text-white border border-slate-200 dark:border-slate-700 hover:border-emerald-300 font-extrabold text-sm sm:text-base shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                >
+                  <MessageCircle className="w-5 h-5 text-[#25d366] shrink-0" aria-hidden="true" />
+                  <span>{isArabic ? 'تواصل عبر واتساب' : 'Ask on WhatsApp'}</span>
+                </a>
+              </div>
+
+              {/* Honest Pricing Scope Clarity Note */}
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-6 max-w-xl">
+                {isArabic
+                  ? '350 جنيه شهريًا هو السعر الابتدائي للباقة الأساسية؛ الإضافات الاختيارية أو الدومين الخاص تُحدد حسب اختيارك.'
+                  : '350 EGP/month is the starting monthly price for the Basic plan; optional add-ons or a custom domain are selected separately.'}
+              </p>
+
+              {/* Key Real Store Highlights */}
+              <div className="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-bold text-slate-700 dark:text-slate-200">
+                {[
+                  {
+                    icon: CheckCircle2,
+                    label: isArabic ? 'بدون عمولات على الطلبات' : 'Zero order commissions',
+                  },
+                  {
+                    icon: CheckCircle2,
+                    label: isArabic ? 'طلبات مباشرة على واتساب' : 'Direct WhatsApp orders',
+                  },
+                  {
+                    icon: CheckCircle2,
+                    label: isArabic ? 'إدارة سهلة للمنتجات والأسعار' : 'Easy product & price control',
+                  },
+                ].map(({ icon: Icon, label }) => (
+                  <div
+                    key={label}
+                    className="flex items-center gap-2 rounded-xl bg-white/80 dark:bg-slate-900/70 border border-slate-200/70 dark:border-slate-800 px-3 py-2.5"
+                  >
+                    <Icon className="w-4 h-4 text-[#0084d6] shrink-0" aria-hidden="true" />
+                    <span className="leading-snug">{label}</span>
+                  </div>
                 ))}
               </div>
 
+              {/* Direct Support Number */}
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-medium">
+                <span>{isArabic ? 'للاستفسار المباشر:' : 'Direct inquiry:'}</span>
+                <a
+                  href={`tel:${whatsappNumber}`}
+                  dir="ltr"
+                  className="font-bold text-[#0e1f38] dark:text-white font-mono hover:text-[#0084d6] dark:hover:text-sky-400 transition-colors"
+                >
+                  {displayPhone}
+                </a>
+              </div>
             </div>
 
-            {/* Featured Product Hero Container */}
-            <div className="relative rounded-2xl overflow-hidden bg-[#f0f7ff] dark:bg-slate-800/80 p-3 sm:p-4 border border-sky-100/70 dark:border-slate-700/60 transition-all duration-500">
-              
-              {/* Floating Badges on Product Image */}
-              <div className="flex items-center justify-between mb-2">
-                <span className="px-2.5 py-1 rounded-xl bg-[#0084d6] text-white font-extrabold text-[10px] shadow-xs flex items-center gap-1">
-                  <span>{currentSlide.badge}</span>
-                </span>
-                <div className="w-7 h-7 rounded-full bg-white dark:bg-slate-900 shadow-2xs flex items-center justify-center text-rose-500">
-                  <Heart className="w-4 h-4 fill-rose-500" />
-                </div>
-              </div>
-
-              {/* Product Image with Smooth Transition */}
-              <div className="w-full h-44 sm:h-48 rounded-xl overflow-hidden bg-white dark:bg-slate-900/60 flex items-center justify-center shadow-xs">
-                <img
-                  key={currentSlide.image}
-                  src={currentSlide.image}
-                  alt={currentSlide.productName}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                  loading="lazy"
-                />
-              </div>
-
-              {/* Product Info */}
-              <div className="mt-3.5 space-y-1">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1 text-amber-500 text-xs font-bold">
-                    <div className="flex items-center">
-                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+            {/* Rotating Feature Cards Column (End side: Left in RTL, Right in LTR) */}
+            <div className="lg:col-span-6 w-full flex justify-center lg:justify-end">
+              <div
+                aria-roledescription="carousel"
+                aria-label={isArabic ? 'مميزات المتجر الإلكتروني' : 'Online store features'}
+                onMouseEnter={() => setIsInteracting(true)}
+                onMouseLeave={() => setIsInteracting(false)}
+                onFocusCapture={() => setIsInteracting(true)}
+                onBlurCapture={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                    setIsInteracting(false);
+                  }
+                }}
+                className="w-full max-w-xl rounded-[2rem] border border-slate-200/90 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 p-4 sm:p-5 shadow-2xl shadow-sky-900/10 backdrop-blur-md"
+              >
+                {/* Top Carousel Bar: Section Label + Controls */}
+                <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-[#e6f4fe] dark:bg-sky-950 text-[#0084d6] dark:text-sky-400 shrink-0">
+                      <Sparkles className="w-4 h-4" aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0">
+                      <span className="block text-xs font-black text-[#0e1f38] dark:text-white truncate">
+                        {isArabic ? 'ليه تمتلك متجرك الإلكتروني الآن؟' : 'Why launch your online store now?'}
+                      </span>
+                      <span className="block text-[11px] font-bold text-slate-500 dark:text-slate-400" dir="ltr">
+                        0{activeSlide + 1} / 0{featureSlides.length}
+                      </span>
                     </div>
-                    <span className="text-slate-500 dark:text-slate-400 text-[10px]">({currentSlide.rating})</span>
                   </div>
-                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md">
-                    {isArabic ? 'متوفر فوري' : 'In Stock'}
-                  </span>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setIsPaused((v) => !v)}
+                      aria-label={
+                        isPaused
+                          ? isArabic
+                            ? 'تشغيل التبديل التلقائي'
+                            : 'Resume auto-rotation'
+                          : isArabic
+                            ? 'إيقاف التبديل التلقائي'
+                            : 'Pause auto-rotation'
+                      }
+                      title={isPaused ? (isArabic ? 'تشغيل' : 'Play') : isArabic ? 'إيقاف مؤقت' : 'Pause'}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-[#0084d6] hover:text-[#0084d6] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0084d6]"
+                    >
+                      {isPaused ? <Play className="w-3.5 h-3.5" aria-hidden="true" /> : <Pause className="w-3.5 h-3.5" aria-hidden="true" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={goPrev}
+                      aria-label={isArabic ? 'الميزة السابقة' : 'Previous feature'}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-[#0084d6] hover:text-[#0084d6] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0084d6]"
+                    >
+                      {isArabic ? <ChevronRight className="w-4 h-4" aria-hidden="true" /> : <ChevronLeft className="w-4 h-4" aria-hidden="true" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={goNext}
+                      aria-label={isArabic ? 'الميزة التالية' : 'Next feature'}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-[#0084d6] hover:text-[#0084d6] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0084d6]"
+                    >
+                      {isArabic ? <ChevronLeft className="w-4 h-4" aria-hidden="true" /> : <ChevronRight className="w-4 h-4" aria-hidden="true" />}
+                    </button>
+                  </div>
                 </div>
 
-                <h4 className="font-extrabold text-sm sm:text-base text-[#0e1f38] dark:text-white leading-snug">
-                  {currentSlide.productName}
-                </h4>
+                {/* Fixed-Height Animated Card Stage (Zero Layout Shift) */}
+                <div className="mt-4 grid grid-cols-1 grid-rows-1 relative overflow-hidden rounded-2xl">
+                  {featureSlides.map((slide, idx) => {
+                    const isCurrent = idx === activeSlide;
+                    const SlideIcon = slide.Icon;
+                    return (
+                      <article
+                        key={slide.id}
+                        aria-hidden={!isCurrent}
+                        className={`col-start-1 row-start-1 flex flex-col justify-between rounded-2xl border border-slate-100 dark:border-slate-800 bg-[#f7fafe] dark:bg-slate-950/60 overflow-hidden transition-all duration-500 ease-out motion-reduce:transition-opacity ${
+                          isCurrent
+                            ? 'opacity-100 translate-y-0 scale-100 z-10'
+                            : 'opacity-0 translate-y-3 scale-[0.98] pointer-events-none z-0'
+                        }`}
+                      >
+                        {/* Studio Visual (16:10 fixed aspect ratio, zero people) */}
+                        <div className="relative w-full aspect-[16/10] bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                          <img
+                            src={slide.image}
+                            alt={slide.imageAlt}
+                            width={960}
+                            height={600}
+                            loading={idx === 0 ? 'eager' : 'lazy'}
+                            decoding="async"
+                            className={`w-full h-full object-cover transition-transform duration-700 ease-out motion-reduce:transition-none ${
+                              isCurrent ? 'scale-100' : 'scale-105'
+                            }`}
+                          />
+                          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0e1f38]/55 via-[#0e1f38]/15 to-transparent pointer-events-none" />
+                          <span
+                            className={`absolute top-3 ${isArabic ? 'right-3' : 'left-3'} inline-flex items-center gap-1.5 rounded-full bg-white/95 dark:bg-slate-900/95 px-3 py-1.5 text-[11px] font-black text-[#0e1f38] dark:text-white shadow-md backdrop-blur-md`}
+                          >
+                            <SlideIcon className="w-3.5 h-3.5 text-[#0084d6]" aria-hidden="true" />
+                            <span>{slide.badge}</span>
+                          </span>
+                        </div>
 
-                <div className="flex items-baseline gap-2 pt-0.5">
-                  <span className="text-lg sm:text-xl font-black text-[#0084d6] dark:text-sky-400">
-                    {currentSlide.price}
-                  </span>
-                  <span className="text-xs text-slate-400 line-through">
-                    {currentSlide.oldPrice}
+                        {/* Feature Text Content (fixed min-height prevents CLS across slides) */}
+                        <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between min-h-[158px] sm:min-h-[150px]">
+                          <div>
+                            <div className="flex items-center gap-2.5">
+                              <span className={`inline-flex h-9 w-9 items-center justify-center rounded-xl shrink-0 ${slide.accentBg} ${slide.accentText}`}>
+                                <SlideIcon className="w-5 h-5" aria-hidden="true" />
+                              </span>
+                              <h2 className="text-lg sm:text-xl font-black text-[#0e1f38] dark:text-white leading-snug">
+                                {slide.title}
+                              </h2>
+                            </div>
+                            <p className="mt-2.5 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
+                              {slide.description}
+                            </p>
+                          </div>
+
+                          <div className="mt-3.5 pt-3 border-t border-slate-200/70 dark:border-slate-800 flex items-center justify-between gap-2 text-[11px] font-bold text-[#0084d6] dark:text-sky-400">
+                            <span className="truncate">{slide.detailTag}</span>
+                            <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+
+                {/* Progress & Slide Selector Pills */}
+                <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 flex-1" role="tablist" aria-label={isArabic ? 'اختيار الميزة' : 'Choose feature slide'}>
+                    {featureSlides.map((slide, idx) => {
+                      const isCurrent = idx === activeSlide;
+                      return (
+                        <button
+                          key={slide.id}
+                          type="button"
+                          role="tab"
+                          aria-selected={isCurrent}
+                          aria-label={slide.title}
+                          onClick={() => setActiveSlide(idx)}
+                          className={`relative h-2 rounded-full overflow-hidden transition-all duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0084d6] ${
+                            isCurrent
+                              ? 'flex-1 bg-sky-100 dark:bg-slate-800'
+                              : 'w-8 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600'
+                          }`}
+                        >
+                          {isCurrent && (
+                            <span
+                              key={`${slide.id}-${activeSlide}-${autoPlayActive ? 'run' : 'stop'}`}
+                              className={`block h-full rounded-full bg-[#0084d6] ${
+                                autoPlayActive ? 'landing-progress-bar' : 'w-full'
+                              }`}
+                            />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 shrink-0">
+                    {featureSlides[activeSlide].title}
                   </span>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
 
-              {/* WhatsApp Action Button in Site's Brand Blue */}
+        {/* 4. CORE ADVANTAGES GRID (Honest, practical value including lower cost than physical rent) */}
+        <section
+          aria-label={isArabic ? 'مزايا متجرك الإلكتروني' : 'Online store advantages'}
+          className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              {
+                Icon: BadgePercent,
+                title: isArabic ? 'بتكلفة أقل من إيجار متجر حقيقي' : 'Lower cost than a physical shop',
+                detail: isArabic
+                  ? 'ابدأ متجرك الإلكتروني ابتداءً من 350 جنيه شهريًا بدل تكاليف الإيجار والتجهيز التقليدية.'
+                  : 'Start your online store from 350 EGP/month without physical store rent and setup overhead.',
+              },
+              {
+                Icon: Clock,
+                title: isArabic ? 'شغال 24 ساعة / 7 أيام' : 'Open 24/7',
+                detail: isArabic
+                  ? 'عملاؤك يتصفحون المنتجات ويختارون طلباتهم في أي وقت من الموبايل دون تثبيت تطبيق.'
+                  : 'Customers browse products and place requests anytime from mobile without installing an app.',
+              },
+              {
+                Icon: MessageCircle,
+                title: isArabic ? 'طلبات مباشرة على واتساب' : 'Direct WhatsApp orders',
+                detail: isArabic
+                  ? 'العميل يجهّز سلته ويرسل تفاصيل الطلب مباشرة على واتسابك بدون عمولات على المبيعات.'
+                  : 'Customers prepare their cart and send full order details directly to your WhatsApp with zero commission.',
+              },
+              {
+                Icon: SlidersHorizontal,
+                title: isArabic ? 'إدارة مرنة لمتجرك' : 'Flexible store management',
+                detail: isArabic
+                  ? 'أضف المنتجات وعدّل الصور والأسعار وتابع الطلبات المسجلة بسهولة من لوحة تحكمك.'
+                  : 'Add products, update photos and prices, and follow recorded orders easily from your dashboard.',
+              },
+            ].map(({ Icon, title, detail }) => (
+              <article
+                key={title}
+                className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs hover:border-sky-300 dark:hover:border-sky-700 hover:shadow-md transition-all"
+              >
+                <span className="mb-4 grid h-11 w-11 place-items-center rounded-2xl bg-sky-50 text-[#0084d6] dark:bg-sky-950/70 dark:text-sky-400">
+                  <Icon className="w-5 h-5" aria-hidden="true" />
+                </span>
+                <h3 className="text-base font-black text-[#0e1f38] dark:text-white">{title}</h3>
+                <p className="mt-2 text-xs sm:text-sm leading-7 text-slate-600 dark:text-slate-400 font-medium">
+                  {detail}
+                </p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        {/* 5. HOW IT WORKS IN 3 CLEAR STEPS */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 text-center space-y-8">
+          <div className="space-y-2 max-w-2xl mx-auto">
+            <span className="text-xs font-black text-[#0084d6] dark:text-sky-400 tracking-wider">
+              {isArabic ? 'خطوات واضحة للبدء' : 'Clear steps to start'}
+            </span>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#0e1f38] dark:text-white">
+              {isArabic ? 'كيف تبدأ متجرك الإلكتروني؟' : 'How do you start your online store?'}
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300 font-medium">
+              {isArabic
+                ? 'خطوات بسيطة من غير تعقيد تقني — جهّز متجرك وابدأ استقبال طلباتك.'
+                : 'Simple steps with no technical complexity — set up your store and start receiving orders.'}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {[
+              {
+                num: isArabic ? '١' : '1',
+                bg: 'bg-[#0084d6]',
+                title: isArabic ? 'سجّل دخولك أو أنشئ حسابك' : 'Sign in or create an account',
+                desc: isArabic
+                  ? 'ابدأ بحساب دعيدر الموحد وأضف بيانات متجرك الأساسية في خطوات بسيطة.'
+                  : 'Start with your unified Daidar account and enter your basic store details.',
+              },
+              {
+                num: isArabic ? '٢' : '2',
+                bg: 'bg-[#0e1f38] dark:bg-slate-800',
+                title: isArabic ? 'جهّز منتجاتك واختر باقتك' : 'Add products & choose your plan',
+                desc: isArabic
+                  ? 'أضف صور منتجاتك وأسعارها وتصنيفاتها، واختر الباقة المناسبة لنشاطك ابتداءً من 350 جنيه شهريًا.'
+                  : 'Add product photos, prices, and categories, and select the plan that fits your business starting from 350 EGP/month.',
+              },
+              {
+                num: isArabic ? '٣' : '3',
+                bg: 'bg-[#25d366]',
+                title: isArabic ? 'شارك رابطك واستقبل الطلبات' : 'Share your link & receive orders',
+                desc: isArabic
+                  ? 'بعد تفعيل المتجر، شارك رابطك الخاص مع عملائك واستقبل تفاصيل طلباتهم مباشرة على واتساب.'
+                  : 'Once activated, share your store link with customers and receive order details directly on WhatsApp.',
+              },
+            ].map((step) => (
+              <article
+                key={step.num}
+                className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-lg transition-all space-y-3 text-start"
+              >
+                <div className={`w-11 h-11 rounded-2xl ${step.bg} text-white flex items-center justify-center font-black text-lg shadow-md`}>
+                  {step.num}
+                </div>
+                <h3 className="text-lg font-black text-[#0e1f38] dark:text-white">{step.title}</h3>
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-medium leading-relaxed">
+                  {step.desc}
+                </p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        {/* 6. BOTTOM CONVERSION CTA BANNER */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+          <div className="p-7 sm:p-11 rounded-[2rem] bg-gradient-to-l from-[#0084d6] via-[#0264a8] to-[#0e1f38] text-white shadow-2xl shadow-sky-900/20 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden">
+            <div className="absolute -end-12 -top-12 w-64 h-64 rounded-full bg-white/10 blur-3xl pointer-events-none" aria-hidden="true" />
+            <div className="space-y-2.5 text-start z-10 max-w-xl">
+              <span className="px-3 py-1 rounded-full bg-white/15 text-white font-extrabold text-xs inline-flex items-center gap-1.5">
+                <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>{isArabic ? 'ابتداءً من 350 جنيه شهريًا · بدون عمولات' : 'Starting from 350 EGP/month · Zero commissions'}</span>
+              </span>
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black leading-tight">
+                {isArabic ? 'جاهز تطلق متجرك الإلكتروني اليوم؟' : 'Ready to launch your online store today?'}
+              </h2>
+              <p className="text-sky-100 text-xs sm:text-sm font-medium leading-relaxed">
+                {isArabic
+                  ? 'سجّل دخولك أو أنشئ حسابك الآن لتجهيز متجرك، أو تواصل معنا مباشرة عبر واتساب لأي استفسار.'
+                  : 'Sign in or create your account now to set up your store, or message us on WhatsApp with any questions.'}
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto z-10 shrink-0">
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenStorefront(currentSlide.storeId);
-                }}
-                className="mt-3.5 w-full py-3 px-4 rounded-2xl bg-[#0084d6] hover:bg-[#0074bd] text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-sky-600/20 transition-all hover:scale-[1.01] active:scale-98 cursor-pointer"
+                onClick={handlePrimaryAuthAction}
+                className="min-h-[52px] w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-white text-[#0074bd] hover:bg-sky-50 active:scale-[0.98] font-black text-sm sm:text-base shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/60"
               >
-                <MessageCircle className="w-4 h-4 fill-white" />
-                <span>{isArabic ? 'اطلب الآن عبر واتساب بنقرة واحدة' : 'Order Now via WhatsApp (1-Click)'}</span>
+                <LogIn className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span>
+                  {currentUser
+                    ? isArabic
+                      ? 'الانتقال إلى مساحة متجري'
+                      : 'Open my store workspace'
+                    : isArabic
+                      ? 'تسجيل الدخول أو إنشاء حساب'
+                      : 'Sign in or create account'}
+                </span>
               </button>
+
+              <a
+                href={whatsappHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="min-h-[52px] w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-white/15 hover:bg-white/25 active:scale-[0.98] text-white font-black text-sm sm:text-base border border-white/25 transition-all cursor-pointer flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/50"
+              >
+                <MessageCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span>{isArabic ? 'استفسر على واتساب' : 'WhatsApp Inquiry'}</span>
+              </a>
             </div>
-
-
           </div>
+        </section>
+      </main>
 
-        </div>
+      {/* 7. FIXED FLOATING WHATSAPP BUTTON — ALWAYS BOTTOM-RIGHT (Desktop & Mobile with Safe Area) */}
+      <div
+        dir="ltr"
+        className="fixed right-4 sm:right-6 z-50 flex items-center group"
+        style={{ bottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+      >
+        <span
+          aria-hidden="true"
+          dir={isArabic ? 'rtl' : 'ltr'}
+          className="pointer-events-none hidden sm:inline-flex items-center rounded-xl bg-[#0e1f38] px-3.5 py-2 text-xs font-extrabold text-white shadow-lg absolute right-16 opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 group-focus-within:opacity-100 group-focus-within:translate-x-0 transition-all duration-200 whitespace-nowrap"
+        >
+          {isArabic ? 'استفسر عن متجرك عبر واتساب' : 'Ask about your store on WhatsApp'}
+        </span>
 
-      </section>
-
-      {/* Practical store features, without fabricated platform counters. */}
-      <section aria-label={isArabic ? 'مميزات متجرك الإلكتروني' : 'Your store features'} className="max-w-7xl mx-auto px-4 sm:px-8 py-8 w-full">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            {Icon: ShoppingBag, title: isArabic ? 'منتجاتك بشكل احترافي' : 'A polished product catalog', detail: isArabic ? 'اعرض صور منتجاتك وأسعارها وتصنيفاتها في واجهة واضحة وسهلة التصفح.' : 'Show product photos, prices and categories in a clear storefront.'},
-            {Icon: MessageCircle, title: isArabic ? 'طلبات على واتساب' : 'WhatsApp orders', detail: isArabic ? 'العميل يختار منتجاته ويشارك معك تفاصيل الطلب مباشرة على واتساب.' : 'Customers choose products and send their order details to your WhatsApp.'},
-            {Icon: Sparkles, title: isArabic ? 'إدارة سهلة لمتجرك' : 'Simple store management', detail: isArabic ? 'أضف منتجاتك وعدّل الأسعار والتوفر من لوحة تحكم خاصة بمتجرك.' : 'Add products and manage prices and availability from your own dashboard.'},
-            {Icon: ExternalLink, title: isArabic ? 'رابط خاص قابل للمشاركة' : 'Your own shareable link', detail: isArabic ? 'شارك رابط متجرك على السوشيال ميديا، وخلي العملاء يتصفحوه من الموبايل.' : 'Share your store on social media and let customers browse on their phones.'},
-          ].map(({Icon,title,detail})=><article key={title} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900"><span className="mb-5 grid h-11 w-11 place-items-center rounded-2xl bg-sky-50 text-sky-600 dark:bg-sky-950 dark:text-sky-400"><Icon size={22}/></span><h3 className="text-base font-extrabold text-slate-900 dark:text-white">{title}</h3><p className="mt-2 text-sm leading-7 text-slate-500 dark:text-slate-400">{detail}</p></article>)}
-        </div>
-      </section>
-
-      {/* 4. HOW IT WORKS IN 3 STEPS */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-8 py-10 sm:py-16 w-full text-center space-y-8">
-        <div className="space-y-2 max-w-2xl mx-auto">
-          <span className="text-xs font-black text-[#0084d6] dark:text-sky-400 tracking-wider">
-            {isArabic ? 'خطوات بسيطة وسريعة' : 'Simple & Fast Steps'}
-          </span>
-          <h2 className="text-2xl sm:text-4xl font-black text-[#0e1f38] dark:text-white">
-            {isArabic ? 'كيف تطلق متجرك وتبدأ البيع اليوم؟' : 'How to Launch Your Store Today?'}
-          </h2>
-          <p className="text-sm text-slate-600 dark:text-slate-300 font-medium">
-            {isArabic ? 'بدون تعقيدات تقنية أو الحاجة لخبرة برمجية، متجرك جاهز في ٣ دقائق فقط.' : 'No technical complexity or coding required, launch in 3 minutes.'}
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Step 1 */}
-          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all space-y-3 text-start group">
-            <div className="w-12 h-12 rounded-2xl bg-[#0084d6] text-white flex items-center justify-center font-black text-xl shadow-lg shadow-sky-600/25">
-              ١
-            </div>
-            <h3 className="text-lg font-black text-[#0e1f38] dark:text-white group-hover:text-[#0084d6] transition-colors">
-              {isArabic ? 'أنشئ متجرك في دقيقة' : 'Create Store in 1 Minute'}
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
-              {isArabic ? 'حدد اسم متجرك ونشاطك التجاري، ويتم إنشاء متجرك السحابي المستقل فوراً مع رابط خاص بك.' : 'Enter your store name and category, and get an instant cloud store with a custom link.'}
-            </p>
-          </div>
-
-          {/* Step 2 */}
-          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all space-y-3 text-start group">
-            <div className="w-12 h-12 rounded-2xl bg-[#0e1f38] dark:bg-slate-800 text-white flex items-center justify-center font-black text-xl shadow-lg shadow-slate-900/15">
-              ٢
-            </div>
-            <h3 className="text-lg font-black text-[#0e1f38] dark:text-white group-hover:text-[#0084d6] transition-colors">
-              {isArabic ? 'أضف منتجاتك بسهولة' : 'Add Products Easily'}
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
-              {isArabic ? 'ارفع صور منتجاتك، وحدد الأسعار والتصنيفات بمرونة كاملة من خلال لوحة تحكم مخصصة لكل تاجر.' : 'Upload photos, set prices and categories with flexible control via merchant portal.'}
-            </p>
-          </div>
-
-          {/* Step 3 */}
-          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all space-y-3 text-start group">
-            <div className="w-12 h-12 rounded-2xl bg-[#25d366] text-white flex items-center justify-center font-black text-xl shadow-lg shadow-emerald-500/25">
-              ٣
-            </div>
-            <h3 className="text-lg font-black text-[#0e1f38] dark:text-white group-hover:text-[#0084d6] transition-colors">
-              {isArabic ? 'استقبل الطلبات على واتساب' : 'Receive WhatsApp Orders'}
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
-              {isArabic ? 'شارك رابط متجرك مع زبائنك، والزبون يطلب بنقرة زر وتصلك تفاصيل الطلب بالكامل على واتسابك مباشرة.' : 'Share your link; customers order in 1 click and details arrive directly on your WhatsApp.'}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. WHY MERCHANTS LOVE US */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-8 py-8 sm:py-12 w-full space-y-8">
-        <div className="text-center space-y-2 max-w-2xl mx-auto">
-          <span className="text-xs font-black text-[#0084d6] dark:text-sky-400 tracking-wider">
-            {isArabic ? 'مزايا فريدة لنشاطك' : 'Exclusive Advantages'}
-          </span>
-          <h2 className="text-2xl sm:text-4xl font-black text-[#0e1f38] dark:text-white">
-            {isArabic ? 'مميزات تجعل متجرك في الصدارة' : 'Features That Put You Ahead'}
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-[#0084d6] transition-all space-y-2.5">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-[#25d366] flex items-center justify-center font-black text-lg">
-              💬
-            </div>
-            <h4 className="font-extrabold text-sm sm:text-base text-[#0e1f38] dark:text-white">
-              {isArabic ? 'طلب مباشر عبر واتساب' : 'Direct WhatsApp Orders'}
-            </h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
-              {isArabic ? 'بدون عمولات بنكية أو احتجاز لأموالك، الزبون يتواصل معك ويطلب بضغطة زر واحدة.' : 'No banking commissions or held funds; customers reach you directly.'}
-            </p>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-[#0084d6] transition-all space-y-2.5">
-            <div className="w-10 h-10 rounded-xl bg-[#f0f7ff] dark:bg-slate-800 text-[#0084d6] dark:text-sky-400 flex items-center justify-center font-black text-lg">
-              ⚡
-            </div>
-            <h4 className="font-extrabold text-sm sm:text-base text-[#0e1f38] dark:text-white">
-              {isArabic ? 'متجرك متاح أونلاين' : 'Your store, online'}
-            </h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
-              {isArabic ? 'متجرك ومنتجاتك في رابط واحد، يمكن للعملاء زيارته بدون تثبيت أي تطبيق.' : 'Your products in one link that customers can visit without installing an app.'}
-            </p>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-[#0084d6] transition-all space-y-2.5">
-            <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 flex items-center justify-center font-black text-lg">
-              🎨
-            </div>
-            <h4 className="font-extrabold text-sm sm:text-base text-[#0e1f38] dark:text-white">
-              {isArabic ? 'تخصيص كامل وتحكم مرن' : 'Full Customization'}
-            </h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
-              {isArabic ? 'لوحة تحكم سهلة تتيح لك تعديل الأسعار، إضافة المنتجات، وتغيير الشعار في أي لحظة.' : 'Intuitive portal lets you update prices, products and logos in seconds.'}
-            </p>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-[#0084d6] transition-all space-y-2.5">
-            <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center font-black text-lg">
-              📱
-            </div>
-            <h4 className="font-extrabold text-sm sm:text-base text-[#0e1f38] dark:text-white">
-              {isArabic ? 'واجهة موبايل استثنائية' : 'Exceptional Mobile UX'}
-            </h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
-              {isArabic ? 'تصميم سلس وممتع يشبه التطبيقات الأصلية لشراء أسرع ومعدل تحويل أعلى للزبائن.' : 'Native-like smooth experience for faster checkout and higher conversion.'}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* 6. LIVE CTA BANNER */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-8 py-8 sm:py-12 w-full">
-        <div className="p-8 sm:p-12 rounded-3xl bg-gradient-to-r from-[#0084d6] via-[#0074bd] to-[#0e1f38] text-white shadow-2xl shadow-sky-600/20 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
-          <div className="absolute -end-10 -top-10 w-60 h-60 rounded-full bg-white/10 blur-2xl pointer-events-none"></div>
-          <div className="space-y-2 text-start z-10 max-w-xl">
-            <span className="px-3 py-1 rounded-full bg-white/15 text-white font-extrabold text-xs inline-block">
-              {isArabic ? '🚀 انطلاقة فورية وبدون أي عمولات' : '🚀 Instant Launch with Zero Commissions'}
-            </span>
-            <h3 className="text-2xl sm:text-4xl font-black leading-tight">
-              {isArabic ? 'جاهز تبدأ متجرك وتزيد مبيعاتك اليوم؟' : 'Ready to Launch and Grow Your Sales?'}
-            </h3>
-            <p className="text-white/80 text-xs sm:text-sm font-medium">
-              {isArabic ? 'انضم لمئات التجار الذين يديرون تجارتهم باستقلالية وسرعة فائقة مع استلام فوري للطلبات على واتساب.' : 'Join hundreds of merchants running independent, fast cloud stores with instant WhatsApp orders.'}
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto z-10 shrink-0">
-            <button
-              onClick={currentUser ? onOpenDashboard : onOpenSetup}
-              className="w-full sm:w-auto px-7 py-4 rounded-2xl bg-white text-[#0084d6] hover:bg-sky-50 active:scale-95 font-black text-sm sm:text-base shadow-xl transition-all cursor-pointer"
-            >
-              {currentUser ? (isArabic ? '🏪 الانتقال للوحة التحكم' : 'Go to Dashboard') : `+ ${t('create_new_store')}`}
-            </button>
-            <button
-              onClick={currentUser ? onOpenDashboard : onOpenMerchantLogin}
-              className="w-full sm:w-auto px-6 py-4 rounded-2xl bg-white/15 hover:bg-white/20 active:scale-95 text-white font-black text-sm sm:text-base border border-white/20 transition-all cursor-pointer"
-            >
-              {currentUser ? (isArabic ? 'إدارة المتجر' : 'Manage Store') : `${t('merchant_portal')} ↗`}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* 7. FLOATING WHATSAPP BUTTON (Bottom Left Corner) */}
-      <div className={`fixed bottom-6 ${isArabic ? 'left-6' : 'right-6'} z-50`}>
         <a
-          href={`https://api.whatsapp.com/send?phone=${whatsappNumber}&text=${encodeURIComponent(isArabic ? 'مرحباً دعيدر للحلول البرمجية، أود الاستفسار عن خدمة إنشاء المتاجر الإلكترونية.' : 'Hello Daidar Solutions, I would like to inquire about My Store service.')}`}
+          href={whatsappHref}
           target="_blank"
           rel="noopener noreferrer"
-          className="w-14 h-14 rounded-full bg-[#25d366] hover:bg-[#20bd5a] text-white flex items-center justify-center shadow-xl shadow-emerald-500/30 hover:scale-110 active:scale-95 transition-all"
-          title={isArabic ? 'تواصل معنا عبر واتساب (+20 10 61532875)' : 'Contact us via WhatsApp (+20 10 61532875)'}
+          aria-label={
+            isArabic
+              ? 'تواصل معنا عبر واتساب للاستفسار عن إنشاء متجر إلكتروني'
+              : 'Contact us on WhatsApp to inquire about creating an online store'
+          }
+          title={isArabic ? 'استفسر عبر واتساب (+20 10 61532875)' : 'Ask via WhatsApp (+20 10 61532875)'}
+          className="w-14 h-14 rounded-full bg-[#25d366] hover:bg-[#1ebe5b] text-white flex items-center justify-center shadow-xl shadow-emerald-600/35 ring-2 ring-white dark:ring-slate-900 hover:scale-105 active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300"
         >
-          <svg className="w-7 h-7 fill-white" viewBox="0 0 24 24">
-            <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+          <svg className="w-7 h-7 fill-white" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
           </svg>
         </a>
       </div>
-
     </div>
   );
 };
