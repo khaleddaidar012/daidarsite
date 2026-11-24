@@ -479,8 +479,8 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
               {/* Short Clear Description */}
               <p className="text-sm sm:text-base lg:text-lg text-slate-600 dark:text-slate-300 font-medium leading-relaxed max-w-xl">
                 {isArabic
-                  ? 'اعرض منتجاتك بصور وأسعار وتصنيفات واضحة، واستقبل طلبات عملائك مباشرة عبر واتساب من رابط خاص بمتجرك — بتكلفة شهرية أقل من إيجار متجر حقيقي.'
-                  : 'Present your products with clear photos, prices, and categories, and receive customer orders directly via WhatsApp from your own store link — at a lower cost than renting a physical shop.'}
+                  ? 'اعرض منتجاتك بصور وأسعار وتصنيفات واضحة، واستقبل طلبات عملائك مباشرة على متجرك وتابعها من لوحة التحكم — بتكلفة شهرية أقل من إيجار متجر حقيقي.'
+                  : 'Present your products with clear photos, prices, and categories, and receive customer orders directly on your store dashboard — at a lower cost than renting a physical shop.'}
               </p>
 
               {/* Prominent Primary CTA (Login / Sign up) + Secondary Inquiry */}
@@ -530,7 +530,7 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
                   },
                   {
                     icon: CheckCircle2,
-                    label: isArabic ? 'طلبات مباشرة على واتساب' : 'Direct WhatsApp orders',
+                    label: isArabic ? 'استقبال الطلبات مباشرة على المتجر' : 'Direct orders on your store',
                   },
                   {
                     icon: CheckCircle2,
@@ -754,11 +754,11 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
                   : 'Customers browse products and place requests anytime from mobile without installing an app.',
               },
               {
-                Icon: MessageCircle,
-                title: isArabic ? 'طلبات مباشرة على واتساب' : 'Direct WhatsApp orders',
+                Icon: ShoppingBag,
+                title: isArabic ? 'طلبات مباشرة على المتجر' : 'Direct orders on your store',
                 detail: isArabic
-                  ? 'العميل يجهّز سلته ويرسل تفاصيل الطلب مباشرة على واتسابك بدون عمولات على المبيعات.'
-                  : 'Customers prepare their cart and send full order details directly to your WhatsApp with zero commission.',
+                  ? 'العميل يختار منتجاته ويسجّل طلبه مباشرة على متجرك، وتظهر لك كل تفاصيل الطلب وحالته في لوحة التحكم بدون عمولات على المبيعات.'
+                  : 'Customers select their products and place orders directly on your store, with full order details and status tracking in your dashboard and zero sales commission.',
               },
               {
                 Icon: SlidersHorizontal,
@@ -823,8 +823,8 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
                 bg: 'bg-[#25d366]',
                 title: isArabic ? 'شارك رابطك واستقبل الطلبات' : 'Share your link & receive orders',
                 desc: isArabic
-                  ? 'بعد تفعيل المتجر، شارك رابطك الخاص مع عملائك واستقبل تفاصيل طلباتهم مباشرة على واتساب.'
-                  : 'Once activated, share your store link with customers and receive order details directly on WhatsApp.',
+                  ? 'بعد تفعيل المتجر، شارك رابطك الخاص مع عملائك واستقبل طلباتهم مباشرة على متجرك وتابع حالتها بسهولة.'
+                  : 'Once activated, share your store link with customers, receive their orders directly on your store, and track every order status easily.',
               },
             ].map((step) => (
               <article
