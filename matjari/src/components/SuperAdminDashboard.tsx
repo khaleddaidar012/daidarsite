@@ -941,10 +941,12 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                             <div className="font-extrabold text-[#0e1f38] dark:text-white text-xs">
                               {m.subscription.plan_name || t('annual_plan')}
                             </div>
+                            {m.subscription.end_date && (
                             <div className="flex items-center gap-1.5 text-[11px] text-slate-600 dark:text-slate-200 font-medium">
                               <Calendar className="w-3 h-3 text-[#0084d6] dark:text-sky-400" />
                               <span>{t('expires_on')} {m.subscription.end_date}</span>
                             </div>
+                            )}
                             {isSubActive ? (
                               <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 block">{t('status_valid')}</span>
                             ) : (

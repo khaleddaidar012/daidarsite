@@ -64,7 +64,7 @@ async function test(){
  const linked=await hub.onRequest({request:request('hub','/api/hub/login','POST',{email:sharedEmail,password:'hub password 12345',link_identity:true},sCookie),env:hubEnv});await data(linked);const linkedCookie=cookie(linked);
  assert.equal((await data(await ec('hub','session',linkedCookie))).user.id,storeIdentity.id);assert.equal((await ec('hub','session',hCookie)).status,200);assert.equal((await data(await ec('hub','session',hCookie))).user,null);
  assert.equal((await hub.onRequest({request:request('hub','/api/hub/session','GET',undefined,linkedCookie),env:hubEnv})).status,200);
- const status=(await data(await ec('store','session',sCookie))).entitlements[0];assert.equal(status.resource_id,merchant.store.id);assert.equal(status.status,'awaiting_activation');
+ const status=(await data(await ec('store','session',sCookie))).entitlements[0];assert.equal(status.resource_id,merchant.store.id);assert.equal(status.status,'awaiting_activation');assert.equal(status.plan,'الباقة المجانية');assert.equal(status.starts_at,null);assert.equal(status.expires_at,null);
  const renew={operation_id:crypto.randomUUID(),system:'store',resource_id:merchant.store.id,action:'renew',months:1};
  assert.equal((await ec('store','admin/entitlements',sCookie,'POST',renew)).status,403);
  await data(await ec('store','admin/entitlements',ownerCookie,'POST',renew));
@@ -160,7 +160,14 @@ async function test(){
  const mountedCallback=await mountedStoreRoute.onRequest({request:request('hub',mountedCallbackUrl.pathname+mountedCallbackUrl.search,'GET',undefined,cookie(mountedLogin)+'; '+hubCookie),env:mountedStoreEnv});
  assert.equal(mountedCallback.status,303);assert.equal(mountedCallback.headers.get('location'),'https://hub.example/ar/hub/stores/?view=store_owner');
  assert.equal(navigation.safeHubReturn('/ar/hub/subscriptions'),'/ar/hub/subscriptions');
- for(const bad of ['https://evil.example','//evil.example','/ar/hub/%2f%2fevil','/ar/hub/../admin','/ar/hub/dashboard#x'])assert.equal(navigation.safeHubReturn(bad),null);
+ assert.equal(navigation.safeHubReturn('/ar/hub/stores/?view=store_owner&tab=subscription'),'/ar/hub/stores/?view=store_owner&tab=subscription');
+ assert.equal(navigation.safeHubReturn('/en/hub/stores/?view=store_owner&tab=subscription'),'/en/hub/stores/?view=store_owner&tab=subscription');
+ for(const bad of ['https://evil.example','//evil.example','/ar/hub/%2f%2fevil','/ar/hub/../admin','/ar/hub/dashboard#x','/ar/hub/stores/?view=store_owner&tab=evil'])assert.equal(navigation.safeHubReturn(bad),null);
+ const upgradeLogin=await mountedStoreRoute.onRequest({request:request('hub','/api/store/ecosystem/login?via=hub&return_to='+encodeURIComponent('/ar/hub/stores/?view=store_owner&tab=subscription')),env:mountedStoreEnv});
+ const upgradeAuthz=await rootRoute.onRequest({request:request('hub',new URL(upgradeLogin.headers.get('location')).pathname+new URL(upgradeLogin.headers.get('location')).search,'GET',undefined,hubCookie),env:hubEnv});
+ const upgradeCbUrl=new URL(upgradeAuthz.headers.get('location'));
+ const upgradeCb=await mountedStoreRoute.onRequest({request:request('hub',upgradeCbUrl.pathname+upgradeCbUrl.search,'GET',undefined,cookie(upgradeLogin)+'; '+hubCookie),env:mountedStoreEnv});
+ assert.equal(upgradeCb.status,303);assert.equal(upgradeCb.headers.get('location'),'https://hub.example/ar/hub/stores/?view=store_owner&tab=subscription');
  assert.equal(customerModel.serviceState('active',Date.now()+100000,Date.now()+200000),'pending');
  assert.equal(customerModel.serviceState('active',null,Date.now()-1),'expired');
  assert.equal(customerModel.serviceState('trial',Date.now()-1000,Date.now()+1000),'trial');

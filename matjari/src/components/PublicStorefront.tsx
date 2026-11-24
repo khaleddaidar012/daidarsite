@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ShoppingBag, Search, Phone, ArrowRight, Heart, Share2, Sparkles, Plus, Check, Moon, Sun, Globe } from 'lucide-react';
 import { Store, Product, CartItem } from '../types';
 import { Footer } from './Footer';
+import { UpgradeBanner } from './UpgradeBanner';
 import { api } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -13,6 +14,7 @@ interface PublicStorefrontProps {
   onAddToCart: (product: Product) => void;
   onOpenCart: () => void;
   onBackToDashboard: () => void;
+  onUpgradeClick?: () => void;
   previewMode?: boolean;
 }
 
@@ -23,6 +25,7 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
   onAddToCart,
   onOpenCart,
   onBackToDashboard,
+  onUpgradeClick,
   previewMode = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -44,6 +47,19 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
   const displayPhone = phone.startsWith('+') || phone.startsWith('0') ? phone : `+${phone}`;
   const storeStatus = store?.effective_status || (store?.is_active === 1 ? 'active' : 'awaiting_activation');
   const canOrder = !!store && ['active', 'trial'].includes(storeStatus);
+  const needsUpgrade = !!store && (typeof store.needs_upgrade === 'boolean' ? store.needs_upgrade : (store.is_paid_subscription === false || !canOrder));
+  const handleUpgradeClick = () => {
+    if (onUpgradeClick) {
+      onUpgradeClick();
+      return;
+    }
+    window.location.assign(`/${isArabic ? 'ar' : 'en'}/hub/stores/?view=store_owner&tab=subscription`);
+  };
+  const upgradeSubtitle = !canOrder
+    ? (storeStatus === 'expired'
+      ? (isArabic ? 'الاشتراك منتهي؛ المتجر لا يستقبل طلبات حاليًا' : 'Subscription expired; this store is not accepting orders')
+      : (isArabic ? 'هذا المتجر على الباقة المجانية وغير مفعّل لاستقبال الطلبات حاليًا' : 'This store is on the Free Plan and cannot receive orders yet'))
+    : (isArabic ? 'هذا المتجر يعمل حاليًا على الباقة المجانية' : 'This store is currently on the Free Plan');
   const defaultLogo = `${import.meta.env.BASE_URL}store-mark.svg`;
   const logoSrc = store?.logo_data || defaultLogo;
 
@@ -70,12 +86,15 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
       {/* 1. TOP PREVIEW BANNER & NAVBAR */}
       <header className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 sticky top-0 z-30 transition-colors shadow-2xs">
         
-        {/* Inactive Store Preview Bar */}
-        {store && !canOrder && (
-          <div className="bg-amber-500 text-white text-xs py-2 px-3 sm:px-6 font-black text-center flex items-center justify-center gap-2">
-            <span>⚠️</span>
-            <span>{storeStatus === 'expired' ? (isArabic ? 'الاشتراك منتهي؛ المتجر لا يستقبل طلبات حاليًا' : 'Subscription expired; this store is not accepting orders') : (isArabic ? 'هذا المتجر غير مفعّل حاليًا ولا يستقبل طلبات' : 'This store is not currently active and cannot receive orders')}</span>
-          </div>
+        {/* Free / Unsubscribed Upgrade Banner */}
+        {store && needsUpgrade && (
+          <UpgradeBanner
+            compact
+            isArabic={isArabic}
+            onAction={handleUpgradeClick}
+            subtitle={upgradeSubtitle}
+            actionLabel={isArabic ? 'الاشتراك والترقية' : 'Subscribe & upgrade'}
+          />
         )}
 
         {previewMode && <div className="bg-[#0e1f38] dark:bg-slate-900 text-sky-200 text-xs py-2 px-3 sm:px-6 border-b border-sky-950 dark:border-slate-800">

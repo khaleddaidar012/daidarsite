@@ -1,7 +1,7 @@
 import { currentActor, publicUser, newSession, passwordHash, passwordMatches, digest, token, cookie, rateLimit, type Actor } from '../../lib/auth';
 import { type EcoEnv, type EcoDB } from '../../../shared/ecosystem';
 import { syncStoreResource } from '../../lib/ecosystem';
-import { displayStorePlan, effectiveStoreStatus, storeIsAvailable } from '../../lib/store-status';
+import { displayStorePlan, effectiveStoreStatus, hasActivePaidSubscription, needsStoreUpgrade, serializeStoreSubscription, storeIsAvailable } from '../../lib/store-status';
 import { domainRoutes, type DomainEnv } from '../../lib/domains';
 import {shortLinkRoutes} from '../../lib/short-links';
 import {storePlanName} from '../../lib/subscription-plans';
@@ -96,7 +96,7 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       await db.batch([
         db.prepare("INSERT INTO stores(id,name,activity_type,whatsapp_number,is_active) SELECT ?,?,?,?,0 WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND store_id IS NULL)").bind(id,b.name.trim(),String(b.activity_type||'عام').slice(0,100),b.whatsapp_number,actor.id),
         db.prepare('UPDATE users SET store_id=? WHERE id=? AND store_id IS NULL').bind(id,actor.id),
-        db.prepare("INSERT INTO subscriptions(id,store_id,plan_name,status,price) SELECT ?,?,'اشتراك مجاني','awaiting_activation',0 WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND store_id=?)").bind(crypto.randomUUID(),id,actor.id,id)
+        db.prepare("INSERT INTO subscriptions(id,store_id,plan_name,status,start_date,end_date,price) SELECT ?,?,'الباقة المجانية','awaiting_activation',date('now'),date('now'),0 WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND store_id=?)").bind(crypto.randomUUID(),id,actor.id,id)
       ]);
       return new Response(JSON.stringify({success:true}),{headers});
     }
@@ -134,8 +134,7 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       const store = actor.store_id ? await db.prepare('SELECT * FROM stores WHERE id=?').bind(actor.store_id).first() : null;
       const subscription = actor.store_id ? await db.prepare('SELECT * FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(actor.store_id).first() : null;
       const userActive = actor.store_id ? await db.prepare('SELECT is_active FROM users WHERE id=?').bind(actor.id).first() : null;
-      const effective_status = store ? effectiveStoreStatus(userActive?.is_active, store.is_active, subscription) : null;
-      return new Response(JSON.stringify({ success: true, user: publicUser(actor), store: store ? { ...store, effective_status } : null, subscription: subscription ? { ...subscription, plan_name: displayStorePlan(subscription) } : null }), { headers });
+      return new Response(JSON.stringify({ success: true, user: publicUser(actor), store: store ? withStoreStatus(store, userActive?.is_active, subscription) : null, subscription: serializeStoreSubscription(subscription) }), { headers });
     }
     if (path === 'auth/logout' && method === 'POST') {
       await db.prepare('DELETE FROM auth_sessions WHERE token_hash=?').bind(await digest(token(request))).run();
@@ -329,12 +328,11 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
           subscription = await db.prepare('SELECT * FROM subscriptions WHERE store_id = ? ORDER BY created_at DESC LIMIT 1').bind((user as any).store_id).first();
         }
 
-        const effective_status = store ? effectiveStoreStatus(user.is_active,store.is_active,subscription) : null;
         return new Response(JSON.stringify({
           success: true,
           user: publicUser(user),
-          store: store ? { ...store, effective_status } : null,
-          subscription: subscription ? { ...subscription, plan_name: displayStorePlan(subscription) } : null,
+          store: store ? withStoreStatus(store, user.is_active, subscription) : null,
+          subscription: serializeStoreSubscription(subscription),
         }), { headers: { ...headers, 'Set-Cookie': await newSession(db, user, env, request, body.link_identity===true) } });
       }
     }
@@ -389,7 +387,7 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
 
         db.prepare(`
           INSERT INTO subscriptions (id, store_id, plan_name, status, start_date, end_date, price)
-          VALUES (?, ?, 'اشتراك مجاني', 'active', date('now'), date('now', '+12 month'), 0)
+          VALUES (?, ?, 'الباقة المجانية', 'awaiting_activation', date('now'), date('now'), 0)
         `).bind(subId, storeId)]);
 
         const createdStore = await db.prepare('SELECT * FROM stores WHERE id = ?').bind(storeId).first();
@@ -399,8 +397,8 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
         return new Response(JSON.stringify({
           success: true,
           user: createdUser,
-          store: createdStore,
-          subscription: createdSub,
+          store: createdStore ? withStoreStatus(createdStore, (createdUser as any)?.is_active, createdSub) : null,
+          subscription: serializeStoreSubscription(createdSub),
         }), { headers: { ...headers, 'Set-Cookie': await newSession(db, { ...createdUser as any, password: hashedPassword }, env, request) } });
       }
     }
@@ -414,11 +412,10 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
           const user = await db.prepare('SELECT id, username, role, is_active FROM users WHERE store_id = ?').bind((store as any).id).first();
           const sub = await db.prepare('SELECT * FROM subscriptions WHERE store_id = ? ORDER BY created_at DESC LIMIT 1').bind((store as any).id).first();
           const pCount = await db.prepare('SELECT COUNT(*) as c FROM products WHERE store_id = ?').bind((store as any).id).first();
-          const effective_status = effectiveStoreStatus(user?.is_active, (store as any).is_active, sub);
           results.push({
-            store: { ...(store as any), effective_status },
+            store: withStoreStatus(store as any, user?.is_active, sub),
             user: user || { id: '', username: 'غير مرتبط', is_active: (store as any).is_active },
-            subscription: sub ? { ...(sub as any), plan_name: displayStorePlan(sub as any) } : { status: 'unsubscribed', end_date: 'غير محدد', plan_name: 'غير محدد' },
+            subscription: sub ? serializeStoreSubscription(sub as any) : { status: 'unsubscribed', start_date: null, end_date: null, plan_name: displayStorePlan(null), is_paid: false, plan_tier: 'free' },
             productCount: (pCount as any)?.c || 0,
           });
         }
@@ -459,7 +456,7 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
 
         db.prepare(`
           INSERT INTO subscriptions (id, store_id, plan_name, status, start_date, end_date, price)
-          VALUES (?, ?, 'بانتظار التفعيل', 'awaiting_activation', date('now'), date('now'), 0)
+          VALUES (?, ?, 'الباقة المجانية', 'awaiting_activation', date('now'), date('now'), 0)
         `).bind(subId, storeId)]);
 
         const createdStore = await db.prepare('SELECT * FROM stores WHERE id = ?').bind(storeId).first();
@@ -469,9 +466,9 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
         return new Response(JSON.stringify({
           success: true,
           merchant: {
-            store: createdStore,
+            store: createdStore ? withStoreStatus(createdStore, (createdUser as any)?.is_active, createdSub) : null,
             user: createdUser,
-            subscription: createdSub,
+            subscription: serializeStoreSubscription(createdSub),
             productCount: 0,
           }
         }), { headers });
@@ -507,7 +504,7 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
         if (nextState) {
           const subscription = await db.prepare('SELECT * FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(storeId).first() as any;
           if (subscription?.status === 'awaiting_activation' && Number(subscription.price) === 0) {
-            await db.prepare("UPDATE subscriptions SET status='active',plan_name='اشتراك مجاني',start_date=date('now'),end_date=date('now','+1 year'),updated_at=datetime('now') WHERE id=?").bind(subscription.id).run();
+            await db.prepare("UPDATE subscriptions SET status='active',plan_name='الباقة المجانية',start_date=date('now'),end_date=date('now','+1 year'),updated_at=datetime('now') WHERE id=?").bind(subscription.id).run();
           } else if (!storeIsAvailable(effectiveStoreStatus(1, 1, subscription))) {
             return new Response(JSON.stringify({ success: false, error: 'لا يمكن تفعيل المتجر قبل تفعيل أو تجديد اشتراكه.' }), { status: 409, headers });
           }
@@ -581,11 +578,13 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
     if (path === 'store') {
       if (method === 'GET') {
         const requestedId = url.searchParams.get('id');
-        const record = requestedId ? await getStoreAccess(db, requestedId) : null;
-        const fallback = !requestedId ? await db.prepare(`SELECT s.* FROM stores s WHERE s.is_active=1 AND NOT EXISTS(SELECT 1 FROM users u WHERE u.store_id=s.id AND u.is_active=0) AND EXISTS(SELECT 1 FROM subscriptions b WHERE b.id=(SELECT x.id FROM subscriptions x WHERE x.store_id=s.id ORDER BY x.created_at DESC LIMIT 1) AND b.status IN ('active','trial') AND b.start_date<=date('now') AND b.end_date>=date('now') LIMIT 1`).first() : null;
-        const store = requestedId ? record?.store : fallback;
+        let record = requestedId ? await getStoreAccess(db, requestedId) : null;
+        if (!requestedId) {
+          const fallback = await db.prepare(`SELECT s.id FROM stores s WHERE s.is_active=1 AND NOT EXISTS(SELECT 1 FROM users u WHERE u.store_id=s.id AND u.is_active=0) AND EXISTS(SELECT 1 FROM subscriptions b WHERE b.id=(SELECT x.id FROM subscriptions x WHERE x.store_id=s.id ORDER BY x.created_at DESC LIMIT 1) AND b.status IN ('active','trial') AND b.start_date<=date('now') AND b.end_date>=date('now')) LIMIT 1`).first() as { id?: string } | null;
+          if (fallback?.id) record = await getStoreAccess(db, fallback.id);
+        }
         if (requestedId && record && !storeIsAvailable(record.status) && actor?.role !== 'super_admin' && actor?.store_id !== requestedId) return fail('المتجر غير متاح حاليًا',404);
-        return new Response(JSON.stringify({ success: true, store: store ? { ...store, effective_status: requestedId ? record?.status : 'active' } : null }), { headers });
+        return new Response(JSON.stringify({ success: true, store: record?.store ? withStoreStatus(record.store, record.user?.is_active ?? 1, record.subscription) : null }), { headers });
       }
 
       if (method === 'POST' || method === 'PUT') {
@@ -732,6 +731,17 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
     return new Response(JSON.stringify({ success: false, error: message }), { status: missingRenewalTable?503:status, headers });
   }
 };
+
+function withStoreStatus(store: any, userActive: number | boolean | null | undefined, subscription: any, now = Date.now()) {
+  const effective_status = effectiveStoreStatus(userActive, store.is_active, subscription, now);
+  return {
+    ...store,
+    effective_status,
+    is_paid_subscription: hasActivePaidSubscription(userActive, store.is_active, subscription, now),
+    needs_upgrade: needsStoreUpgrade(userActive, store.is_active, subscription, now),
+    plan_name: displayStorePlan(subscription),
+  };
+}
 
 async function getStoreAccess(db:any,storeId:string,now=Date.now()){
   const store=await db.prepare('SELECT * FROM stores WHERE id=?').bind(storeId).first() as any;

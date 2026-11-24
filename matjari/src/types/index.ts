@@ -18,9 +18,11 @@ export interface Subscription {
   store_id: string;
   plan_name: string;
   status: SubscriptionStatus;
-  start_date: string;
-  end_date: string;
+  start_date: string | null;
+  end_date: string | null;
   price: number;
+  is_paid?: boolean;
+  plan_tier?: 'free' | 'paid';
   notes?: string;
   created_at?: string;
   updated_at?: string;
@@ -71,6 +73,9 @@ export interface Store {
   logo_data?: string;
   is_active: number;
   effective_status?: string;
+  is_paid_subscription?: boolean;
+  needs_upgrade?: boolean;
+  plan_name?: string;
   created_at?: string;
   updated_at?: string;
 }

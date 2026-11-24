@@ -24,6 +24,7 @@ export const App: React.FC = () => {
   const [currentStore, setCurrentStore] = useState<Store | null>(null);
   const [currentSubscription, setCurrentSubscription] = useState<Subscription | null>(null);
   const [view, setView] = useState<AppView>('landing');
+  const [storeOwnerTab, setStoreOwnerTab] = useState<'overview' | 'subscription'>('overview');
   const [allStores, setAllStores] = useState<Store[]>([]);
 
   // Public Storefront State
@@ -48,33 +49,41 @@ export const App: React.FC = () => {
   },[view,storefrontStore?.name,storefrontStore?.logo_data]);
 
   // Helper to safely navigate and keep URL synchronized with browser history
-  const navigateTo = (newView: AppView, params?: { storeId?: string }) => {
+  const navigateTo = (newView: AppView, params?: { storeId?: string; tab?: 'overview' | 'subscription' }) => {
     setView(newView);
     const url = new URL(window.location.href);
 
     if (newView === 'storefront' && params?.storeId) {
       url.searchParams.set('view', 'storefront');
       url.searchParams.set('store_id', params.storeId);
+      url.searchParams.delete('tab');
       window.history.pushState({}, '', url.toString());
     } else if (newView === 'merchant_login') {
       url.searchParams.set('view', 'merchant_login');
       url.searchParams.delete('store_id');
+      if (params?.tab === 'subscription') url.searchParams.set('tab', 'subscription');
+      else url.searchParams.delete('tab');
       window.history.pushState({}, '', url.toString());
     } else if (newView === 'landing') {
       url.searchParams.set('view', 'landing');
       url.searchParams.delete('store_id');
+      url.searchParams.delete('tab');
       window.history.pushState({}, '', url.toString());
     } else if (newView === 'explore_stores') {
       url.searchParams.set('view', 'explore_stores');
       url.searchParams.delete('store_id');
+      url.searchParams.delete('tab');
       window.history.pushState({}, '', url.toString());
     } else if (newView === 'store_owner') {
       url.searchParams.set('view', 'store_owner');
       url.searchParams.delete('store_id');
+      if (params?.tab === 'subscription') url.searchParams.set('tab', 'subscription');
+      else url.searchParams.delete('tab');
       window.history.pushState({}, '', url.toString());
     } else if (newView === 'super_admin') {
       url.searchParams.set('view', 'super_admin');
       url.searchParams.delete('store_id');
+      url.searchParams.delete('tab');
       window.history.pushState({}, '', url.toString());
     } else {
       url.search = '';
@@ -115,6 +124,8 @@ export const App: React.FC = () => {
         const params = new URLSearchParams(window.location.search);
         const urlView = params.get('view');
         const urlStoreId = params.get('store_id');
+        const urlTab = params.get('tab') === 'subscription' ? 'subscription' : 'overview';
+        setStoreOwnerTab(urlTab);
 
         // Fetch all stores for explore/showcase
         try {
@@ -183,7 +194,18 @@ export const App: React.FC = () => {
 
         // 3. Direct Store Owner Dashboard (?view=store_owner)
         if (urlView === 'store_owner') {
-          setView(session?.user.role === 'super_admin' ? 'super_admin' : session ? 'store_owner' : 'merchant_login');
+          if (session?.user.role === 'super_admin') {
+            setView('super_admin');
+          } else if (session) {
+            setView('store_owner');
+          } else if (integratedWithHub) {
+            const lang = window.location.pathname.startsWith('/en/') ? 'en' : 'ar';
+            const returnTo = `/${lang}/hub/stores/?view=store_owner${urlTab === 'subscription' ? '&tab=subscription' : ''}`;
+            window.location.assign(`/api/store/ecosystem/login?via=hub&return_to=${encodeURIComponent(returnTo)}`);
+            return;
+          } else {
+            setView('merchant_login');
+          }
           setIsLoading(false);
           return;
         }
@@ -221,8 +243,33 @@ export const App: React.FC = () => {
     setCurrentUser(user);
     setCurrentStore(store);
     setCurrentSubscription(subscription);
-    if(new URLSearchParams(window.location.search).has('ecosystem_resume')){window.location.assign('/api/store/ecosystem/continue');return}
-    navigateTo(user.role === 'super_admin' ? 'super_admin' : 'store_owner');
+    const params = new URLSearchParams(window.location.search);
+    if(params.has('ecosystem_resume')){window.location.assign('/api/store/ecosystem/continue');return}
+    const desiredTab = params.get('tab') === 'subscription' ? 'subscription' : storeOwnerTab;
+    setStoreOwnerTab(desiredTab);
+    navigateTo(user.role === 'super_admin' ? 'super_admin' : 'store_owner', user.role === 'super_admin' ? undefined : { tab: desiredTab });
+  };
+
+  const handleStorefrontUpgrade = () => {
+    const lang = isArabic ? 'ar' : 'en';
+    const targetPath = `/${lang}/hub/stores/?view=store_owner&tab=subscription`;
+    const host = window.location.hostname;
+    const isPrimaryHost = ['daidarsoluations.com', 'www.daidarsoluations.com', 'daidarsite2.pages.dev', 'localhost', '127.0.0.1'].includes(host) || host.endsWith('.daidarsite2.pages.dev') || host.endsWith('.pages.dev');
+    if (!isPrimaryHost) {
+      window.location.assign(`https://daidarsoluations.com${targetPath}`);
+      return;
+    }
+    if (currentUser?.role === 'merchant') {
+      setStoreOwnerTab('subscription');
+      navigateTo('store_owner', { tab: 'subscription' });
+      return;
+    }
+    if (integratedWithHub) {
+      window.location.assign(targetPath);
+      return;
+    }
+    setStoreOwnerTab('subscription');
+    navigateTo(currentUser ? 'store_owner' : 'merchant_login', { tab: 'subscription' });
   };
 
   // Handle Logout
@@ -326,6 +373,7 @@ export const App: React.FC = () => {
           cart={cart}
           onAddToCart={handleAddToCart}
           onOpenCart={() => setIsCartOpen(true)}
+          onUpgradeClick={handleStorefrontUpgrade}
           onBackToDashboard={() => {
             // Clean up the URL when returning from storefront
             if (currentUser?.role === 'super_admin') {
@@ -368,6 +416,7 @@ export const App: React.FC = () => {
         user={currentUser}
         initialStore={currentStore}
         subscription={currentSubscription}
+        initialTab={storeOwnerTab}
         onLogout={handleStoreOwnerLogout}
         onPreviewStore={handlePreviewStore}
         onBackToHome={() => navigateTo('landing')}

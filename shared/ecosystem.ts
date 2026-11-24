@@ -145,7 +145,8 @@ export async function ecosystem(request:Request,e:EcoEnv,adapter:EcoAdapter):Pro
       let id:string;
       try{id=await adapter.ensureLocal(identity)}catch(error:any){if(error.status!==409)throw error;return redirect(allowed[client]+(client==='store'?storeLocation(sameSite,'?view=merchant_login&ecosystem_link=1'):'/ar/hub?ecosystem_link=1'),[await familyCookie(e,identity.id,identity.family),ecoCookie('__Host-eco_state','',0),ecoCookie('__Host-eco_pkce','',0)])}
       await adapter.sync(identity,id);
-      const destination=client==='hub'?safeHubReturn(ecoRead(request,'__Host-eco_return')):null;
+      const rawReturn=safeHubReturn(ecoRead(request,'__Host-eco_return'));
+      const destination=client==='hub'?rawReturn:(client==='store'&&sameSite&&rawReturn&&/^\/(ar|en)\/hub\/stores/.test(rawReturn)?rawReturn:null);
       return redirect(allowed[client]+(destination||homepage(client,sameSite)),[await familyCookie(e,identity.id,identity.family),ecoCookie('__Host-eco_state','',0),ecoCookie('__Host-eco_pkce','',0),ecoCookie('__Host-eco_return','',0)]);
     }
     if(path==='google'&&request.method==='GET'){

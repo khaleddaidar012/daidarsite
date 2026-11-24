@@ -1,6 +1,6 @@
 import type {EcoEnv,Identity} from './ecosystem';
-import {displayStorePlan,effectiveStoreStatus} from '../matjari/lib/store-status';
-export type ServiceState='active'|'trial'|'pending'|'expired'|'cancelled'|'suspended';
+import {displayStorePlan,effectiveStoreStatus,isPaidStoreSubscription,needsStoreUpgrade} from '../matjari/lib/store-status';
+export type ServiceState='active'|'trial'|'pending'|'expired'|'cancelled'|'suspended'|'free';
 export function serviceState(status:string,start:number|null,end:number|null,now=Date.now()):ServiceState {
   if(start!==null&&!Number.isFinite(start)||end!==null&&!Number.isFinite(end))return 'pending';
   if(['cancelled','suspended'].includes(status))return status as ServiceState;
@@ -20,14 +20,17 @@ export async function customerOverview(env:EcoEnv,user:Identity){
       const row=await env.ECOSYSTEM_STORE_DB.prepare('SELECT s.id,s.name,s.is_active,u.is_active AS user_active FROM users u JOIN stores s ON s.id=u.store_id WHERE u.id=?').bind(link.local_id).first();
       if(!row)continue;
       const sub=await env.ECOSYSTEM_STORE_DB.prepare('SELECT id,plan_name,status,start_date,end_date,price,notes FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(row.id).first();
-      const start=sub?Date.parse(sub.start_date+'T00:00:00Z'):null,end=sub?Date.parse(sub.end_date+'T23:59:59.999Z'):null;
+      const paid=isPaidStoreSubscription(sub);
+      const rawStart=sub?.start_date?Date.parse(sub.start_date+'T00:00:00Z'):null,rawEnd=sub?.end_date?Date.parse(sub.end_date+'T23:59:59.999Z'):null;
+      const start=paid?rawStart:null,end=paid?rawEnd:null;
       const effectiveStatus=effectiveStoreStatus(row.user_active,row.is_active,sub);
-      const state=serviceState(effectiveStatus,start,end);
+      const state=serviceState(effectiveStatus,rawStart,rawEnd);
+      const displayState=!paid&&(state==='active'||state==='trial')?'free':state;
       const preview=new URL(storePath,storeOrigin);preview.hostname='daidarsite2.pages.dev';preview.search=new URLSearchParams({view:'storefront',store_id:row.id}).toString();
       let previewUrl=preview.toString();
       const connected=await env.ECOSYSTEM_STORE_DB.prepare("SELECT domain FROM store_domain_links WHERE store_id=? AND status='active' UNION ALL SELECT domain FROM domain_requests WHERE store_id=? AND status='active' LIMIT 1").bind(row.id,row.id).first();
       if(connected)previewUrl='https://'+connected.domain+'/';
-      services.push({id:row.id,system:'store',title:row.name,plan:displayStorePlan(sub),status:state,start,end,can_access:['active','trial'].includes(state),preview_url:previewUrl});
+      services.push({id:row.id,system:'store',title:row.name,plan:displayStorePlan(sub),status:displayState,start,end,is_paid:paid,needs_upgrade:needsStoreUpgrade(row.user_active,row.is_active,sub),can_access:['active','trial'].includes(state),preview_url:previewUrl});
     }
     if(link.system==='hub'){
       if(!env.ECOSYSTEM_HUB_DB){unavailable.push('hub');continue}
