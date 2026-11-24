@@ -73,8 +73,14 @@ async function test(){
  assert.equal((await call('subscription-requests','POST',{features:['main_store'],proof:receipt},c2)).status,201);
  const adminHash=await auth.passwordHash('Owner secure password');sqlite.prepare("INSERT INTO users(id,username,password,role) VALUES('owner','owner',?,'super_admin')").run(adminHash);
  const ar=await call('auth/login','POST',{username:'owner',password:'Owner secure password'});await data(ar);const ac=session(ar);
- const created=await data(await call('admin/merchants','POST',{store_name:'New employee store',activity_type:'عام',whatsapp_number:'01000000000',username:'employee-inactive',password:'eight123',price:1200,duration_months:12,is_active:1},ac));
- assert.equal(created.merchant.store.is_active,0);assert.equal(created.merchant.user.is_active,1);assert.equal(created.merchant.subscription.status,'awaiting_activation');assert.equal(created.merchant.subscription.price,0);assert.equal(created.merchant.subscription.start_date,created.merchant.subscription.end_date);
+ assert.equal((await call('admin/merchants','POST',{store_name:'Forbidden',activity_type:'عام',whatsapp_number:'01000000000',username:'nope-user',password:'eight123'},c1)).status,403);
+ assert.equal((await call('admin/merchants','POST',{store_name:'Missing creds',activity_type:'عام',whatsapp_number:'01000000000'},ac)).status,400);
+ assert.equal((await call('admin/merchants','POST',{store_name:'Short pass',activity_type:'عام',whatsapp_number:'01000000000',username:'short-pass-user',password:'1234567'},ac)).status,400);
+ const created=await data(await call('admin/merchants','POST',{store_name:'New employee store',activity_type:'',whatsapp_number:'01000000000',username:'employee-inactive',password:'eight123',price:1200,duration_months:12,is_active:1},ac));
+ assert.equal(created.merchant.store.is_active,0);assert.equal(created.merchant.store.activity_type,'تجارة عامة');assert.equal(created.merchant.user.is_active,1);assert.equal(created.merchant.subscription.status,'awaiting_activation');assert.equal(created.merchant.subscription.price,0);assert.equal(created.merchant.subscription.start_date,null);assert.equal(created.merchant.subscription.end_date,null);
+ assert.equal((await call('admin/merchants','POST',{store_name:'Dup store',activity_type:'عام',whatsapp_number:'01000000000',username:' employee-inactive ',password:'eight123'},ac)).status,400);
+ const superAdminSrc=fs.readFileSync('matjari/src/components/SuperAdminDashboard.tsx','utf8');
+ for(const fieldId of ['admin-create-store-name','admin-create-activity-type','admin-create-whatsapp','admin-create-username','admin-create-password'])assert.ok(superAdminSrc.includes(fieldId),'Missing create-store field: '+fieldId);
  const inactiveLogin=await call('auth/login','POST',{username:'employee-inactive',password:'eight123'});await data(inactiveLogin);const inactiveCookie=session(inactiveLogin);
  assert.equal((await call('store?id='+created.merchant.store.id)).status,404);assert.equal((await call('auth/activate-free','POST',{},inactiveCookie)).status,403);
  sqlite.prepare("INSERT INTO employee_store_renewal_requests(id,store_id,employee_id,employee_name,employee_email,months,proof_mime,proof_base64,status) VALUES(?,?,?,?,?,3,'image/png','iVBORw0KGgo=','pending')").run('initial-subscription',created.merchant.store.id,'employee-test','موظف','employee@example.com');

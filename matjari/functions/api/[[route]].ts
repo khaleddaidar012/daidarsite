@@ -433,9 +433,16 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
           password,
         } = body;
 
-        if (typeof username !== 'string' || !username.trim() || username.length > 80 || typeof password !== 'string' || password.length < 8 || password.length > 256 || !store_name || !activity_type || !whatsapp_number) return fail('راجع بيانات التاجر وكلمة المرور (٨ أحرف على الأقل)', 400);
+        const cleanStoreName = typeof store_name === 'string' ? store_name.trim() : '';
+        const cleanActivityType = typeof activity_type === 'string' && activity_type.trim() ? activity_type.trim() : 'تجارة عامة';
+        const cleanWhatsapp = typeof whatsapp_number === 'string' ? whatsapp_number.trim() : '';
+        const cleanUsername = typeof username === 'string' ? username.trim() : '';
+
+        if (!cleanStoreName || cleanStoreName.length > 160 || cleanActivityType.length > 100 || !cleanWhatsapp || cleanWhatsapp.length > 30 || !cleanUsername || cleanUsername.length > 80 || typeof password !== 'string' || password.length < 8 || password.length > 256) {
+          return fail('راجع بيانات المتجر واسم المستخدم وكلمة المرور (٨ أحرف على الأقل)', 400);
+        }
         const hashedPassword = await passwordHash(password);
-        const existingUser = await db.prepare('SELECT id FROM users WHERE username = ?').bind(username).first();
+        const existingUser = await db.prepare('SELECT id FROM users WHERE username = ?').bind(cleanUsername).first();
         if (existingUser) {
           return new Response(JSON.stringify({ success: false, error: 'اسم المستخدم محجوز بالفعل' }), { status: 400, headers });
         }
@@ -447,12 +454,12 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
         await db.batch([db.prepare(`
           INSERT INTO stores (id, name, activity_type, whatsapp_number, currency, bio, is_active)
           VALUES (?, ?, ?, ?, ?, '', 0)
-        `).bind(storeId, store_name, activity_type, whatsapp_number, currency),
+        `).bind(storeId, cleanStoreName, cleanActivityType, cleanWhatsapp, currency),
 
         db.prepare(`
           INSERT INTO users (id, username, password, role, store_id, is_active)
           VALUES (?, ?, ?, 'merchant', ?, 1)
-        `).bind(userId, username.trim(), hashedPassword, storeId),
+        `).bind(userId, cleanUsername, hashedPassword, storeId),
 
         db.prepare(`
           INSERT INTO subscriptions (id, store_id, plan_name, status, start_date, end_date, price)

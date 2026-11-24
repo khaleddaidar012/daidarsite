@@ -36,7 +36,9 @@ import {
   X,
   MessageSquare,
   Trash2,
-  Compass
+  Compass,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
@@ -99,6 +101,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   const [newWhatsapp, setNewWhatsapp] = useState('');
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [createModalError, setCreateModalError] = useState('');
+  useEffect(() => { if (isCreateModalOpen) setCreateModalError(''); }, [isCreateModalOpen]);
 
   const logoBase=typeof window==='undefined'?'/':new URL('.',window.location.href).pathname;
   const logoSrc = embedded?'/icon.png':isDark
@@ -156,8 +161,34 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
 
   const handleCreateMerchant = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStoreName.trim() || !newUsername.trim() || !newPassword.trim() || !newWhatsapp.trim()) {
-      setMessage({ type: 'error', text: isArabic ? 'يرجى ملء جميع الحقول المطلوبة' : 'Please fill all required fields' });
+    setCreateModalError('');
+
+    const missingFields: string[] = [];
+    if (!newStoreName.trim()) missingFields.push(isArabic ? 'اسم المتجر' : 'Store name');
+    if (!newWhatsapp.trim()) missingFields.push(isArabic ? 'رقم الواتساب' : 'WhatsApp number');
+    if (!newUsername.trim()) missingFields.push(isArabic ? 'اسم المستخدم' : 'Username');
+    if (!newPassword) missingFields.push(isArabic ? 'كلمة المرور' : 'Password');
+
+    if (missingFields.length > 0) {
+      setCreateModalError(
+        isArabic
+          ? `يرجى ملء الحقول المطلوبة: ${missingFields.join('، ')}`
+          : `Please fill in the required fields: ${missingFields.join(', ')}`
+      );
+      return;
+    }
+
+    if (newUsername.trim().length > 80) {
+      setCreateModalError(
+        isArabic ? 'اسم المستخدم يجب ألا يتجاوز ٨٠ حرفًا.' : 'Username must be 80 characters or fewer.'
+      );
+      return;
+    }
+
+    if (newPassword.length < 8 || newPassword.length > 256) {
+      setCreateModalError(
+        isArabic ? 'كلمة المرور يجب أن تكون ٨ أحرف على الأقل.' : 'Password must be at least 8 characters long.'
+      );
       return;
     }
 
@@ -169,19 +200,21 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         activity_type: newActivityType.trim() || (isArabic ? 'تجارة عامة' : 'General Commerce'),
         whatsapp_number: newWhatsapp.trim(),
         username: newUsername.trim(),
-        password: newPassword.trim(),
+        password: newPassword,
       });
 
-      setMessage({ type: 'success', text: isArabic ? `تم إنشاء حساب متجر «${newStoreName}» بنجاح!` : `Store account "${newStoreName}" created successfully!` });
+      setMessage({ type: 'success', text: isArabic ? `تم إنشاء حساب متجر «${newStoreName.trim()}» بنجاح!` : `Store account "${newStoreName.trim()}" created successfully!` });
       setIsCreateModalOpen(false);
+      setCreateModalError('');
       setNewStoreName('');
       setNewActivityType('');
       setNewWhatsapp('');
       setNewUsername('');
       setNewPassword('');
+      setShowNewPassword(false);
       await loadMerchants();
     } catch (err: any) {
-      setMessage({ type: 'error', text: err.message || (isArabic ? 'حدث خطأ أثناء إنشاء الحساب' : 'Error creating account') });
+      setCreateModalError(err.message || (isArabic ? 'حدث خطأ أثناء إنشاء الحساب' : 'Error creating account'));
     } finally {
       setActionLoading(false);
     }
@@ -1039,75 +1072,182 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
 
       {/* CREATE NEW STORE OWNER MODAL */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs font-cairo">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-fadeIn space-y-6">
-            
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-[#0084d6] text-white flex items-center justify-center shadow-xs">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs font-cairo overflow-y-auto"
+          role="presentation"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-store-modal-title"
+            className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-lg w-full max-h-[90dvh] flex flex-col overflow-hidden shadow-2xl animate-fadeIn my-auto"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-5 sm:px-7 py-4 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-2xl bg-[#0084d6] text-white flex items-center justify-center shadow-xs shrink-0">
                   <StoreIcon className="w-4 h-4" />
                 </div>
-                <div>
-                  <h3 className="font-black text-[#0e1f38] dark:text-white text-base">{t('modal_create_store_title')}</h3>
-                  <span className="text-[11px] text-[#0084d6] font-bold">{t('modal_admin_subtitle')}</span>
+                <div className="min-w-0">
+                  <h3 id="create-store-modal-title" className="font-black text-[#0e1f38] dark:text-white text-base truncate">{t('modal_create_store_title')}</h3>
+                  <span className="text-[11px] text-[#0084d6] font-bold block truncate">{t('modal_admin_subtitle')}</span>
                 </div>
               </div>
               <button
-                onClick={() => setIsCreateModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 flex items-center justify-center font-bold"
+                type="button"
+                aria-label={isArabic ? 'إغلاق' : 'Close'}
+                onClick={() => {
+                  setIsCreateModalOpen(false);
+                  setCreateModalError('');
+                }}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center justify-center font-bold shrink-0 cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleCreateMerchant} className="space-y-4">
-              <div>
-                <label className="block text-xs font-extrabold text-[#0e1f38] dark:text-white mb-1">
-                  {t('store_name')} <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newStoreName}
-                  onChange={(e) => setNewStoreName(e.target.value)}
-                  placeholder={t('store_name_placeholder')}
-                  className="w-full px-4 py-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:border-[#0084d6] focus:ring-4 focus:ring-sky-100 placeholder:text-slate-400 dark:placeholder:text-slate-400"
-                  required
-                />
+            <form onSubmit={handleCreateMerchant} noValidate className="flex flex-col flex-1 min-h-0">
+              <div className="overflow-y-auto px-5 sm:px-7 py-5 space-y-4 flex-1">
+                {createModalError && (
+                  <div
+                    role="alert"
+                    className="rounded-2xl border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/50 px-4 py-3 text-xs font-bold text-rose-700 dark:text-rose-300 flex items-start gap-2"
+                  >
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+                    <span>{createModalError}</span>
+                  </div>
+                )}
+
+                <div>
+                  <label htmlFor="admin-create-store-name" className="block text-xs font-extrabold text-[#0e1f38] dark:text-white mb-1">
+                    {t('store_name')} <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    id="admin-create-store-name"
+                    name="store_name"
+                    type="text"
+                    value={newStoreName}
+                    onChange={(e) => {
+                      setNewStoreName(e.target.value);
+                      if (createModalError) setCreateModalError('');
+                    }}
+                    placeholder={t('store_name_placeholder')}
+                    maxLength={160}
+                    className="w-full px-4 py-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:border-[#0084d6] focus:ring-4 focus:ring-sky-100 placeholder:text-slate-400 dark:placeholder:text-slate-400"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="admin-create-activity-type" className="block text-xs font-extrabold text-[#0e1f38] dark:text-white mb-1">
+                    {t('store_activity_type')}
+                  </label>
+                  <input
+                    id="admin-create-activity-type"
+                    name="activity_type"
+                    type="text"
+                    value={newActivityType}
+                    onChange={(e) => setNewActivityType(e.target.value)}
+                    placeholder={t('activity_example')}
+                    maxLength={100}
+                    className="w-full px-4 py-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:border-[#0084d6] focus:ring-4 focus:ring-sky-100 placeholder:text-slate-400 dark:placeholder:text-slate-400"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="admin-create-whatsapp" className="block text-xs font-extrabold text-[#0e1f38] dark:text-white mb-1">
+                    {t('store_whatsapp')} <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    id="admin-create-whatsapp"
+                    name="whatsapp_number"
+                    type="tel"
+                    value={newWhatsapp}
+                    onChange={(e) => {
+                      setNewWhatsapp(e.target.value);
+                      if (createModalError) setCreateModalError('');
+                    }}
+                    placeholder="201012345678"
+                    maxLength={30}
+                    className="w-full px-4 py-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:border-[#0084d6] font-mono dir-ltr text-start placeholder:text-slate-400 dark:placeholder:text-slate-400"
+                    required
+                  />
+                  <span className="text-[10px] text-slate-500 dark:text-slate-300 mt-1 block">
+                    {t('whatsapp_sub_hint')}
+                  </span>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                  <p className="text-xs font-black text-[#0084d6] dark:text-sky-400">
+                    {isArabic ? 'بيانات حساب صاحب المتجر (للدخول الموحد)' : 'Merchant Account Credentials (Unified Login)'}
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="admin-create-username" className="block text-xs font-extrabold text-[#0e1f38] dark:text-white mb-1">
+                        {t('username_label')} <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        id="admin-create-username"
+                        name="username"
+                        type="text"
+                        value={newUsername}
+                        onChange={(e) => {
+                          setNewUsername(e.target.value);
+                          if (createModalError) setCreateModalError('');
+                        }}
+                        placeholder={t('username_example')}
+                        maxLength={80}
+                        autoComplete="off"
+                        dir="ltr"
+                        className="w-full px-4 py-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:border-[#0084d6] focus:ring-4 focus:ring-sky-100 font-mono text-start placeholder:text-slate-400 dark:placeholder:text-slate-400"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="admin-create-password" className="block text-xs font-extrabold text-[#0e1f38] dark:text-white mb-1">
+                        {t('password_label')} <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="admin-create-password"
+                          name="password"
+                          type={showNewPassword ? 'text' : 'password'}
+                          value={newPassword}
+                          onChange={(e) => {
+                            setNewPassword(e.target.value);
+                            if (createModalError) setCreateModalError('');
+                          }}
+                          placeholder="••••••••"
+                          minLength={8}
+                          maxLength={256}
+                          autoComplete="new-password"
+                          dir="ltr"
+                          className="w-full px-4 py-2.5 pe-10 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:border-[#0084d6] focus:ring-4 focus:ring-sky-100 font-mono text-start placeholder:text-slate-400 dark:placeholder:text-slate-400"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword((v) => !v)}
+                          aria-label={showNewPassword ? (isArabic ? 'إخفاء كلمة المرور' : 'Hide password') : (isArabic ? 'إظهار كلمة المرور' : 'Show password')}
+                          className={`absolute top-1/2 -translate-y-1/2 ${isArabic ? 'left-3' : 'right-3'} text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer`}
+                        >
+                          {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-300 mt-1 block">
+                        {isArabic ? '٨ أحرف على الأقل.' : 'At least 8 characters.'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs leading-6 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700 px-3.5 py-2.5 text-slate-600 dark:text-slate-300">
+                  {isArabic ? 'يُنشأ المتجر على الباقة المجانية وغير مفعّل افتراضيًا. يستطيع صاحبه تسجيل الدخول، ويبدأ الاشتراك المدفوع بعد تقديم الطلب وموافقة الإدارة.' : 'Stores start on the Free Plan and inactive by default. The owner can sign in immediately; paid subscriptions start only after admin approval.'}
+                </p>
               </div>
 
-              <div>
-                <label className="block text-xs font-extrabold text-[#0e1f38] dark:text-white mb-1">
-                  {t('store_activity_type')}
-                </label>
-                <input
-                  type="text"
-                  value={newActivityType}
-                  onChange={(e) => setNewActivityType(e.target.value)}
-                  placeholder={t('activity_example')}
-                  className="w-full px-4 py-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:border-[#0084d6] focus:ring-4 focus:ring-sky-100 placeholder:text-slate-400 dark:placeholder:text-slate-400"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-extrabold text-[#0e1f38] dark:text-white mb-1">
-                  {t('store_whatsapp')} <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="tel"
-                  value={newWhatsapp}
-                  onChange={(e) => setNewWhatsapp(e.target.value)}
-                  placeholder="201012345678"
-                  className="w-full px-4 py-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:border-[#0084d6] font-mono dir-ltr text-start placeholder:text-slate-400 dark:placeholder:text-slate-400"
-                  required
-                />
-                <span className="text-[10px] text-slate-500 dark:text-slate-300 mt-1 block">
-                  {t('whatsapp_sub_hint')}
-                </span>
-              </div>
-
-              <p className="text-sm text-slate-500">{isArabic ? 'يُنشأ المتجر غير مفعّل. يبدأ الاشتراك بعد تقديم الطلب وموافقة الإدارة.' : 'Stores start inactive until an admin approves the subscription request.'}</p>
-
-              <div className="pt-4 flex gap-2.5">
+              <div className="px-5 sm:px-7 py-4 border-t border-slate-100 dark:border-slate-800 flex gap-2.5 shrink-0 bg-white dark:bg-slate-900">
                 <button
                   type="submit"
                   disabled={actionLoading}
@@ -1117,8 +1257,11 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="px-5 py-3.5 rounded-2xl border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold hover:bg-slate-50 transition-colors"
+                  onClick={() => {
+                    setIsCreateModalOpen(false);
+                    setCreateModalError('');
+                  }}
+                  className="px-5 py-3.5 rounded-2xl border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                 >
                   {t('cancel')}
                 </button>
