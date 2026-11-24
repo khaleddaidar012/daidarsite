@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Store, Product, User } from '../types';
 import {
   Menu,
@@ -10,7 +10,6 @@ import {
   ShoppingBag,
   Home,
   MessageCircle,
-  Sparkles,
   CheckCircle2,
   ExternalLink,
   Clock,
@@ -20,8 +19,6 @@ import {
   Users,
   Layers,
   BadgePercent,
-  Pause,
-  Play,
   ArrowLeft,
   ArrowRight,
   SlidersHorizontal,
@@ -135,9 +132,10 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
   ];
 
   const [activeSlide, setActiveSlide] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
+  const [exitingSlide, setExitingSlide] = useState<number | null>(null);
   const [isInteracting, setIsInteracting] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const exitTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return;
@@ -148,23 +146,52 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
     return () => media.removeEventListener?.('change', sync);
   }, []);
 
-  const autoPlayActive = !isPaused && !isInteracting && !prefersReducedMotion;
+  useEffect(() => () => {
+    if (exitTimerRef.current) window.clearTimeout(exitTimerRef.current);
+  }, []);
+
+  const switchToSlide = useCallback(
+    (nextIndex: number) => {
+      setActiveSlide((current) => {
+        if (nextIndex === current) return current;
+        if (!prefersReducedMotion) {
+          setExitingSlide(current);
+          if (exitTimerRef.current) window.clearTimeout(exitTimerRef.current);
+          exitTimerRef.current = window.setTimeout(() => {
+            setExitingSlide(null);
+          }, 620);
+        }
+        return nextIndex;
+      });
+    },
+    [prefersReducedMotion]
+  );
+
+  const autoPlayActive = !isInteracting && !prefersReducedMotion;
 
   useEffect(() => {
     if (!autoPlayActive) return;
     const timer = window.setInterval(() => {
-      setActiveSlide((prev) => (prev + 1) % featureSlides.length);
+      setActiveSlide((current) => {
+        const next = (current + 1) % featureSlides.length;
+        setExitingSlide(current);
+        if (exitTimerRef.current) window.clearTimeout(exitTimerRef.current);
+        exitTimerRef.current = window.setTimeout(() => {
+          setExitingSlide(null);
+        }, 620);
+        return next;
+      });
     }, SLIDE_INTERVAL_MS);
     return () => window.clearInterval(timer);
   }, [autoPlayActive, featureSlides.length]);
 
   const goPrev = useCallback(() => {
-    setActiveSlide((prev) => (prev - 1 + featureSlides.length) % featureSlides.length);
-  }, [featureSlides.length]);
+    switchToSlide((activeSlide - 1 + featureSlides.length) % featureSlides.length);
+  }, [activeSlide, featureSlides.length, switchToSlide]);
 
   const goNext = useCallback(() => {
-    setActiveSlide((prev) => (prev + 1) % featureSlides.length);
-  }, [featureSlides.length]);
+    switchToSlide((activeSlide + 1) % featureSlides.length);
+  }, [activeSlide, featureSlides.length, switchToSlide]);
 
   const PrimaryArrow = isArabic ? ArrowLeft : ArrowRight;
 
@@ -564,7 +591,7 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
               </div>
             </div>
 
-            {/* Rotating Feature Cards Column (End side: Left in RTL, Right in LTR) */}
+            {/* Rotating 3D Stacked Feature Card Deck (End side: Left in RTL, Right in LTR) */}
             <div className="lg:col-span-6 w-full flex justify-center lg:justify-end">
               <div
                 aria-roledescription="carousel"
@@ -577,75 +604,41 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
                     setIsInteracting(false);
                   }
                 }}
-                className="w-full max-w-xl rounded-[2rem] border border-slate-200/90 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 p-4 sm:p-5 shadow-2xl shadow-sky-900/10 backdrop-blur-md"
+                className="w-full max-w-[33rem] px-3 sm:px-5"
               >
-                {/* Top Carousel Bar: Section Label + Controls */}
-                <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-slate-100 dark:border-slate-800">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-[#e6f4fe] dark:bg-sky-950 text-[#0084d6] dark:text-sky-400 shrink-0">
-                      <Sparkles className="w-4 h-4" aria-hidden="true" />
-                    </span>
-                    <div className="min-w-0">
-                      <span className="block text-xs font-black text-[#0e1f38] dark:text-white truncate">
-                        {isArabic ? 'ليه تمتلك متجرك الإلكتروني الآن؟' : 'Why launch your online store now?'}
-                      </span>
-                      <span className="block text-[11px] font-bold text-slate-500 dark:text-slate-400" dir="ltr">
-                        0{activeSlide + 1} / 0{featureSlides.length}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setIsPaused((v) => !v)}
-                      aria-label={
-                        isPaused
-                          ? isArabic
-                            ? 'تشغيل التبديل التلقائي'
-                            : 'Resume auto-rotation'
-                          : isArabic
-                            ? 'إيقاف التبديل التلقائي'
-                            : 'Pause auto-rotation'
-                      }
-                      title={isPaused ? (isArabic ? 'تشغيل' : 'Play') : isArabic ? 'إيقاف مؤقت' : 'Pause'}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-[#0084d6] hover:text-[#0084d6] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0084d6]"
-                    >
-                      {isPaused ? <Play className="w-3.5 h-3.5" aria-hidden="true" /> : <Pause className="w-3.5 h-3.5" aria-hidden="true" />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={goPrev}
-                      aria-label={isArabic ? 'الميزة السابقة' : 'Previous feature'}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-[#0084d6] hover:text-[#0084d6] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0084d6]"
-                    >
-                      {isArabic ? <ChevronRight className="w-4 h-4" aria-hidden="true" /> : <ChevronLeft className="w-4 h-4" aria-hidden="true" />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={goNext}
-                      aria-label={isArabic ? 'الميزة التالية' : 'Next feature'}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-[#0084d6] hover:text-[#0084d6] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0084d6]"
-                    >
-                      {isArabic ? <ChevronLeft className="w-4 h-4" aria-hidden="true" /> : <ChevronRight className="w-4 h-4" aria-hidden="true" />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Fixed-Height Animated Card Stage (Zero Layout Shift) */}
-                <div className="mt-4 grid grid-cols-1 grid-rows-1 relative overflow-hidden rounded-2xl">
+                {/* 3D Layered Deck Stage (Fixed height, zero layout shift) */}
+                <div className="relative grid grid-cols-1 grid-rows-1 pb-9 sm:pb-10">
                   {featureSlides.map((slide, idx) => {
-                    const isCurrent = idx === activeSlide;
+                    const total = featureSlides.length;
+                    const offset = (idx - activeSlide + total) % total;
+                    const isCurrent = offset === 0;
+                    const isExiting = idx === exitingSlide && !isCurrent;
                     const SlideIcon = slide.Icon;
+
+                    let deckTransform = '';
+                    if (isExiting) {
+                      deckTransform = isArabic
+                        ? 'opacity-0 translate-x-10 -translate-y-2 rotate-3 scale-[0.96] z-40 pointer-events-none'
+                        : 'opacity-0 -translate-x-10 -translate-y-2 -rotate-3 scale-[0.96] z-40 pointer-events-none';
+                    } else if (offset === 0) {
+                      deckTransform =
+                        'opacity-100 translate-x-0 translate-y-0 rotate-0 scale-100 z-30 shadow-[0_24px_60px_-15px_rgba(14,31,56,0.18)] dark:shadow-[0_24px_60px_-15px_rgba(0,0,0,0.65)]';
+                    } else if (offset === 1) {
+                      deckTransform = isArabic
+                        ? 'opacity-80 -translate-x-3 translate-y-4 -rotate-[1.5deg] scale-[0.95] z-20 shadow-lg cursor-pointer hover:opacity-95'
+                        : 'opacity-80 translate-x-3 translate-y-4 rotate-[1.5deg] scale-[0.95] z-20 shadow-lg cursor-pointer hover:opacity-95';
+                    } else {
+                      deckTransform = isArabic
+                        ? 'opacity-45 -translate-x-6 translate-y-8 -rotate-[3deg] scale-[0.90] z-10 shadow-md pointer-events-none'
+                        : 'opacity-45 translate-x-6 translate-y-8 rotate-[3deg] scale-[0.90] z-10 shadow-md pointer-events-none';
+                    }
+
                     return (
                       <article
                         key={slide.id}
                         aria-hidden={!isCurrent}
-                        className={`col-start-1 row-start-1 flex flex-col justify-between rounded-2xl border border-slate-100 dark:border-slate-800 bg-[#f7fafe] dark:bg-slate-950/60 overflow-hidden transition-all duration-500 ease-out motion-reduce:transition-opacity ${
-                          isCurrent
-                            ? 'opacity-100 translate-y-0 scale-100 z-10'
-                            : 'opacity-0 translate-y-3 scale-[0.98] pointer-events-none z-0'
-                        }`}
+                        onClick={offset === 1 ? () => switchToSlide(idx) : undefined}
+                        className={`col-start-1 row-start-1 flex flex-col justify-between rounded-[1.85rem] border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden will-change-transform transition-all duration-[650ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-opacity motion-reduce:transform-none ${deckTransform}`}
                       >
                         {/* Studio Visual (16:10 fixed aspect ratio, zero people) */}
                         <div className="relative w-full aspect-[16/10] bg-slate-100 dark:bg-slate-800 overflow-hidden">
@@ -656,36 +649,38 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
                             height={600}
                             loading={idx === 0 ? 'eager' : 'lazy'}
                             decoding="async"
-                            className={`w-full h-full object-cover transition-transform duration-700 ease-out motion-reduce:transition-none ${
+                            className={`w-full h-full object-cover transition-transform duration-[1100ms] ease-out motion-reduce:transition-none ${
                               isCurrent ? 'scale-100' : 'scale-105'
                             }`}
                           />
-                          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0e1f38]/55 via-[#0e1f38]/15 to-transparent pointer-events-none" />
+                          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#0e1f38]/55 via-[#0e1f38]/15 to-transparent pointer-events-none" />
                           <span
-                            className={`absolute top-3 ${isArabic ? 'right-3' : 'left-3'} inline-flex items-center gap-1.5 rounded-full bg-white/95 dark:bg-slate-900/95 px-3 py-1.5 text-[11px] font-black text-[#0e1f38] dark:text-white shadow-md backdrop-blur-md`}
+                            className={`absolute top-3.5 ${isArabic ? 'right-3.5' : 'left-3.5'} inline-flex items-center gap-1.5 rounded-full bg-white/95 dark:bg-slate-900/95 px-3.5 py-1.5 text-[11px] font-black text-[#0e1f38] dark:text-white shadow-md backdrop-blur-md`}
                           >
                             <SlideIcon className="w-3.5 h-3.5 text-[#0084d6]" aria-hidden="true" />
                             <span>{slide.badge}</span>
                           </span>
                         </div>
 
-                        {/* Feature Text Content (fixed min-height prevents CLS across slides) */}
-                        <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between min-h-[158px] sm:min-h-[150px]">
+                        {/* Feature Text Content */}
+                        <div className="p-5 sm:p-6 flex-1 flex flex-col justify-between min-h-[164px] sm:min-h-[158px]">
                           <div>
                             <div className="flex items-center gap-2.5">
-                              <span className={`inline-flex h-9 w-9 items-center justify-center rounded-xl shrink-0 ${slide.accentBg} ${slide.accentText}`}>
+                              <span
+                                className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl shrink-0 ${slide.accentBg} ${slide.accentText}`}
+                              >
                                 <SlideIcon className="w-5 h-5" aria-hidden="true" />
                               </span>
                               <h2 className="text-lg sm:text-xl font-black text-[#0e1f38] dark:text-white leading-snug">
                                 {slide.title}
                               </h2>
                             </div>
-                            <p className="mt-2.5 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
+                            <p className="mt-3 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
                               {slide.description}
                             </p>
                           </div>
 
-                          <div className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white/90 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 px-3 py-2 text-[11px] font-bold text-[#0084d6] dark:text-sky-400 w-fit">
+                          <div className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#f4f9fe] dark:bg-slate-800/80 border border-sky-100 dark:border-slate-700 px-3 py-1.5 text-[11px] font-bold text-[#0084d6] dark:text-sky-400 w-fit">
                             <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                             <span>{slide.detailTag}</span>
                           </div>
@@ -695,34 +690,46 @@ export const HeroLandingView: React.FC<HeroLandingViewProps> = ({
                   })}
                 </div>
 
-                {/* Clean Interactive 3-Tab Feature Switcher (No Loading Bar) */}
-                <div
-                  className="mt-4 grid grid-cols-3 gap-2"
-                  role="tablist"
-                  aria-label={isArabic ? 'اختيار الميزة' : 'Choose feature slide'}
-                >
-                  {featureSlides.map((slide, idx) => {
-                    const isCurrent = idx === activeSlide;
-                    const TabIcon = slide.Icon;
-                    return (
-                      <button
-                        key={slide.id}
-                        type="button"
-                        role="tab"
-                        aria-selected={isCurrent}
-                        aria-label={slide.title}
-                        onClick={() => setActiveSlide(idx)}
-                        className={`min-h-[42px] px-2.5 py-2 rounded-xl text-[11px] sm:text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0084d6] ${
-                          isCurrent
-                            ? 'bg-[#0e1f38] dark:bg-[#0084d6] text-white shadow-md shadow-slate-900/15'
-                            : 'bg-slate-100/90 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-[#e6f4fe] hover:text-[#0084d6] dark:hover:bg-slate-800'
-                        }`}
-                      >
-                        <TabIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                        <span className="truncate">{slide.shortLabel}</span>
-                      </button>
-                    );
-                  })}
+                {/* Minimal Floating Dots & Subtle Arrows */}
+                <div className="mt-1 flex items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={goPrev}
+                    aria-label={isArabic ? 'الميزة السابقة' : 'Previous feature'}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200/90 dark:border-slate-700 bg-white/90 dark:bg-slate-900 text-slate-500 hover:border-[#0084d6] hover:text-[#0084d6] transition-colors shadow-2xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0084d6]"
+                  >
+                    {isArabic ? <ChevronRight className="w-4 h-4" aria-hidden="true" /> : <ChevronLeft className="w-4 h-4" aria-hidden="true" />}
+                  </button>
+
+                  <div className="flex items-center gap-2" role="tablist" aria-label={isArabic ? 'التنقل بين المميزات' : 'Navigate features'}>
+                    {featureSlides.map((slide, idx) => {
+                      const isCurrent = idx === activeSlide;
+                      return (
+                        <button
+                          key={slide.id}
+                          type="button"
+                          role="tab"
+                          aria-selected={isCurrent}
+                          aria-label={slide.title}
+                          onClick={() => switchToSlide(idx)}
+                          className={`h-2 rounded-full transition-all duration-400 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0084d6] ${
+                            isCurrent
+                              ? 'w-7 bg-[#0084d6] shadow-xs shadow-sky-500/40'
+                              : 'w-2 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 dark:hover:bg-slate-600'
+                          }`}
+                        />
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={goNext}
+                    aria-label={isArabic ? 'الميزة التالية' : 'Next feature'}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200/90 dark:border-slate-700 bg-white/90 dark:bg-slate-900 text-slate-500 hover:border-[#0084d6] hover:text-[#0084d6] transition-colors shadow-2xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0084d6]"
+                  >
+                    {isArabic ? <ChevronLeft className="w-4 h-4" aria-hidden="true" /> : <ChevronRight className="w-4 h-4" aria-hidden="true" />}
+                  </button>
                 </div>
               </div>
             </div>
