@@ -75,7 +75,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ store, products = []
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 4000);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Error updating settings in Cloudflare D1');
+      setErrorMessage(err.message || (isArabic ? 'تعذر حفظ التعديلات. حاول مرة أخرى.' : 'Error updating settings'));
     } finally {
       setIsSaving(false);
     }
@@ -95,7 +95,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ store, products = []
               {t('settings')}
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-              {isArabic ? 'تعديل بيانات المتجر، معلومات التواصل، مسار الواتساب، والربط بقاعدة بيانات Cloudflare D1.' : 'Update store data, WhatsApp checkout routing, and Cloudflare D1 database.'}
+              {isArabic ? 'تعديل بيانات المتجر، معلومات التواصل، وإعدادات استلام الطلبات عبر واتساب.' : 'Update store information, contact details, and WhatsApp order settings.'}
             </p>
           </div>
         </div>
@@ -105,7 +105,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ store, products = []
       {saveSuccess && (
         <div className="p-4 rounded-2xl bg-sky-50 dark:bg-sky-950/50 border border-sky-200 dark:border-sky-800 text-sky-900 dark:text-sky-200 text-xs sm:text-sm font-bold flex items-center gap-2 shadow-xs">
           <Check className="w-5 h-5 text-[#0084d6] dark:text-sky-400" />
-          <span>{isArabic ? 'تم حفظ وتحديث كافة الإعدادات بنجاح في Cloudflare D1!' : 'All settings saved successfully in Cloudflare D1!'}</span>
+          <span>{isArabic ? 'تم حفظ التعديلات بنجاح!' : 'Changes saved successfully!'}</span>
         </div>
       )}
 
@@ -253,7 +253,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ store, products = []
             ) : (
               <>
                 <Save className="w-4 h-4" />
-                <span>{isArabic ? 'حفظ التعديلات في Cloudflare D1' : 'Save Settings to Cloudflare D1'}</span>
+                <span>{isArabic ? 'حفظ التعديلات' : 'Save Changes'}</span>
               </>
             )}
           </button>
