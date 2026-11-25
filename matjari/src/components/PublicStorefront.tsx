@@ -277,9 +277,8 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
 
       return (
         <div
-          className={`inline-flex items-center justify-between gap-2 px-1.5 py-1.5 font-black text-xs ${
-            fullWidth ? 'w-full' : 'min-w-[116px]'
-          } ${stepperShell}`}
+          className={`inline-flex items-center justify-between gap-2 px-1.5 py-1.5 font-black text-xs ${fullWidth ? 'w-full' : 'min-w-[116px]'
+            } ${stepperShell}`}
         >
           <button
             type="button"
@@ -319,9 +318,8 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
         type="button"
         disabled={!canOrder}
         onClick={() => handleAdd(p)}
-        className={`px-3.5 py-2.5 text-xs font-black transition-all inline-flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
-          fullWidth ? 'w-full' : ''
-        } ${addBtnClass}`}
+        className={`px-3.5 py-2.5 text-xs font-black transition-all inline-flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${fullWidth ? 'w-full' : ''
+          } ${addBtnClass}`}
       >
         {isAdded ? (
           <>
@@ -491,34 +489,31 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
               <img
                 src={logoSrc}
                 alt={store?.name || 'Store Logo'}
-                className={`w-10 h-10 sm:w-11 sm:h-11 object-contain shrink-0 p-1 ${
-                  isTech
-                    ? 'rounded-xl bg-slate-900 border border-cyan-500/35 shadow-md shadow-cyan-500/10'
-                    : isBoutique
-                      ? 'rounded-full bg-white border-2 border-amber-900/25 shadow-sm'
-                      : isCatalog
-                        ? 'rounded-xl bg-emerald-50 border border-emerald-200'
-                        : 'rounded-2xl bg-white border border-sky-200 shadow-sm'
-                }`}
+                className={`w-10 h-10 sm:w-11 sm:h-11 object-contain shrink-0 p-1 ${isTech
+                  ? 'rounded-xl bg-slate-900 border border-cyan-500/35 shadow-md shadow-cyan-500/10'
+                  : isBoutique
+                    ? 'rounded-full bg-white border-2 border-amber-900/25 shadow-sm'
+                    : isCatalog
+                      ? 'rounded-xl bg-emerald-50 border border-emerald-200'
+                      : 'rounded-2xl bg-white border border-sky-200 shadow-sm'
+                  }`}
               />
               <div className="min-w-0">
                 <h1
-                  className={`text-sm sm:text-lg font-black leading-tight truncate max-w-[160px] sm:max-w-xs md:max-w-sm ${
-                    isTech ? 'text-white tracking-tight' : isBoutique ? 'text-stone-900' : 'text-[#0e1f38]'
-                  }`}
+                  className={`text-sm sm:text-lg font-black leading-tight truncate max-w-[160px] sm:max-w-xs md:max-w-sm ${isTech ? 'text-white tracking-tight' : isBoutique ? 'text-stone-900' : 'text-[#0e1f38]'
+                    }`}
                 >
                   {store?.name || t('daidar_solutions')}
                 </h1>
                 <p
-                  className={`text-[11px] mt-0.5 truncate hidden sm:block font-bold ${
-                    isTech
-                      ? 'text-cyan-400 font-mono'
-                      : isBoutique
-                        ? 'text-amber-900/75'
-                        : isCatalog
-                          ? 'text-emerald-700'
-                          : 'text-[#0084d6]'
-                  }`}
+                  className={`text-[11px] mt-0.5 truncate hidden sm:block font-bold ${isTech
+                    ? 'text-cyan-400 font-mono'
+                    : isBoutique
+                      ? 'text-amber-900/75'
+                      : isCatalog
+                        ? 'text-emerald-700'
+                        : 'text-[#0084d6]'
+                    }`}
                 >
                   {store?.activity_type || t('cloud_store_mgmt')}
                 </p>
@@ -544,18 +539,16 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                 <button
                   type="button"
                   onClick={toggleLang}
-                  className={`flex items-center gap-1 px-2.5 py-2 text-xs font-bold border transition-colors cursor-pointer ${
-                    isTech
-                      ? 'rounded-xl text-slate-200 border-slate-700 hover:border-cyan-500/50 hover:bg-slate-800'
-                      : isBoutique
-                        ? 'rounded-full text-stone-800 border-amber-900/20 hover:bg-amber-100/60'
-                        : 'rounded-xl text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
+                  className={`flex items-center gap-1 px-2.5 py-2 text-xs font-bold border transition-colors cursor-pointer ${isTech
+                    ? 'rounded-xl text-slate-200 border-slate-700 hover:border-cyan-500/50 hover:bg-slate-800'
+                    : isBoutique
+                      ? 'rounded-full text-stone-800 border-amber-900/20 hover:bg-amber-100/60'
+                      : 'rounded-xl text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
                 >
                   <Globe
-                    className={`w-3.5 h-3.5 ${
-                      isTech ? 'text-cyan-400' : isBoutique ? 'text-[#8c2f13]' : isCatalog ? 'text-emerald-600' : 'text-[#0084d6]'
-                    }`}
+                    className={`w-3.5 h-3.5 ${isTech ? 'text-cyan-400' : isBoutique ? 'text-[#8c2f13]' : isCatalog ? 'text-emerald-600' : 'text-[#0084d6]'
+                      }`}
                   />
                   <span>{t('lang_switch')}</span>
                 </button>
@@ -1109,17 +1102,16 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
       >
         {/* Filter + Search + Sort + View Mode Toolbar */}
         <div
-          className={`space-y-4 ${
-            isMinimal
-              ? 'border-b border-zinc-200 pb-5'
-              : isTech
-                ? 'rounded-2xl bg-[#0d1424] border border-slate-800 p-4'
-                : isCatalog
-                  ? 'rounded-2xl bg-white border border-slate-200 p-3.5 shadow-sm'
-                  : isBoutique
-                    ? 'rounded-3xl bg-white/80 border border-amber-900/10 p-4 shadow-sm'
-                    : 'rounded-3xl bg-white border border-slate-200/80 p-4 shadow-sm'
-          }`}
+          className={`space-y-4 ${isMinimal
+            ? 'border-b border-zinc-200 pb-5'
+            : isTech
+              ? 'rounded-2xl bg-[#0d1424] border border-slate-800 p-4'
+              : isCatalog
+                ? 'rounded-2xl bg-white border border-slate-200 p-3.5 shadow-sm'
+                : isBoutique
+                  ? 'rounded-3xl bg-white/80 border border-amber-900/10 p-4 shadow-sm'
+                  : 'rounded-3xl bg-white border border-slate-200/80 p-4 shadow-sm'
+            }`}
         >
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             {/* Category Pills */}
@@ -1155,17 +1147,16 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                   >
                     <span>{cat}</span>
                     <span
-                      className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full ${
-                        selected
-                          ? isMinimal
-                            ? 'bg-zinc-950 text-white'
-                            : isTech
-                              ? 'bg-slate-950/20 text-slate-950'
-                              : 'bg-white/20 text-white'
+                      className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full ${selected
+                        ? isMinimal
+                          ? 'bg-zinc-950 text-white'
                           : isTech
-                            ? 'bg-slate-800 text-slate-400'
-                            : 'bg-black/5 text-current opacity-70'
-                      }`}
+                            ? 'bg-slate-950/20 text-slate-950'
+                            : 'bg-white/20 text-white'
+                        : isTech
+                          ? 'bg-slate-800 text-slate-400'
+                          : 'bg-black/5 text-current opacity-70'
+                        }`}
                     >
                       {formatCount(categoryCounts[cat] || 0)}
                     </span>
@@ -1183,17 +1174,16 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder={isArabic ? 'ابحث عن منتج...' : 'Search products...'}
-                  className={`w-full px-4 py-2.5 ps-9 text-xs font-medium outline-none transition-all ${
-                    isTech
-                      ? 'rounded-xl border border-slate-700 bg-[#111827] text-slate-100 placeholder:text-slate-400 focus:border-cyan-400'
-                      : isMinimal
-                        ? 'rounded-none border-b border-zinc-300 bg-transparent text-zinc-950 placeholder:text-zinc-400 focus:border-zinc-950'
-                        : isBoutique
-                          ? 'rounded-full border border-amber-900/20 bg-white text-stone-900 placeholder:text-stone-400 focus:border-[#8c2f13]'
-                          : isCatalog
-                            ? 'rounded-xl border border-slate-300 bg-slate-50 text-slate-900 focus:bg-white focus:border-emerald-600'
-                            : 'rounded-2xl border border-slate-200 bg-slate-50 text-slate-800 focus:bg-white focus:border-[#0084d6]'
-                  }`}
+                  className={`w-full px-4 py-2.5 ps-9 text-xs font-medium outline-none transition-all ${isTech
+                    ? 'rounded-xl border border-slate-700 bg-[#111827] text-slate-100 placeholder:text-slate-400 focus:border-cyan-400'
+                    : isMinimal
+                      ? 'rounded-none border-b border-zinc-300 bg-transparent text-zinc-950 placeholder:text-zinc-400 focus:border-zinc-950'
+                      : isBoutique
+                        ? 'rounded-full border border-amber-900/20 bg-white text-stone-900 placeholder:text-stone-400 focus:border-[#8c2f13]'
+                        : isCatalog
+                          ? 'rounded-xl border border-slate-300 bg-slate-50 text-slate-900 focus:bg-white focus:border-emerald-600'
+                          : 'rounded-2xl border border-slate-200 bg-slate-50 text-slate-800 focus:bg-white focus:border-[#0084d6]'
+                    }`}
                 />
                 <Search className="w-4 h-4 absolute start-3 top-2.5 text-slate-400" />
               </div>
@@ -1203,17 +1193,16 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                 aria-label={isArabic ? 'ترتيب المنتجات' : 'Sort products'}
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className={`px-3 py-2.5 text-xs font-bold outline-none cursor-pointer transition-colors ${
-                  isTech
-                    ? 'rounded-xl border border-slate-700 bg-[#111827] text-slate-200 focus:border-cyan-400'
-                    : isMinimal
-                      ? 'rounded-none border border-zinc-300 bg-white text-zinc-900 focus:border-zinc-950'
-                      : isBoutique
-                        ? 'rounded-full border border-amber-900/20 bg-white text-stone-800 focus:border-[#8c2f13]'
-                        : isCatalog
-                          ? 'rounded-xl border border-slate-300 bg-white text-slate-800 focus:border-emerald-600'
-                          : 'rounded-2xl border border-slate-200 bg-white text-slate-700 focus:border-[#0084d6]'
-                }`}
+                className={`px-3 py-2.5 text-xs font-bold outline-none cursor-pointer transition-colors ${isTech
+                  ? 'rounded-xl border border-slate-700 bg-[#111827] text-slate-200 focus:border-cyan-400'
+                  : isMinimal
+                    ? 'rounded-none border border-zinc-300 bg-white text-zinc-900 focus:border-zinc-950'
+                    : isBoutique
+                      ? 'rounded-full border border-amber-900/20 bg-white text-stone-800 focus:border-[#8c2f13]'
+                      : isCatalog
+                        ? 'rounded-xl border border-slate-300 bg-white text-slate-800 focus:border-emerald-600'
+                        : 'rounded-2xl border border-slate-200 bg-white text-slate-700 focus:border-[#0084d6]'
+                  }`}
               >
                 <option value="default">{isArabic ? 'الترتيب: الافتراضي' : 'Sort: Default'}</option>
                 <option value="price_asc">{isArabic ? 'السعر: الأقل للأعلى' : 'Price: Low to High'}</option>
@@ -1227,9 +1216,8 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                     type="button"
                     onClick={() => setCatalogViewMode('grid')}
                     aria-label={isArabic ? 'عرض شبكة' : 'Grid view'}
-                    className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                      catalogViewMode === 'grid' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
-                    }`}
+                    className={`p-1.5 rounded-lg transition-colors cursor-pointer ${catalogViewMode === 'grid' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                      }`}
                   >
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -1242,9 +1230,8 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                     type="button"
                     onClick={() => setCatalogViewMode('list')}
                     aria-label={isArabic ? 'عرض قائمة سريعة' : 'Quick list view'}
-                    className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                      catalogViewMode === 'list' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
-                    }`}
+                    className={`p-1.5 rounded-lg transition-colors cursor-pointer ${catalogViewMode === 'list' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                      }`}
                   >
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <line x1="8" y1="6" x2="21" y2="6" />
@@ -1275,9 +1262,8 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                   setSelectedCategory(t('all'));
                   setSortBy('default');
                 }}
-                className={`underline cursor-pointer ${
-                  isTech ? 'text-cyan-400' : isBoutique ? 'text-[#8c2f13]' : isCatalog ? 'text-emerald-700' : 'text-[#0084d6]'
-                }`}
+                className={`underline cursor-pointer ${isTech ? 'text-cyan-400' : isBoutique ? 'text-[#8c2f13]' : isCatalog ? 'text-emerald-700' : 'text-[#0084d6]'
+                  }`}
               >
                 {isArabic ? 'إعادة ضبط الفلاتر' : 'Reset filters'}
               </button>
@@ -1288,15 +1274,14 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
         {/* Products Grid or List */}
         {filteredProducts.length === 0 ? (
           <div
-            className={`rounded-3xl border border-dashed p-12 text-center ${
-              isTech
-                ? 'bg-[#0f172a] border-slate-700 text-slate-300'
-                : isMinimal
-                  ? 'bg-white border-zinc-300 text-zinc-700 rounded-none'
-                  : isBoutique
-                    ? 'bg-white/90 border-amber-900/20 text-stone-700'
-                    : 'bg-white border-slate-300 text-slate-700'
-            }`}
+            className={`rounded-3xl border border-dashed p-12 text-center ${isTech
+              ? 'bg-[#0f172a] border-slate-700 text-slate-300'
+              : isMinimal
+                ? 'bg-white border-zinc-300 text-zinc-700 rounded-none'
+                : isBoutique
+                  ? 'bg-white/90 border-amber-900/20 text-stone-700'
+                  : 'bg-white border-slate-300 text-slate-700'
+              }`}
           >
             <ShoppingBag className={`w-12 h-12 mx-auto mb-3 ${isTech ? 'text-slate-600' : 'text-slate-300'}`} />
             <h3 className="text-base font-black">
@@ -1404,15 +1389,14 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                   {/* Product Media Frame */}
                   <div
                     onClick={() => setSelectedProduct(p)}
-                    className={`relative ${mediaAspectClass} w-full cursor-pointer overflow-hidden ${
-                      isTech
-                        ? 'bg-slate-900'
-                        : isMinimal
-                          ? 'bg-zinc-100 border border-zinc-200/80'
-                          : isBoutique
-                            ? 'bg-[#f6ede2]'
-                            : 'bg-slate-100'
-                    }`}
+                    className={`relative ${mediaAspectClass} w-full cursor-pointer overflow-hidden ${isTech
+                      ? 'bg-slate-900'
+                      : isMinimal
+                        ? 'bg-zinc-100 border border-zinc-200/80'
+                        : isBoutique
+                          ? 'bg-[#f6ede2]'
+                          : 'bg-slate-100'
+                      }`}
                   >
                     <img
                       src={imgSrc}
@@ -1431,17 +1415,16 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                     {/* Category Badge */}
                     {p.category && (
                       <span
-                        className={`absolute top-2.5 ${isArabic ? 'right-2.5' : 'left-2.5'} text-[10px] font-black px-2.5 py-1 backdrop-blur-sm ${
-                          isTech
-                            ? 'bg-slate-950/85 text-cyan-300 border border-cyan-500/35 rounded-md font-mono'
-                            : isMinimal
-                              ? 'bg-white/95 text-zinc-950 rounded-none tracking-wider uppercase'
-                              : isBoutique
-                                ? 'bg-[#fdf8f3]/95 text-stone-900 rounded-full border border-amber-900/15'
-                                : isCatalog
-                                  ? 'bg-emerald-950/80 text-emerald-100 rounded-md'
-                                  : 'bg-[#0e1f38]/85 text-white rounded-full'
-                        }`}
+                        className={`absolute top-2.5 ${isArabic ? 'right-2.5' : 'left-2.5'} text-[10px] font-black px-2.5 py-1 backdrop-blur-sm ${isTech
+                          ? 'bg-slate-950/85 text-cyan-300 border border-cyan-500/35 rounded-md font-mono'
+                          : isMinimal
+                            ? 'bg-white/95 text-zinc-950 rounded-none tracking-wider uppercase'
+                            : isBoutique
+                              ? 'bg-[#fdf8f3]/95 text-stone-900 rounded-full border border-amber-900/15'
+                              : isCatalog
+                                ? 'bg-emerald-950/80 text-emerald-100 rounded-md'
+                                : 'bg-[#0e1f38]/85 text-white rounded-full'
+                          }`}
                       >
                         {p.category}
                       </span>
@@ -1454,17 +1437,15 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                         e.stopPropagation();
                         setSelectedProduct(p);
                       }}
-                      className={`absolute ${
-                        isMinimal ? 'inset-x-3 bottom-3 py-2.5 justify-center' : `top-2.5 ${isArabic ? 'left-2.5' : 'right-2.5'} p-2`
-                      } inline-flex items-center gap-1.5 text-[11px] font-extrabold opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-200 cursor-pointer ${
-                        isTech
+                      className={`absolute ${isMinimal ? 'inset-x-3 bottom-3 py-2.5 justify-center' : `top-2.5 ${isArabic ? 'left-2.5' : 'right-2.5'} p-2`
+                        } inline-flex items-center gap-1.5 text-[11px] font-extrabold opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-200 cursor-pointer ${isTech
                           ? 'rounded-lg bg-slate-950/90 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-400 hover:text-slate-950'
                           : isMinimal
                             ? 'bg-zinc-950/90 text-white hover:bg-zinc-950'
                             : isBoutique
                               ? 'rounded-full bg-white/95 text-[#8c2f13] shadow-md hover:bg-[#8c2f13] hover:text-white'
                               : 'rounded-full bg-white/95 text-slate-800 shadow-md hover:bg-[#0084d6] hover:text-white'
-                      }`}
+                        }`}
                       aria-label={isArabic ? `معاينة ${p.name}` : `Quick view ${p.name}`}
                     >
                       <Eye className="w-3.5 h-3.5" />
@@ -1483,37 +1464,34 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
 
                   {/* Product Card Body */}
                   <div
-                    className={`${
-                      isMinimal ? 'pt-4 px-0.5' : isCatalog ? 'p-3.5' : 'p-4 sm:p-5'
-                    } flex-1 flex flex-col justify-between`}
+                    className={`${isMinimal ? 'pt-4 px-0.5' : isCatalog ? 'p-3.5' : 'p-4 sm:p-5'
+                      } flex-1 flex flex-col justify-between`}
                   >
                     <div className={isBoutique ? 'text-center' : ''}>
                       <h3
                         onClick={() => setSelectedProduct(p)}
-                        className={`font-black ${isCatalog ? 'text-xs sm:text-sm' : 'text-sm sm:text-base'} leading-snug line-clamp-2 cursor-pointer transition-colors ${
-                          isTech
-                            ? 'text-white hover:text-cyan-300'
-                            : isMinimal
-                              ? 'text-zinc-950 hover:text-zinc-600'
-                              : isBoutique
-                                ? 'text-stone-900 hover:text-[#8c2f13]'
-                                : 'text-[#0e1f38] hover:text-[#0084d6]'
-                        }`}
+                        className={`font-black ${isCatalog ? 'text-xs sm:text-sm' : 'text-sm sm:text-base'} leading-snug line-clamp-2 cursor-pointer transition-colors ${isTech
+                          ? 'text-white hover:text-cyan-300'
+                          : isMinimal
+                            ? 'text-zinc-950 hover:text-zinc-600'
+                            : isBoutique
+                              ? 'text-stone-900 hover:text-[#8c2f13]'
+                              : 'text-[#0e1f38] hover:text-[#0084d6]'
+                          }`}
                       >
                         {p.name}
                       </h3>
 
                       {!isCatalog && (
                         <p
-                          className={`text-xs line-clamp-2 mt-1.5 leading-relaxed font-medium ${
-                            isTech
-                              ? 'text-slate-400'
-                              : isMinimal
-                                ? 'text-zinc-500'
-                                : isBoutique
-                                  ? 'text-stone-600'
-                                  : 'text-slate-500'
-                          }`}
+                          className={`text-xs line-clamp-2 mt-1.5 leading-relaxed font-medium ${isTech
+                            ? 'text-slate-400'
+                            : isMinimal
+                              ? 'text-zinc-500'
+                              : isBoutique
+                                ? 'text-stone-600'
+                                : 'text-slate-500'
+                            }`}
                         >
                           {p.description ||
                             (isArabic ? 'جودة ممتازة وضمان كامل مع طلب مباشر.' : 'High quality guaranteed with direct ordering.')}
@@ -1522,15 +1500,14 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                     </div>
 
                     <div
-                      className={`pt-3.5 mt-3.5 border-t ${
-                        isTech
-                          ? 'border-slate-800'
-                          : isMinimal
-                            ? 'border-zinc-200/80'
-                            : isBoutique
-                              ? 'border-amber-900/10'
-                              : 'border-slate-100'
-                      } ${isCatalog || isBoutique ? 'space-y-2.5' : 'flex items-center justify-between gap-2'}`}
+                      className={`pt-3.5 mt-3.5 border-t ${isTech
+                        ? 'border-slate-800'
+                        : isMinimal
+                          ? 'border-zinc-200/80'
+                          : isBoutique
+                            ? 'border-amber-900/10'
+                            : 'border-slate-100'
+                        } ${isCatalog || isBoutique ? 'space-y-2.5' : 'flex items-center justify-between gap-2'}`}
                     >
                       {!isBoutique && (
                         <div>
@@ -1538,15 +1515,14 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                             <span className="text-[10px] block font-bold text-slate-400">{t('price_label')}</span>
                           )}
                           <span
-                            className={`text-base sm:text-lg font-black font-mono ${
-                              isTech
-                                ? 'text-cyan-400'
-                                : isMinimal
-                                  ? 'text-zinc-950'
-                                  : isCatalog
-                                    ? 'text-emerald-700'
-                                    : 'text-[#0084d6]'
-                            }`}
+                            className={`text-base sm:text-lg font-black font-mono ${isTech
+                              ? 'text-cyan-400'
+                              : isMinimal
+                                ? 'text-zinc-950'
+                                : isCatalog
+                                  ? 'text-emerald-700'
+                                  : 'text-[#0084d6]'
+                              }`}
                           >
                             {formatPrice(p.price)}{' '}
                             <span className={`text-[11px] font-extrabold ${isTech ? 'text-slate-300' : 'text-slate-500'}`}>
@@ -1576,15 +1552,14 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className={`max-w-xl w-full overflow-hidden shadow-2xl border animate-fadeIn ${
-              isTech
-                ? 'rounded-2xl bg-[#0f172a] border-cyan-500/35 text-slate-100'
-                : isMinimal
-                  ? 'rounded-none bg-white border-zinc-300 text-zinc-950'
-                  : isBoutique
-                    ? 'rounded-3xl bg-[#fffaf4] border-amber-900/20 text-stone-900'
-                    : 'rounded-3xl bg-white border-slate-200 text-slate-900'
-            }`}
+            className={`max-w-xl w-full overflow-hidden shadow-2xl border animate-fadeIn ${isTech
+              ? 'rounded-2xl bg-[#0f172a] border-cyan-500/35 text-slate-100'
+              : isMinimal
+                ? 'rounded-none bg-white border-zinc-300 text-zinc-950'
+                : isBoutique
+                  ? 'rounded-3xl bg-[#fffaf4] border-amber-900/20 text-stone-900'
+                  : 'rounded-3xl bg-white border-slate-200 text-slate-900'
+              }`}
           >
             <div className={`relative aspect-[4/3] w-full ${isTech ? 'bg-slate-900' : isBoutique ? 'bg-[#f6ede2]' : 'bg-slate-100'}`}>
               <img
@@ -1608,32 +1583,30 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
             <div className="p-6 space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <span
-                  className={`text-xs font-black px-3 py-1 ${
-                    isTech
-                      ? 'rounded-md bg-cyan-950 text-cyan-300 border border-cyan-500/30 font-mono'
-                      : isMinimal
-                        ? 'rounded-none bg-zinc-100 text-zinc-900 uppercase tracking-wider text-[11px]'
-                        : isBoutique
-                          ? 'rounded-full bg-amber-100 text-[#8c2f13]'
-                          : isCatalog
-                            ? 'rounded-lg bg-emerald-50 text-emerald-700'
-                            : 'rounded-full bg-[#e6f4fe] text-[#0084d6]'
-                  }`}
+                  className={`text-xs font-black px-3 py-1 ${isTech
+                    ? 'rounded-md bg-cyan-950 text-cyan-300 border border-cyan-500/30 font-mono'
+                    : isMinimal
+                      ? 'rounded-none bg-zinc-100 text-zinc-900 uppercase tracking-wider text-[11px]'
+                      : isBoutique
+                        ? 'rounded-full bg-amber-100 text-[#8c2f13]'
+                        : isCatalog
+                          ? 'rounded-lg bg-emerald-50 text-emerald-700'
+                          : 'rounded-full bg-[#e6f4fe] text-[#0084d6]'
+                    }`}
                 >
                   {selectedProduct.category || fallbackCategory}
                 </span>
                 <span
-                  className={`text-xl font-black font-mono ${
-                    isTech
-                      ? 'text-cyan-400'
-                      : isMinimal
-                        ? 'text-zinc-950'
-                        : isBoutique
-                          ? 'text-[#8c2f13]'
-                          : isCatalog
-                            ? 'text-emerald-700'
-                            : 'text-[#0084d6]'
-                  }`}
+                  className={`text-xl font-black font-mono ${isTech
+                    ? 'text-cyan-400'
+                    : isMinimal
+                      ? 'text-zinc-950'
+                      : isBoutique
+                        ? 'text-[#8c2f13]'
+                        : isCatalog
+                          ? 'text-emerald-700'
+                          : 'text-[#0084d6]'
+                    }`}
                 >
                   {formatPrice(selectedProduct.price)} {currency}
                 </span>
@@ -1646,9 +1619,8 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
               </p>
 
               <div
-                className={`pt-4 border-t flex flex-wrap items-center gap-3 ${
-                  isTech ? 'border-slate-800' : isBoutique ? 'border-amber-900/15' : 'border-slate-100'
-                }`}
+                className={`pt-4 border-t flex flex-wrap items-center gap-3 ${isTech ? 'border-slate-800' : isBoutique ? 'border-amber-900/15' : 'border-slate-100'
+                  }`}
               >
                 <div className="flex-1">{renderCardAction(selectedProduct, true)}</div>
                 {storeWhatsAppHref && (
@@ -1661,13 +1633,12 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                     )!}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`px-4 py-2.5 text-xs font-extrabold inline-flex items-center gap-1.5 border transition-colors ${
-                      isTech
-                        ? 'rounded-xl border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'
-                        : isMinimal
-                          ? 'rounded-none border-zinc-300 text-zinc-900 hover:border-zinc-950'
-                          : 'rounded-2xl border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                    }`}
+                    className={`px-4 py-2.5 text-xs font-extrabold inline-flex items-center gap-1.5 border transition-colors ${isTech
+                      ? 'rounded-xl border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'
+                      : isMinimal
+                        ? 'rounded-none border-zinc-300 text-zinc-900 hover:border-zinc-950'
+                        : 'rounded-2xl border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                      }`}
                   >
                     <MessageCircle className="w-4 h-4" />
                     <span>{isArabic ? 'اسأل عبر واتساب' : 'Ask on WhatsApp'}</span>
@@ -1718,52 +1689,40 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
 
       {/* 5. THEMED STOREFRONT FOOTER */}
       <footer
-        className={`w-full border-t font-cairo transition-colors ${
-          isTech
-            ? 'bg-[#050810] border-slate-800 text-slate-300'
-            : isMinimal
-              ? 'bg-white border-zinc-200 text-zinc-700'
-              : isBoutique
-                ? 'bg-[#361106] border-amber-900/30 text-amber-100/90'
-                : isCatalog
-                  ? 'bg-slate-900 border-slate-800 text-slate-300'
-                  : 'bg-[#0e1f38] border-slate-800 text-slate-200'
-        }`}
+        className={`w-full border-t font-cairo transition-colors ${isTech
+          ? 'bg-[#050810] border-slate-800 text-slate-300'
+          : isMinimal
+            ? 'bg-white border-zinc-200 text-zinc-700'
+            : isBoutique
+              ? 'bg-[#361106] border-amber-900/30 text-amber-100/90'
+              : isCatalog
+                ? 'bg-slate-900 border-slate-800 text-slate-300'
+                : 'bg-[#0e1f38] border-slate-800 text-slate-200'
+          }`}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3.5">
           {/* Store Identity */}
-          <div className="space-y-2.5">
-            <div className="flex items-center gap-2.5">
-              <img
-                src={logoSrc}
-                alt={store?.name || 'Store'}
-                className={`w-9 h-9 object-contain p-1 ${
-                  isMinimal ? 'border border-zinc-200 bg-zinc-50' : 'rounded-xl bg-white/95'
+          <div className="flex items-center gap-2.5 min-w-0">
+            <img
+              src={logoSrc}
+              alt={store?.name || 'Store'}
+              className={`w-8 h-8 object-contain p-1 shrink-0 ${isMinimal ? 'border border-zinc-200 bg-zinc-50' : 'rounded-lg bg-white/95'
                 }`}
-              />
-              <div>
-                <strong className={`text-sm font-black block ${isMinimal ? 'text-zinc-950' : 'text-white'}`}>
-                  {store?.name || t('platform_name')}
-                </strong>
-                <span className={`text-[11px] ${isMinimal ? 'text-zinc-500' : 'opacity-75'}`}>
-                  {store?.activity_type || t('cloud_store_mgmt')}
-                </span>
-              </div>
+            />
+            <div className="min-w-0">
+              <strong className={`text-xs sm:text-sm font-black block truncate ${isMinimal ? 'text-zinc-950' : 'text-white'}`}>
+                {store?.name || t('platform_name')}
+              </strong>
+              <span className={`text-[11px] block truncate ${isMinimal ? 'text-zinc-500' : 'opacity-75'}`}>
+                {store?.activity_type || t('cloud_store_mgmt')}
+              </span>
             </div>
-            {store?.bio && (
-              <p className={`text-xs leading-6 max-w-xs ${isMinimal ? 'text-zinc-600' : 'opacity-80'}`}>
-                {store.bio}
-              </p>
-            )}
           </div>
 
-          {/* Quick Category Links */}
-          <div className="space-y-2">
-            <h4 className={`text-xs font-black uppercase tracking-wider ${isMinimal ? 'text-zinc-950' : 'text-white'}`}>
-              {isArabic ? 'التصنيفات' : 'Categories'}
-            </h4>
-            <div className="flex flex-wrap gap-1.5">
-              {categories.slice(0, 6).map((cat) => (
+          {/* Quick Category Links (only when store has categories) */}
+          {categories.length > 1 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {categories.slice(0, 5).map((cat) => (
                 <button
                   key={cat}
                   type="button"
@@ -1771,34 +1730,29 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                     setSelectedCategory(cat);
                     scrollToCatalog();
                   }}
-                  className={`px-2.5 py-1 text-[11px] font-bold transition-colors cursor-pointer ${
-                    isMinimal
-                      ? 'border border-zinc-200 text-zinc-700 hover:border-zinc-950 hover:text-zinc-950'
-                      : 'rounded-lg bg-white/10 hover:bg-white/20 text-current'
-                  }`}
+                  className={`px-2.5 py-1 text-[11px] font-bold transition-colors cursor-pointer ${isMinimal
+                    ? 'border border-zinc-200 text-zinc-700 hover:border-zinc-950 hover:text-zinc-950'
+                    : 'rounded-lg bg-white/10 hover:bg-white/20 text-current'
+                    }`}
                 >
                   {cat}
                 </button>
               ))}
             </div>
-          </div>
+          )}
 
           {/* Direct Store Contact */}
-          <div className="space-y-2">
-            <h4 className={`text-xs font-black uppercase tracking-wider ${isMinimal ? 'text-zinc-950' : 'text-white'}`}>
-              {isArabic ? 'التواصل المباشر' : 'Direct Contact'}
-            </h4>
-            <div className="flex flex-wrap items-center gap-2">
+          {(phone || storeWhatsAppHref) && (
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               {phone && (
                 <a
                   href={`tel:${phone.replace(/[^\d+]/g, '')}`}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold transition-colors ${
-                    isMinimal
-                      ? 'border border-zinc-300 text-zinc-900 hover:border-zinc-950'
-                      : 'rounded-lg bg-white/10 hover:bg-white/20 text-white'
-                  }`}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold transition-colors ${isMinimal
+                    ? 'border border-zinc-300 text-zinc-900 hover:border-zinc-950'
+                    : 'rounded-lg bg-white/10 hover:bg-white/20 text-white'
+                    }`}
                 >
-                  <Phone className="w-3.5 h-3.5" />
+                  <Phone className="w-3 h-3" />
                   <span dir="ltr" className="font-mono">
                     {displayPhone}
                   </span>
@@ -1809,27 +1763,25 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                   href={storeWhatsAppHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#25d366] hover:bg-[#1ebe5b] px-3 py-1.5 text-xs font-black text-white transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#25d366] hover:bg-[#1ebe5b] px-2.5 py-1.5 text-[11px] font-black text-white transition-colors"
                 >
-                  <MessageCircle className="w-3.5 h-3.5" />
+                  <MessageCircle className="w-3 h-3" />
                   <span>{isArabic ? 'واتساب المتجر' : 'Store WhatsApp'}</span>
                 </a>
               )}
             </div>
-          </div>
+          )}
         </div>
 
         <div
-          className={`border-t py-3.5 px-4 text-center text-[11px] ${
-            isMinimal ? 'border-zinc-200 text-zinc-500' : 'border-white/10 text-white/60'
-          }`}
+          className={`border-t py-2 px-4 text-center text-[11px] ${isMinimal ? 'border-zinc-200 text-zinc-500' : 'border-white/10 text-white/60'
+            }`}
         >
           developed by{' '}
           <a
             href="https://daidarsoluations.com/ar"
-            className={`font-bold underline underline-offset-4 ${
-              isMinimal ? 'text-zinc-900 hover:text-zinc-600' : 'text-white/90 hover:text-white'
-            }`}
+            className={`font-bold underline underline-offset-4 ${isMinimal ? 'text-zinc-900 hover:text-zinc-600' : 'text-white/90 hover:text-white'
+              }`}
           >
             daidarsoluations
           </a>
