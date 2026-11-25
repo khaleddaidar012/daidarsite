@@ -387,10 +387,6 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                   <Clock className="w-3 h-3 text-sky-300" />
                   {isArabic ? 'مفتوح 24/7 للطلبات' : 'Open 24/7 for orders'}
                 </span>
-                <span className="inline-flex items-center gap-1">
-                  <MessageCircle className="w-3 h-3 text-emerald-300" />
-                  {isArabic ? 'تأكيد سريع عبر واتساب' : 'Instant WhatsApp confirmation'}
-                </span>
               </span>
             </div>
           </div>
@@ -826,7 +822,7 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
               <p className="text-xs sm:text-sm text-slate-300 leading-7 max-w-xl">
                 {store?.bio ||
                   (isArabic
-                    ? 'تصفح المواصفات والأسعار بدقة عالية وأضف اختياراتك للسلة لتأكيد الطلب فورًا عبر واتساب.'
+                    ? 'تصفح المواصفات والأسعار بدقة عالية وأضف اختياراتك للسلة لإتمام طلبك بسهولة وسرعة.'
                     : 'Compare specifications and pricing with crystal clarity, then check out directly in one step.')}
               </p>
 
@@ -956,7 +952,7 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                   className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-extrabold text-white transition-colors"
                 >
                   <MessageCircle className="w-3.5 h-3.5" />
-                  <span>{isArabic ? 'طلب عبر واتساب' : 'WhatsApp Order'}</span>
+                  <span>{isArabic ? 'تواصل عبر واتساب' : 'Chat on WhatsApp'}</span>
                 </a>
               )}
             </div>
@@ -973,9 +969,7 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
             <div className="space-y-4">
               <div className="inline-flex items-center gap-2 text-xs font-black text-[#0084d6] bg-[#e6f4fe] px-3.5 py-1.5 rounded-full border border-sky-200/80">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>
-                  {store?.activity_type || t('shop_safe')} • {t('whatsapp_order')}
-                </span>
+                <span>{store?.activity_type || t('shop_safe')}</span>
               </div>
 
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#0e1f38] tracking-tight leading-tight">
@@ -985,8 +979,8 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
               <p className="text-xs sm:text-sm text-slate-600 leading-7 max-w-xl font-medium">
                 {store?.bio ||
                   (isArabic
-                    ? 'تصفح أحدث المنتجات والعروض المتوفرة، وأضف اختياراتك للسلة لإتمام الطلب مباشرة عبر واتساب بخطوة واحدة.'
-                    : 'Browse our latest products and collections, add favorites to your bag, and order directly via WhatsApp in one click.')}
+                    ? 'تصفح أحدث المنتجات والعروض المتوفرة، وأضف اختياراتك للسلة لإتمام طلبك بخطوة واحدة سهلة وسريعة.'
+                    : 'Browse our latest products and collections, add favorites to your bag, and place your order in one easy step.')}
               </p>
 
               <div className="flex flex-wrap items-center gap-3 pt-1">
@@ -1035,8 +1029,8 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                   <span className="text-[11px] font-bold text-slate-500">{isArabic ? 'تصفح بأي وقت' : 'Shop anytime'}</span>
                 </div>
                 <div className="rounded-2xl bg-white/90 border border-sky-100 p-3 shadow-sm">
-                  <strong className="block text-xs sm:text-sm font-black text-emerald-600">{isArabic ? 'مباشر' : 'Direct'}</strong>
-                  <span className="text-[11px] font-bold text-slate-500">{isArabic ? 'عبر واتساب' : 'Via WhatsApp'}</span>
+                  <strong className="block text-xs sm:text-sm font-black text-emerald-600">{isArabic ? 'تواصل مباشر' : 'Direct'}</strong>
+                  <span className="text-[11px] font-bold text-slate-500">{isArabic ? 'مع صاحب المتجر' : 'With store owner'}</span>
                 </div>
               </div>
             </div>
