@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>تشجيرة موقع دعيدر — daidarsoluations.com</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f4f8fc;
+      --surface: #ffffff;
+      --surface-soft: #f8fafc;
+      --border: #dbe5f1;
+      --text: #0e1f38;
+      --muted: #556987;
+      --line: #cbd5e1;
+      --shadow: 0 10px 30px rgba(14, 31, 56, 0.06);
+
+      --c-public: #0084d6;
+      --c-public-bg: #e6f4fe;
+      --c-hub: #4f46e5;
+      --c-hub-bg: #eef2ff;
+      --c-store: #059669;
+      --c-store-bg: #ecfdf5;
+      --c-admin: #d97706;
+      --c-admin-bg: #fffbeb;
+      --c-api: #0891b2;
+      --c-api-bg: #ecfeff;
+    }
+
+    body.dark {
+      --bg: #070d19;
+      --surface: #0f172a;
+      --surface-soft: #142038;
+      --border: #1e2d4a;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --line: #2a3b5c;
+      --shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+
+      --c-public-bg: rgba(0, 132, 214, 0.16);
+      --c-hub-bg: rgba(79, 70, 229, 0.18);
+      --c-store-bg: rgba(5, 150, 105, 0.18);
+      --c-admin-bg: rgba(217, 119, 6, 0.18);
+      --c-api-bg: rgba(8, 145, 178, 0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Cairo', system-ui, -apple-system, sans-serif;
+      background:
+        radial-gradient(circle at 85% 0%, rgba(0, 132, 214, 0.1), transparent 40%),
+        radial-gradient(circle at 10% 100%, rgba(5, 150, 105, 0.08), transparent 45%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+      transition: background 0.25s ease, color 0.25s ease;
+    }
+
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 28px 18px 56px;
+    }
+
+    /* ── Header ───────────────────────────────────────── */
+    .hero {
+      background: linear-gradient(135deg, #0b1930 0%, #102a4c 55%, #006eb3 100%);
+      color: #ffffff;
+      border-radius: 26px;
+      padding: 28px 28px 24px;
+      box-shadow: 0 18px 42px rgba(11, 25, 48, 0.2);
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 22px;
+    }
+
+    .hero::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+      background-size: 30px 30px;
+      pointer-events: none;
+    }
+
+    .hero-top {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .hero h1 {
+      font-size: clamp(22px, 3vw, 32px);
+      font-weight: 900;
+      letter-spacing: -0.01em;
+    }
+
+    .hero p {
+      color: rgba(255, 255, 255, 0.84);
+      font-size: 14px;
+      margin-top: 6px;
+      max-width: 680px;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .btn {
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 800;
+      border-radius: 12px;
+      padding: 9px 14px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn-glass {
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.24);
+      color: #ffffff;
+    }
+
+    .btn-glass:hover {
+      background: rgba(255, 255, 255, 0.24);
+    }
+
+    .stats-row {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .stat-card {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 16px;
+      padding: 11px 14px;
+      backdrop-filter: blur(6px);
+    }
+
+    .stat-card strong {
+      display: block;
+      font-size: 20px;
+      font-weight: 900;
+      line-height: 1.2;
+    }
+
+    .stat-card span {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.8);
+      font-weight: 600;
+    }
+
+    /* ── Toolbar ──────────────────────────────────────── */
+    .toolbar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 14px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .search-wrap {
+      flex: 1;
+      min-width: 230px;
+      position: relative;
+    }
+
+    .search-wrap input {
+      width: 100%;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px 14px;
+      border-radius: 13px;
+      border: 1px solid var(--border);
+      background: var(--surface-soft);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .search-wrap input:focus {
+      border-color: var(--c-public);
+      box-shadow: 0 0 0 3px rgba(0, 132, 214, 0.15);
+    }
+
+    .filter-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .pill {
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 7px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface-soft);
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+
+    .pill:hover {
+      border-color: var(--c-public);
+      color: var(--text);
+    }
+
+    .pill.active {
+      background: var(--text);
+      color: var(--surface);
+      border-color: var(--text);
+    }
+
+    /* ── Root Node ────────────────────────────────────── */
+    .root-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .root-node {
+      background: var(--surface);
+      border: 2px solid var(--c-public);
+      border-radius: 18px;
+      padding: 12px 24px;
+      box-shadow: var(--shadow);
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .root-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.2);
+    }
+
+    .root-domain {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px;
+      font-weight: 700;
+      direction: ltr;
+    }
+
+    .root-sub {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .trunk-line {
+      width: 2px;
+      height: 24px;
+      background: var(--line);
+    }
+
+    /* ── Branch Sections (CSS Tree) ───────────────────── */
+    .branches {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+
+    .branch {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      border-top: 4px solid var(--branch-color, var(--c-public));
+    }
+
+    .branch[data-group="public"] { --branch-color: var(--c-public); --branch-bg: var(--c-public-bg); }
+    .branch[data-group="hub"]    { --branch-color: var(--c-hub);    --branch-bg: var(--c-hub-bg); }
+    .branch[data-group="store"]  { --branch-color: var(--c-store);  --branch-bg: var(--c-store-bg); }
+    .branch[data-group="admin"]  { --branch-color: var(--c-admin);  --branch-bg: var(--c-admin-bg); }
+    .branch[data-group="api"]    { --branch-color: var(--c-api);    --branch-bg: var(--c-api-bg); }
+
+    .branch > summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 16px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: linear-gradient(to left, var(--branch-bg), transparent 65%);
+      user-select: none;
+    }
+
+    .branch > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .branch-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .branch-num {
+      width: 34px;
+      height: 34px;
+      border-radius: 11px;
+      background: var(--branch-color);
+      color: #ffffff;
+      font-weight: 900;
+      font-size: 15px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+
+    .branch-title {
+      font-size: 17px;
+      font-weight: 900;
+    }
+
+    .branch-desc {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .branch-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .count-chip {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--branch-bg);
+      color: var(--branch-color);
+      border: 1px solid color-mix(in srgb, var(--branch-color) 28%, transparent);
+    }
+
+    .chevron {
+      width: 28px;
+      height: 28px;
+      border-radius: 9px;
+      background: var(--surface-soft);
+      border: 1px solid var(--border);
+      display: grid;
+      place-items: center;
+      font-size: 13px;
+      color: var(--muted);
+      transition: transform 0.2s ease;
+    }
+
+    .branch[open] > summary .chevron {
+      transform: rotate(180deg);
+    }
+
+    /* ── Tree List Connectors (RTL) ───────────────────── */
+    .tree-body {
+      padding: 8px 22px 22px;
+      border-top: 1px solid var(--border);
+    }
+
+    ul.tree {
+      list-style: none;
+      position: relative;
+      padding-right: 22px;
+      margin-top: 10px;
+    }
+
+    ul.tree::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 18px;
+      right: 6px;
+      width: 2px;
+      background: var(--line);
+    }
+
+    ul.tree > li {
+      position: relative;
+      padding: 7px 18px 7px 0;
+    }
+
+    ul.tree > li::before {
+      content: '';
+      position: absolute;
+      top: 24px;
+      right: -16px;
+      width: 18px;
+      height: 2px;
+      background: var(--line);
+    }
+
+    ul.tree > li::after {
+      content: '';
+      position: absolute;
+      top: 20px;
+      right: -2px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 2.5px solid var(--branch-color, var(--c-public));
+    }
+
+    .node-card {
+      background: var(--surface-soft);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 11px 14px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      transition: border-color 0.18s ease, transform 0.15s ease, box-shadow 0.18s ease;
+    }
+
+    .node-card:hover {
+      border-color: var(--branch-color);
+      box-shadow: 0 6px 18px rgba(14, 31, 56, 0.06);
+      transform: translateX(-2px);
+    }
+
+    .node-main {
+      min-width: 220px;
+      flex: 1;
+    }
+
+    .node-title-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .node-title {
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .path-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      font-weight: 700;
+      direction: ltr;
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 7px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--branch-color);
+    }
+
+    .node-note {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    .node-tags {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tag {
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .tag.lang  { color: #0369a1; border-color: #bae6fd; background: #f0f9ff; }
+    .tag.auth  { color: #4338ca; border-color: #c7d2fe; background: #eef2ff; }
+    .tag.admin { color: #b45309; border-color: #fde68a; background: #fffbeb; }
+    .tag.wa    { color: #15803d; border-color: #bbf7d0; background: #f0fdf4; }
+
+    body.dark .tag.lang  { color: #7dd3fc; border-color: rgba(56, 189, 248, 0.35); background: rgba(56, 189, 248, 0.12); }
+    body.dark .tag.auth  { color: #a5b4fc; border-color: rgba(129, 140, 248, 0.35); background: rgba(129, 140, 248, 0.14); }
+    body.dark .tag.admin { color: #fcd34d; border-color: rgba(251, 191, 36, 0.35); background: rgba(251, 191, 36, 0.14); }
+    body.dark .tag.wa    { color: #86efac; border-color: rgba(74, 222, 128, 0.35); background: rgba(74, 222, 128, 0.14); }
+
+    .visit-link {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--branch-color);
+      text-decoration: none;
+      padding: 4px 9px;
+      border-radius: 8px;
+      background: var(--branch-bg);
+      white-space: nowrap;
+    }
+
+    .visit-link:hover {
+      text-decoration: underline;
+    }
+
+    /* Nested sub-tree */
+    ul.tree ul.tree {
+      margin-top: 8px;
+      padding-right: 20px;
+    }
+
+    ul.tree ul.tree .node-card {
+      background: var(--surface);
+      padding: 8px 12px;
+    }
+
+    /* ── Legend & Footer ──────────────────────────────── */
+    .legend {
+      margin-top: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 16px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .legend-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 42px 20px;
+      background: var(--surface);
+      border: 1px dashed var(--border);
+      border-radius: 20px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    /* ── Print Styles ─────────────────────────────────── */
+    @media print {
+      body { background: #fff; color: #000; }
+      .toolbar, .hero-actions, .visit-link { display: none !important; }
+      .hero { box-shadow: none; break-inside: avoid; }
+      .branch { box-shadow: none; break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Hero -->
+    <header class="hero">
+      <div class="hero-top">
+        <div>
+          <span class="hero-badge">🗺️ خريطة وهيكلة الموقع الكاملة</span>
+          <h1>تشجيرة صفحات موقع دعيدر (Daidar Solutions)</h1>
+          <p>
+            خريطة بصرية تفاعلية تجمع كل صفحات الموقع التعريفي، دعيدر هب، منظومة المتاجر الإلكترونية (متجري)،
+            الروابط المختصرة والدومينات الخاصة، بوابات الإدارة والموظفين، ومسارات الـ API الخلفية.
+          </p>
+        </div>
+        <div class="hero-actions">
+          <button type="button" class="btn btn-glass" id="toggleAllBtn">طيّ / فتح الكل</button>
+          <button type="button" class="btn btn-glass" id="themeBtn">الوضع الداكن 🌙</button>
+          <button type="button" class="btn btn-glass" onclick="window.print()">طباعة / PDF 🖨️</button>
+        </div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card"><strong>5</strong><span>أقسام رئيسية بالمنظومة</span></div>
+        <div class="stat-card"><strong>AR / EN</strong><span>دعم كامل للغتين</span></div>
+        <div class="stat-card"><strong>10</strong><span>أقسام داخل دعيدر هب</span></div>
+        <div class="stat-card"><strong>6</strong><span>تبويبات للوحة صاحب المتجر</span></div>
+        <div class="stat-card"><strong>5</strong><span>ثيمات احترافية للمتاجر</span></div>
+      </div>
+    </header>
+
+    <!-- Toolbar -->
+    <section class="toolbar" aria-label="أدوات البحث والتصفية">
+      <div class="search-wrap">
+        <input
+          type="search"
+          id="searchInput"
+          placeholder="ابحث باسم الصفحة أو المسار (مثلاً: stores، admin، portfolio، /s/، واتساب)..."
+        />
+      </div>
+      <div class="filter-pills" id="filterPills">
+        <button type="button" class="pill active" data-filter="all">الكل</button>
+        <button type="button" class="pill" data-filter="public">الموقع العام</button>
+        <button type="button" class="pill" data-filter="hub">دعيدر هب</button>
+        <button type="button" class="pill" data-filter="store">متجري</button>
+        <button type="button" class="pill" data-filter="admin">الإدارة والموظفين</button>
+        <button type="button" class="pill" data-filter="api">مسارات API</button>
+      </div>
+    </section>
+
+    <!-- Root Domain Node -->
+    <div class="root-wrap">
+      <div class="root-node">
+        <span class="root-dot" aria-hidden="true"></span>
+        <div>
+          <div class="root-domain">https://daidarsoluations.com</div>
+          <div class="root-sub">الجذر الرئيسي — Cloudflare Pages (`daidarsite2`) + D1 Databases</div>
+        </div>
+      </div>
+      <div class="trunk-line" aria-hidden="true"></div>
+    </div>
+
+    <!-- Branches -->
+    <main class="branches" id="branches">
+
+      <!-- 1. Public Website -->
+      <details class="branch" data-group="public" open>
+        <summary>
+          <div class="branch-head">
+            <span class="branch-num">1</span>
+            <div>
+              <div class="branch-title">الموقع التعريفي العام (Public Website)</div>
+              <div class="branch-desc">صفحات التعريف بشركة دعيدر ومعرض الأعمال ونموذج طلب المشاريع</div>
+            </div>
+          </div>
+          <div class="branch-meta">
+            <span class="count-chip">5 مسارات + 3 مشاريع</span>
+            <span class="chevron">▾</span>
+          </div>
+        </summary>
+        <div class="tree-body">
+          <ul class="tree">
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">الجذر الرئيسي (تحويل تلقائي)</span>
+                    <span class="path-code">/</span>
+                  </div>
+                  <div class="node-note">يحوّل الزائر تلقائيًا إلى النسخة العربية `/ar`.</div>
+                </div>
+                <div class="node-tags">
+                  <a class="visit-link" href="https://daidarsoluations.com/" target="_blank" rel="noopener">فتح ↗</a>
+                </div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">الصفحة الرئيسية للشركة</span>
+                    <span class="path-code">/{ar|en}</span>
+                  </div>
+                  <div class="node-note">واجهة دعيدر الرئيسية: الهيرو، الخدمات، قسم من نحن، التواصل السريع.</div>
+                </div>
+                <div class="node-tags">
+                  <span class="tag lang">AR / EN</span>
+                  <a class="visit-link" href="https://daidarsoluations.com/ar" target="_blank" rel="noopener">فتح ↗</a>
+                </div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">معرض الأعمال (Portfolio)</span>
+                    <span class="path-code">/{ar|en}/portfolio</span>
+                  </div>
+                  <div class="node-note">استعراض المشاريع والأنظمة التي طوّرتها دعيدر.</div>
+                </div>
+                <div class="node-tags">
+                  <span class="tag lang">AR / EN</span>
+                  <a class="visit-link" href="https://daidarsoluations.com/ar/portfolio" target="_blank" rel="noopener">فتح ↗</a>
+                </div>
+              </div>
+              <ul class="tree">
+                <li>
+                  <div class="node-card">
+                    <div class="node-main">
+                      <div class="node-title-row">
+                        <span class="node-title">Nile Link Logistics</span>
+                        <span class="path-code">/{ar|en}/portfolio/nile-link-logistics</span>
+                      </div>
+                    </div>
+                    <div class="node-tags">
+                      <a class="visit-link" href="https://daidarsoluations.com/ar/portfolio/nile-link-logistics" target="_blank" rel="noopener">فتح ↗</a>
+                    </div>
+                  </div>
+                </li>
+                <li>
+                  <div class="node-card">
+                    <div class="node-main">
+                      <div class="node-title-row">
+                        <span class="node-title">Spark Engineering ERP</span>
+                        <span class="path-code">/{ar|en}/portfolio/spark-engineering-erp</span>
+                      </div>
+                    </div>
+                    <div class="node-tags">
+                      <a class="visit-link" href="https://daidarsoluations.com/ar/portfolio/spark-engineering-erp" target="_blank" rel="noopener">فتح ↗</a>
+                    </div>
+                  </div>
+                </li>
+                <li>
+                  <div class="node-card">
+                    <div class="node-main">
+                      <div class="node-title-row">
+                        <span class="node-title">El Kayan CRM</span>
+                        <span class="path-code">/{ar|en}/portfolio/el-kayan-crm</span>
+                      </div>
+                    </div>
+                    <div class="node-tags">
+                      <a class="visit-link" href="https://daidarsoluations.com/ar/portfolio/el-kayan-crm" target="_blank" rel="noopener">فتح ↗</a>
+                    </div>
+                  </div>
+                </li>
+              </ul>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">طلب مشروع أو خدمة جديدة</span>
+                    <span class="path-code">/{ar|en}/request</span>
+                  </div>
+                  <div class="node-note">نموذج إرسال تفاصيل المشروع المطلوب مباشرة لفريق دعيدر.</div>
+                </div>
+                <div class="node-tags">
+                  <span class="tag lang">AR / EN</span>
+                  <a class="visit-link" href="https://daidarsoluations.com/ar/request" target="_blank" rel="noopener">فتح ↗</a>
+                </div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">صفحة الخدمات القادمة قريبًا</span>
+                    <span class="path-code">/{ar|en}/coming-soon</span>
+                  </div>
+                  <div class="node-note">صفحة تمهيدية للميزات والأنظمة الجاري إطلاقها.</div>
+                </div>
+                <div class="node-tags">
+                  <span class="tag lang">AR / EN</span>
+                </div>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </details>
+
+      <!-- 2. Daidar Hub -->
+      <details class="branch" data-group="hub" open>
+        <summary>
+          <div class="branch-head">
+            <span class="branch-num">2</span>
+            <div>
+              <div class="branch-title">دعيدر هب (Daidar Hub)</div>
+              <div class="branch-desc">المنصة الموحّدة للعملاء — الدخول الموحّد، الخدمات، الاشتراكات، والأنظمة</div>
+            </div>
+          </div>
+          <div class="branch-meta">
+            <span class="count-chip">10 أقسام · واتساب دعم دعيدر</span>
+            <span class="chevron">▾</span>
+          </div>
+        </summary>
+        <div class="tree-body">
+          <ul class="tree">
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">الرئيسية لدعيدر هب</span>
+                    <span class="path-code">/{ar|en}/hub</span>
+                  </div>
+                  <div class="node-note">المدخل الرئيسي للعميل لكل خدمات دعيدر تحت حساب واحد.</div>
+                </div>
+                <div class="node-tags">
+                  <span class="tag lang">AR / EN</span>
+                  <span class="tag wa">واتساب دعيدر</span>
+                  <a class="visit-link" href="https://daidarsoluations.com/ar/hub" target="_blank" rel="noopener">فتح ↗</a>
+                </div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">تسجيل الدخول وإنشاء الحساب</span>
+                    <span class="path-code">/{ar|en}/hub/login</span>
+                  </div>
+                  <div class="node-note">بوابة الدخول الموحّد (حساب عادي أو Google OIDC) للعملاء وأصحاب المتاجر.</div>
+                </div>
+                <div class="node-tags">
+                  <span class="tag lang">AR / EN</span>
+                  <span class="tag wa">واتساب دعيدر</span>
+                  <a class="visit-link" href="https://daidarsoluations.com/ar/hub/login" target="_blank" rel="noopener">فتح ↗</a>
+                </div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">لوحة تحكم العميل (Dashboard)</span>
+                    <span class="path-code">/{ar|en}/hub/dashboard</span>
+                  </div>
+                  <div class="node-note">نظرة شاملة على خدمات العميل النشطة، المتجر، والباقة الحالية.</div>
+                </div>
+                <div class="node-tags">
+                  <span class="tag auth">يتطلب دخول</span>
+                  <span class="tag wa">واتساب دعيدر</span>
+                </div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">دليل الخدمات المتاحة</span>
+                    <span class="path-code">/{ar|en}/hub/services</span>
+                  </div>
+                  <div class="node-note">تصفح الخدمات والباقات المتاحة للاشتراك داخل دعيدر هب.</div>
+                </div>
+                <div class="node-tags"><span class="tag lang">AR / EN</span></div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">خدماتي ومشاريعي</span>
+                    <span class="path-code">/{ar|en}/hub/my-services</span>
+                  </div>
+                  <div class="node-note">قائمة الخدمات المملوكة للعميل وحالة كل خدمة (بما فيها الباقة المجانية أو المدفوعة).</div>
+                </div>
+                <div class="node-tags"><span class="tag auth">يتطلب دخول</span></div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">الاشتراكات والفواتير</span>
+                    <span class="path-code">/{ar|en}/hub/subscriptions</span>
+                  </div>
+                  <div class="node-note">متابعة تواريخ التجديد، الترقية، وحالة طلبات الدفع.</div>
+                </div>
+                <div class="node-tags"><span class="tag auth">يتطلب دخول</span></div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">الأنظمة والبرامج</span>
+                    <span class="path-code">/{ar|en}/hub/systems</span>
+                  </div>
+                  <div class="node-note">إدارة وتحميل الأنظمة السحابية وتطبيقات سطح المكتب وربط الأجهزة.</div>
+                </div>
+                <div class="node-tags"><span class="tag auth">يتطلب دخول</span></div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">خدمات أخرى</span>
+                    <span class="path-code">/{ar|en}/hub/other-services</span>
+                  </div>
+                  <div class="node-note">خدمات إضافية وتكاملات مساندة لعملاء دعيدر.</div>
+                </div>
+                <div class="node-tags"><span class="tag lang">AR / EN</span></div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">إعدادات الحساب الشخصي</span>
+                    <span class="path-code">/{ar|en}/hub/account</span>
+                  </div>
+                  <div class="node-note">تحديث بيانات الحساب والأمان والجلسات المرتبطة.</div>
+                </div>
+                <div class="node-tags"><span class="tag auth">يتطلب دخول</span></div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">إدارة دعيدر هب (Hub Admin)</span>
+                    <span class="path-code">/{ar|en}/hub/admin</span>
+                  </div>
+                  <div class="node-note">إدارة عملاء هب، الأنظمة، الاشتراكات، ومراجعة الطلبات.</div>
+                </div>
+                <div class="node-tags"><span class="tag admin">أدمن فقط</span></div>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </details>
+
+      <!-- 3. Matjari Stores Ecosystem -->
+      <details class="branch" data-group="store" open>
+        <summary>
+          <div class="branch-head">
+            <span class="branch-num">3</span>
+            <div>
+              <div class="branch-title">منظومة المتاجر الإلكترونية (متجري / Matjari)</div>
+              <div class="branch-desc">صفحة الإعلان، لوحة صاحب المتجر، واجهات المتاجر بـ 5 ثيمات، الروابط المختصرة والدومينات</div>
+            </div>
+          </div>
+          <div class="branch-meta">
+            <span class="count-chip">لاندنج + لوحة التاجر + الواجهات العامة</span>
+            <span class="chevron">▾</span>
+          </div>
+        </summary>
+        <div class="tree-body">
+          <ul class="tree">
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">صفحة اللاندنج الإعلانية للمتاجر</span>
+                    <span class="path-code">/{ar|en}/hub/stores</span>
+                  </div>
+                  <div class="node-note">تعرض مميزات المتجر (24/7، وصول أوسع للعملاء، عرض منتجات أكثر) وزر البدء/التسجيل.</div>
+                </div>
+                <div class="node-tags">
+                  <span class="tag lang">AR / EN</span>
+                  <span class="tag wa">واتساب دعيدر</span>
+                  <a class="visit-link" href="https://daidarsoluations.com/ar/hub/stores" target="_blank" rel="noopener">فتح ↗</a>
+                </div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">دخول وتسجيل أصحاب المتاجر</span>
+                    <span class="path-code">/{ar|en}/hub/stores/?view=merchant_login</span>
+                  </div>
+                  <div class="node-note">إنشاء متجر جديد مع اختيار الثيم المبدئي أو ربط حساب متجري بدعيدر هب.</div>
+                </div>
+                <div class="node-tags">
+                  <span class="tag wa">واتساب دعيدر</span>
+                </div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">لوحة تحكم صاحب المتجر</span>
+                    <span class="path-code">/{ar|en}/hub/stores/?view=store_owner</span>
+                  </div>
+                  <div class="node-note">مساحة إدارة المتجر الكاملة مع شريط الترقية البرتقالي للباقة المجانية.</div>
+                </div>
+                <div class="node-tags">
+                  <span class="tag auth">صاحب المتجر</span>
+                  <span class="tag wa">واتساب دعيدر</span>
+                </div>
+              </div>
+              <ul class="tree">
+                <li>
+                  <div class="node-card">
+                    <div class="node-main">
+                      <div class="node-title-row"><span class="node-title">تبويب: متجري (Overview)</span></div>
+                      <div class="node-note">رابط المتجر المختصر، المعاينة، إحصائيات سريعة، وشرح ربط الدومين الخاص.</div>
+                    </div>
+                  </div>
+                </li>
+                <li>
+                  <div class="node-card">
+                    <div class="node-main">
+                      <div class="node-title-row"><span class="node-title">تبويب: المنتجات</span></div>
+                      <div class="node-note">إضافة وتعديل وحذف المنتجات مع ضغط تلقائي للصور وتحديد التوفر والتصنيف.</div>
+                    </div>
+                  </div>
+                </li>
+                <li>
+                  <div class="node-card">
+                    <div class="node-main">
+                      <div class="node-title-row"><span class="node-title">تبويب: الطلبات</span></div>
+                      <div class="node-note">بحث بالاسم/الهاتف، فلترة بالحالة، وتحديث مراحل الطلب مع إشعارات الطلبات الجديدة.</div>
+                    </div>
+                  </div>
+                </li>
+                <li>
+                  <div class="node-card">
+                    <div class="node-main">
+                      <div class="node-title-row"><span class="node-title">تبويب: بيانات المتجر (Settings)</span></div>
+                      <div class="node-note">رفع/حذف اللوجو، تعديل الاسم والنبذة والعملة ورقم الواتساب (مع تحقق فوري)، واختيار ومعاينة 5 ثيمات.</div>
+                    </div>
+                  </div>
+                </li>
+                <li>
+                  <div class="node-card">
+                    <div class="node-main">
+                      <div class="node-title-row"><span class="node-title">تبويب: الاشتراك والدعم</span><span class="path-code">?view=store_owner&amp;tab=subscription</span></div>
+                      <div class="node-note">اختيار الباقة والمزايا والثيم ورفع إيصال التحويل للمراجعة والتفعيل.</div>
+                    </div>
+                  </div>
+                </li>
+                <li>
+                  <div class="node-card">
+                    <div class="node-main">
+                      <div class="node-title-row"><span class="node-title">تبويب: دومين المتجر</span></div>
+                      <div class="node-note">البحث عن دومين وطلب الشراء والربط ومتابعة حالة التفعيل.</div>
+                    </div>
+                  </div>
+                </li>
+              </ul>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">واجهة المتجر العامة (للزبائن)</span>
+                    <span class="path-code">/s/{slug}</span>
+                    <span class="path-code">https://{custom-domain}/</span>
+                    <span class="path-code">?view=storefront&amp;store_id=...</span>
+                  </div>
+                  <div class="node-note">
+                    واجهة التسوق بـ 5 ثيمات (كلاسيك، مينيمال، بوتيك، تقني داكن، كتالوج سريع)، سلة مشتريات،
+                    معاينة سريعة، ترتيب المنتجات، وفوتر مخصص — وعزل كامل للوحات الإدارة على الدومين الخاص.
+                  </div>
+                </div>
+                <div class="node-tags">
+                  <span class="tag lang">AR / EN</span>
+                  <span class="tag wa">واتساب صاحب المتجر فقط</span>
+                </div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">إدارة واستعراض جميع المتاجر</span>
+                    <span class="path-code">?view=super_admin</span>
+                    <span class="path-code">?view=explore_stores</span>
+                  </div>
+                  <div class="node-note">لوحة مشرف المتاجر لتفعيل/إيقاف المتاجر ومراجعة الاشتراكات والتجديدات.</div>
+                </div>
+                <div class="node-tags"><span class="tag admin">أدمن فقط</span></div>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </details>
+
+      <!-- 4. Admin, Employee & Tracking -->
+      <details class="branch" data-group="admin" open>
+        <summary>
+          <div class="branch-head">
+            <span class="branch-num">4</span>
+            <div>
+              <div class="branch-title">بوابات الإدارة والموظفين ومتابعة المشاريع</div>
+              <div class="branch-desc">لوحة الإدارة الرئيسية، مساحة الموظفين، وصفحة تتبع المشاريع للعملاء</div>
+            </div>
+          </div>
+          <div class="branch-meta">
+            <span class="count-chip">3 بوابات مستقلة</span>
+            <span class="chevron">▾</span>
+          </div>
+        </summary>
+        <div class="tree-body">
+          <ul class="tree">
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">لوحة تحكم الإدارة الرئيسية</span>
+                    <span class="path-code">/admin</span>
+                  </div>
+                  <div class="node-note">إدارة العملاء، المشاريع، الموظفين، المتاجر، الاشتراكات، خزينة كلمات المرور، والنسخ الاحتياطي.</div>
+                </div>
+                <div class="node-tags">
+                  <span class="tag admin">أدمن فقط</span>
+                  <a class="visit-link" href="https://daidarsoluations.com/admin" target="_blank" rel="noopener">فتح ↗</a>
+                </div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">بوابة الموظفين</span>
+                    <span class="path-code">/employee</span>
+                  </div>
+                  <div class="node-note">متابعة المهام والمشاريع، طلبات تجديد المتاجر، والدردشة الداخلية للفريق.</div>
+                </div>
+                <div class="node-tags">
+                  <span class="tag auth">موظفين</span>
+                  <a class="visit-link" href="https://daidarsoluations.com/employee" target="_blank" rel="noopener">فتح ↗</a>
+                </div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">متابعة حالة المشروع للعملاء</span>
+                    <span class="path-code">/track</span>
+                  </div>
+                  <div class="node-note">صفحة عامة تتيح للعميل إدخال كود التتبع لمعرفة مراحل تنفيذ مشروعه.</div>
+                </div>
+                <div class="node-tags">
+                  <a class="visit-link" href="https://daidarsoluations.com/track" target="_blank" rel="noopener">فتح ↗</a>
+                </div>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </details>
+
+      <!-- 5. Backend APIs -->
+      <details class="branch" data-group="api" open>
+        <summary>
+          <div class="branch-head">
+            <span class="branch-num">5</span>
+            <div>
+              <div class="branch-title">مسارات الـ API الخلفية (Cloudflare Pages Functions)</div>
+              <div class="branch-desc">طبقة الخادم المتصلة بقواعد بيانات Cloudflare D1 (الأدمن، المنظومة، المتاجر)</div>
+            </div>
+          </div>
+          <div class="branch-meta">
+            <span class="count-chip">6 مجموعات API</span>
+            <span class="chevron">▾</span>
+          </div>
+        </summary>
+        <div class="tree-body">
+          <ul class="tree">
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">المصادقة الموحدة (Ecosystem SSO)</span>
+                    <span class="path-code">/api/ecosystem/*</span>
+                  </div>
+                  <div class="node-note">تسجيل الدخول الموحد، Google OIDC، تبادل التوكنات، تسجيل الخروج المشترك، وسجل الاشتراكات.</div>
+                </div>
+                <div class="node-tags"><span class="tag">ECOSYSTEM_DB</span></div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">واجهات دعيدر هب</span>
+                    <span class="path-code">/api/hub/*</span>
+                  </div>
+                  <div class="node-note">خدمات العملاء، طلبات الشراء، الأنظمة، الأجهزة المصرّح لها، والملفات.</div>
+                </div>
+                <div class="node-tags"><span class="tag">ECOSYSTEM_HUB_DB</span></div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">واجهات متجري (Matjari Store API)</span>
+                    <span class="path-code">/api/store/*</span>
+                  </div>
+                  <div class="node-note">المتاجر، رفع اللوجو (`/logo`)، الثيم (`/theme`)، المنتجات، الطلبات، الدومينات، الروابط المختصرة، والاشتراكات.</div>
+                </div>
+                <div class="node-tags"><span class="tag">ECOSYSTEM_STORE_DB</span></div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">واجهات لوحة الإدارة</span>
+                    <span class="path-code">/api/admin/*</span>
+                  </div>
+                  <div class="node-note">مراجعة الطلبات، صلاحيات الموظفين، خزينة كلمات المرور، الإشعارات، واستخدام/نسخ D1.</div>
+                </div>
+                <div class="node-tags"><span class="tag admin">أدمن فقط</span></div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">واجهات الموظفين</span>
+                    <span class="path-code">/api/employee/*</span>
+                  </div>
+                  <div class="node-note">جلسات الموظفين، طلبات تجديد المتاجر، والدردشة الداخلية.</div>
+                </div>
+                <div class="node-tags"><span class="tag auth">موظفين</span></div>
+              </div>
+            </li>
+
+            <li>
+              <div class="node-card">
+                <div class="node-main">
+                  <div class="node-title-row">
+                    <span class="node-title">واجهات الموقع العام</span>
+                    <span class="path-code">/api/contact</span>
+                    <span class="path-code">/api/projects</span>
+                    <span class="path-code">/api/tracking</span>
+                    <span class="path-code">/api/visit</span>
+                  </div>
+                  <div class="node-note">رسائل التواصل، بيانات المشاريع، تتبع الطلبات، وإحصائيات الزيارات.</div>
+                </div>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </details>
+
+    </main>
+
+    <div class="empty-state hidden" id="emptyState">
+      لا توجد صفحات مطابقة لبحثك. جرّب كلمة أخرى أو اضغط على «الكل».
+    </div>
+
+    <footer class="legend">
+      <div class="legend-items">
+        <strong>دليل الشارات:</strong>
+        <span class="tag lang">AR / EN = يدعم اللغتين</span>
+        <span class="tag auth">يتطلب تسجيل دخول</span>
+        <span class="tag admin">أدمن فقط</span>
+        <span class="tag wa">زر واتساب عائم بالبريق</span>
+      </div>
+      <div>Daidar Solutions · تشجيرة الموقع المحدثة</div>
+    </footer>
+  </div>
+
+  <script>
+    const searchInput = document.getElementById('searchInput');
+    const filterPills = document.getElementById('filterPills');
+    const branches = Array.from(document.querySelectorAll('.branch'));
+    const emptyState = document.getElementById('emptyState');
+    const toggleAllBtn = document.getElementById('toggleAllBtn');
+    const themeBtn = document.getElementById('themeBtn');
+
+    let activeGroup = 'all';
+
+    function applyFilter() {
+      const q = searchInput.value.trim().toLowerCase();
+      let visibleBranches = 0;
+
+      branches.forEach((branch) => {
+        const groupMatch = activeGroup === 'all' || branch.dataset.group === activeGroup;
+        if (!groupMatch) {
+          branch.classList.add('hidden');
+          return;
+        }
+
+        const items = Array.from(branch.querySelectorAll('.tree-body > ul.tree > li'));
+        let visibleItems = 0;
+
+        items.forEach((li) => {
+          const text = li.textContent.toLowerCase();
+          const match = !q || text.includes(q);
+          li.classList.toggle('hidden', !match);
+          if (match) visibleItems++;
+        });
+
+        const branchTitleMatch = !q || branch.querySelector('summary').textContent.toLowerCase().includes(q);
+        if (visibleItems > 0 || branchTitleMatch) {
+          if (branchTitleMatch && visibleItems === 0) {
+            items.forEach((li) => li.classList.remove('hidden'));
+          }
+          branch.classList.remove('hidden');
+          if (q) branch.open = true;
+          visibleBranches++;
+        } else {
+          branch.classList.add('hidden');
+        }
+      });
+
+      emptyState.classList.toggle('hidden', visibleBranches > 0);
+    }
+
+    searchInput.addEventListener('input', applyFilter);
+
+    filterPills.addEventListener('click', (e) => {
+      const btn = e.target.closest('.pill');
+      if (!btn) return;
+      activeGroup = btn.dataset.filter;
+      filterPills.querySelectorAll('.pill').forEach((p) => p.classList.toggle('active', p === btn));
+      applyFilter();
+    });
+
+    toggleAllBtn.addEventListener('click', () => {
+      const anyClosed = branches.some((b) => !b.classList.contains('hidden') && !b.open);
+      branches.forEach((b) => {
+        if (!b.classList.contains('hidden')) b.open = anyClosed;
+      });
+    });
+
+    themeBtn.addEventListener('click', () => {
+      const isDark = document.body.classList.toggle('dark');
+      themeBtn.textContent = isDark ? 'الوضع الفاتح ☀️' : 'الوضع الداكن 🌙';
+    });
+  </script>
+</body>
+</html>
