@@ -40,6 +40,13 @@ function decodePaymentProof(value: unknown): { mime: string; base64: string } | 
   }
 }
 
+function validateStoreLogo(value: unknown): string | null {
+  if (value === '') return '';
+  if (typeof value !== 'string' || value.length > 700_000) return null;
+  const decoded = decodePaymentProof(value);
+  return decoded ? `data:${decoded.mime};base64,${decoded.base64}` : null;
+}
+
 // Server-only delegation. The public HTTP entry point never accepts an actor.
 export async function handleStoreRequest(request:Request, env:Env, delegatedActor?:Actor) {
   const url = new URL(request.url);
@@ -97,6 +104,17 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       if(!store)return fail('المتجر غير موجود',404);
       await saveStoreThemeId(db,actor.store_id,b.theme_id);
       return new Response(JSON.stringify({success:true,theme_id:b.theme_id}),{headers});
+    }
+    if(path==='logo'&&method==='PUT'){
+      if(!actor)return fail('يرجى تسجيل الدخول',401);
+      if(actor.role!=='merchant'||!actor.store_id)return fail('رفع شعار المتجر متاح لصاحب المتجر فقط',403);
+      const b=await request.json() as any;
+      const validLogo=validateStoreLogo(b?.logo_data);
+      if(validLogo===null)return fail('ارفع شعارًا صحيحًا بصيغة PNG أو JPG أو WebP وبحجم مناسب',400);
+      const store=await db.prepare('SELECT id FROM stores WHERE id=?').bind(actor.store_id).first();
+      if(!store)return fail('المتجر غير موجود',404);
+      await db.prepare("UPDATE stores SET logo_data=?,updated_at=datetime('now') WHERE id=?").bind(validLogo,actor.store_id).run();
+      return new Response(JSON.stringify({success:true,logo_data:validLogo}),{headers});
     }
     if(path==='auth/create-store'&&method==='POST'){
       if(!actor)return fail('سجل الدخول أولاً',401);
@@ -627,21 +645,27 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       if (method === 'POST' || method === 'PUT') {
         const body = await request.json() as any;
         const id = body.id || 'store-' + Date.now();
-        const { name, activity_type, whatsapp_number = '201061532875', currency = 'ج.م', bio = '', logo_data = '', theme_id } = body;
+        const { name, activity_type, whatsapp_number = '201061532875', currency = 'ج.م', bio = '', theme_id } = body;
         if (theme_id !== undefined && !isValidStoreThemeId(theme_id)) return fail('ثيم المتجر المختار غير صالح', 400);
+        const hasLogoUpdate = body.logo_data !== undefined;
+        const validatedLogo = hasLogoUpdate ? validateStoreLogo(body.logo_data) : '';
+        if (hasLogoUpdate && validatedLogo === null) {
+          return fail('ارفع شعارًا صحيحًا بصيغة PNG أو JPG أو WebP وبحجم مناسب', 400);
+        }
 
-        const existing = await db.prepare('SELECT id FROM stores WHERE id = ?').bind(id).first();
+        const existing = await db.prepare('SELECT id, logo_data FROM stores WHERE id = ?').bind(id).first() as { id: string; logo_data?: string } | null;
+        const finalLogo = hasLogoUpdate ? validatedLogo! : (existing?.logo_data || '');
         if (existing) {
           await db.prepare(`
             UPDATE stores 
             SET name = ?, activity_type = ?, whatsapp_number = ?, currency = ?, bio = ?, logo_data = ?, updated_at = datetime('now')
             WHERE id = ?
-          `).bind(name, activity_type, whatsapp_number, currency, bio, logo_data, id).run();
+          `).bind(name, activity_type, whatsapp_number, currency, bio, finalLogo, id).run();
         } else {
           await db.prepare(`
             INSERT INTO stores (id, name, activity_type, whatsapp_number, currency, bio, logo_data, is_active)
             VALUES (?, ?, ?, ?, ?, ?, ?, 1)
-          `).bind(id, name, activity_type, whatsapp_number, currency, bio, logo_data).run();
+          `).bind(id, name, activity_type, whatsapp_number, currency, bio, finalLogo).run();
         }
         if (theme_id) await saveStoreThemeId(db, id, theme_id);
 

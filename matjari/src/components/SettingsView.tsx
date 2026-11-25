@@ -6,6 +6,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { resolveStoreThemeId } from '../../../shared/store-themes';
 import { normalizeWhatsAppPhone } from '../../../shared/whatsapp';
 import { StoreThemePicker } from './StoreThemePicker';
+import { StoreLogoUploader } from './StoreLogoUploader';
 
 interface SettingsViewProps {
   store: Store | null;
@@ -20,6 +21,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ store, products = []
   const [whatsapp, setWhatsapp] = useState(store?.whatsapp_number || '');
   const [currency, setCurrency] = useState(store?.currency || (isArabic ? 'ج.م' : '$'));
   const [bio, setBio] = useState(store?.bio || '');
+  const [logoData, setLogoData] = useState(store?.logo_data || '');
   const [themeId, setThemeId] = useState<StoreThemeId>(() => resolveStoreThemeId(store?.theme_id));
 
   const [isSaving, setIsSaving] = useState(false);
@@ -29,6 +31,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ store, products = []
   useEffect(() => {
     setThemeId(resolveStoreThemeId(store?.theme_id));
   }, [store?.theme_id]);
+
+  useEffect(() => {
+    setLogoData(store?.logo_data || '');
+  }, [store?.logo_data]);
 
   const handleSaveThemeOnly = async (nextTheme: StoreThemeId) => {
     await api.updateStoreTheme(nextTheme);
@@ -68,6 +74,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ store, products = []
         whatsapp_number: whatsapp.trim(),
         currency,
         bio: bio.trim(),
+        logo_data: logoData,
         theme_id: themeId,
       });
 
@@ -118,6 +125,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ store, products = []
 
       {/* Settings Form */}
       <form onSubmit={handleSave} className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 p-6 sm:p-10 shadow-xs space-y-6 transition-colors">
+
+        {/* Store Logo Upload */}
+        <StoreLogoUploader
+          logoData={logoData}
+          storeName={name || store?.name}
+          isArabic={isArabic}
+          onSaved={async (nextLogo) => {
+            setLogoData(nextLogo);
+            await onRefresh();
+          }}
+        />
 
         {/* Basic Store Info */}
         <div className="space-y-4">

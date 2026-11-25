@@ -1,38 +1,38 @@
-const assert=require('node:assert/strict'),fs=require('node:fs'),ts=require('typescript'),{DatabaseSync}=require('node:sqlite');
-function load(file,deps={}){const m={exports:{}};new Function('require','module','exports',ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(n=>deps[n]||(n.startsWith('.')&&fs.existsSync(require('node:path').resolve(require('node:path').dirname(file),n)+'.ts')?load(require('node:path').resolve(require('node:path').dirname(file),n)+'.ts'):require(n)),m,m.exports);return m.exports}
-const sqlite=new DatabaseSync(':memory:');sqlite.exec('PRAGMA foreign_keys=ON');
-for(const file of ['0001_initial_schema.sql','0002_auth_sessions.sql','0003_subscription_payment_requests.sql','0004_employee_store_renewal_requests.sql','0009_order_notes.sql','0010_store_theme.sql'])sqlite.exec(fs.readFileSync('matjari/migrations/'+file,'utf8'));
-const DB={prepare(sql){let args=[];return{bind(...values){args=values;return this},async first(){return sqlite.prepare(sql).get(...args)||null},async all(){return{results:sqlite.prepare(sql).all(...args)}},async run(){return sqlite.prepare(sql).run(...args)}}},async batch(statements){sqlite.exec('BEGIN');try{const out=[];for(const s of statements)out.push(await s.run());sqlite.exec('COMMIT');return out}catch(e){sqlite.exec('ROLLBACK');throw e}}};
-const auth=load('matjari/lib/auth.ts'),{onRequest}=load('matjari/functions/api/[[route]].ts',{'../../lib/auth':auth});
-const {effectiveStoreStatus,displayStorePlan,isPaidStoreSubscription,hasActivePaidSubscription,needsStoreUpgrade}=load('matjari/lib/store-status.ts');
-const {createStoreApi}=load('matjari/src/services/api.ts');
-const call=(path,method='GET',body,cookie='',origin='https://test.example',ip='127.0.0.1',env={DB})=>onRequest({env,request:new Request('https://test.example/api/'+path,{method,headers:{'Content-Type':'application/json',Cookie:cookie,Origin:origin,'CF-Connecting-IP':ip},body:body===undefined?undefined:JSON.stringify(body)})});
-const data=async r=>{assert.equal(r.status,200,await r.clone().text());return r.json()};
-const session=r=>r.headers.get('set-cookie').split(';')[0];
-async function test(){
- const urls=load('matjari/src/services/storefront-url.ts');let openedTarget='';const priorWindow=global.window,priorFetch=global.fetch;
- const wa=load('shared/whatsapp.ts');
- assert.equal(wa.normalizeWhatsAppPhone('01061532875'),'201061532875');
- assert.equal(wa.normalizeWhatsAppPhone('+20 10 1234-5678'),'201012345678');
- assert.equal(wa.normalizeWhatsAppPhone('00201122334455'),'201122334455');
- assert.equal(wa.normalizeWhatsAppPhone('٠١٢٣٤٥٦٧٨٩٠'),'201234567890');
- assert.equal(wa.normalizeWhatsAppPhone('+966 50 123 4567'),'966501234567');
- for(const badPhone of ['',null,undefined,'123','invalid','https://evil.example','0000000000'])assert.equal(wa.normalizeWhatsAppPhone(badPhone),null);
- assert.equal(wa.buildDaidarSupportWhatsAppUrl(),'https://wa.me/201061532875');
- assert.ok(wa.buildDaidarSupportWhatsAppUrl('مساعدة').startsWith('https://wa.me/201061532875?text='));
- assert.equal(wa.buildStoreWhatsAppUrl('01011112222'),'https://wa.me/201011112222');
- assert.equal(wa.buildStoreWhatsAppUrl('+201555566666'),'https://wa.me/201555566666');
- assert.equal(wa.buildStoreWhatsAppUrl(''),null);
- assert.equal(wa.buildStoreWhatsAppUrl(null),null);
- const themes=load('shared/store-themes.ts');
- assert.equal(themes.STORE_THEMES.length,5);
- for(const id of ['classic','minimal','boutique','tech','catalog'])assert.equal(themes.isValidStoreThemeId(id),true);
- for(const badTheme of ['','unknown','<script>','../evil',null,undefined])assert.equal(themes.isValidStoreThemeId(badTheme),false);
- assert.equal(themes.resolveStoreThemeId('unknown'),'classic');
- assert.equal(themes.resolveStoreThemeId(null),'classic');
- global.window={location:{origin:'https://test.example',pathname:'/ar/hub/stores'},open:()=>({opener:null,location:{replace:v=>{openedTarget=v}}})};
- global.fetch=async()=>Response.json({slug:'m-random123',domain:null});
- try{const copied=await urls.preferredStorefrontUrl('store-test');await urls.openStorePreview('store-test');assert.equal(openedTarget,copied);assert.equal(new URL(openedTarget).pathname,'/s/m-random123');assert.equal(new URL(openedTarget).search,'');global.fetch=async()=>Response.json({slug:'m-random123',domain:'shop.example.com'});await urls.openStorePreview('store-test');assert.equal(openedTarget,'https://shop.example.com/')}finally{global.fetch=priorFetch;global.window=priorWindow}
+const assert = require('node:assert/strict'), fs = require('node:fs'), ts = require('typescript'), { DatabaseSync } = require('node:sqlite');
+function load(file, deps = {}) { const m = { exports: {} }; new Function('require', 'module', 'exports', ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText)(n => deps[n] || (n.startsWith('.') && fs.existsSync(require('node:path').resolve(require('node:path').dirname(file), n) + '.ts') ? load(require('node:path').resolve(require('node:path').dirname(file), n) + '.ts') : require(n)), m, m.exports); return m.exports }
+const sqlite = new DatabaseSync(':memory:'); sqlite.exec('PRAGMA foreign_keys=ON');
+for (const file of ['0001_initial_schema.sql', '0002_auth_sessions.sql', '0003_subscription_payment_requests.sql', '0004_employee_store_renewal_requests.sql', '0009_order_notes.sql', '0010_store_theme.sql']) sqlite.exec(fs.readFileSync('matjari/migrations/' + file, 'utf8'));
+const DB = { prepare(sql) { let args = []; return { bind(...values) { args = values; return this }, async first() { return sqlite.prepare(sql).get(...args) || null }, async all() { return { results: sqlite.prepare(sql).all(...args) } }, async run() { return sqlite.prepare(sql).run(...args) } } }, async batch(statements) { sqlite.exec('BEGIN'); try { const out = []; for (const s of statements) out.push(await s.run()); sqlite.exec('COMMIT'); return out } catch (e) { sqlite.exec('ROLLBACK'); throw e } } };
+const auth = load('matjari/lib/auth.ts'), { onRequest } = load('matjari/functions/api/[[route]].ts', { '../../lib/auth': auth });
+const { effectiveStoreStatus, displayStorePlan, isPaidStoreSubscription, hasActivePaidSubscription, needsStoreUpgrade } = load('matjari/lib/store-status.ts');
+const { createStoreApi } = load('matjari/src/services/api.ts');
+const call = (path, method = 'GET', body, cookie = '', origin = 'https://test.example', ip = '127.0.0.1', env = { DB }) => onRequest({ env, request: new Request('https://test.example/api/' + path, { method, headers: { 'Content-Type': 'application/json', Cookie: cookie, Origin: origin, 'CF-Connecting-IP': ip }, body: body === undefined ? undefined : JSON.stringify(body) }) });
+const data = async r => { assert.equal(r.status, 200, await r.clone().text()); return r.json() };
+const session = r => r.headers.get('set-cookie').split(';')[0];
+async function test() {
+    const urls = load('matjari/src/services/storefront-url.ts'); let openedTarget = ''; const priorWindow = global.window, priorFetch = global.fetch;
+    const wa = load('shared/whatsapp.ts');
+    assert.equal(wa.normalizeWhatsAppPhone('01061532875'), '201061532875');
+    assert.equal(wa.normalizeWhatsAppPhone('+20 10 1234-5678'), '201012345678');
+    assert.equal(wa.normalizeWhatsAppPhone('00201122334455'), '201122334455');
+    assert.equal(wa.normalizeWhatsAppPhone('٠١٢٣٤٥٦٧٨٩٠'), '201234567890');
+    assert.equal(wa.normalizeWhatsAppPhone('+966 50 123 4567'), '966501234567');
+    for (const badPhone of ['', null, undefined, '123', 'invalid', 'https://evil.example', '0000000000']) assert.equal(wa.normalizeWhatsAppPhone(badPhone), null);
+    assert.equal(wa.buildDaidarSupportWhatsAppUrl(), 'https://wa.me/201061532875');
+    assert.ok(wa.buildDaidarSupportWhatsAppUrl('مساعدة').startsWith('https://wa.me/201061532875?text='));
+    assert.equal(wa.buildStoreWhatsAppUrl('01011112222'), 'https://wa.me/201011112222');
+    assert.equal(wa.buildStoreWhatsAppUrl('+201555566666'), 'https://wa.me/201555566666');
+    assert.equal(wa.buildStoreWhatsAppUrl(''), null);
+    assert.equal(wa.buildStoreWhatsAppUrl(null), null);
+    const themes = load('shared/store-themes.ts');
+    assert.equal(themes.STORE_THEMES.length, 5);
+    for (const id of ['classic', 'minimal', 'boutique', 'tech', 'catalog']) assert.equal(themes.isValidStoreThemeId(id), true);
+    for (const badTheme of ['', 'unknown', '<script>', '../evil', null, undefined]) assert.equal(themes.isValidStoreThemeId(badTheme), false);
+    assert.equal(themes.resolveStoreThemeId('unknown'), 'classic');
+    assert.equal(themes.resolveStoreThemeId(null), 'classic');
+    global.window = { location: { origin: 'https://test.example', pathname: '/ar/hub/stores' }, open: () => ({ opener: null, location: { replace: v => { openedTarget = v } } }) };
+    global.fetch = async () => Response.json({ slug: 'm-random123', domain: null });
+    try { const copied = await urls.preferredStorefrontUrl('store-test'); await urls.openStorePreview('store-test'); assert.equal(openedTarget, copied); assert.equal(new URL(openedTarget).pathname, '/s/m-random123'); assert.equal(new URL(openedTarget).search, ''); global.fetch = async () => Response.json({ slug: 'm-random123', domain: 'shop.example.com' }); await urls.openStorePreview('store-test'); assert.equal(openedTarget, 'https://shop.example.com/') } finally { global.fetch = priorFetch; global.window = priorWindow }
 
     assert.equal(sqlite.prepare('SELECT count(*) AS n FROM users').get().n, 0);
     const now = Date.parse('2026-11-07T12:00:00Z');
@@ -141,6 +141,15 @@ async function test(){
     const approvedSub = sqlite.prepare('SELECT * FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').get(a.store.id); assert.equal(approvedSub.plan_name, 'الباقة الأساسية'); assert.equal(approvedSub.price, 350); assert.equal(JSON.parse(approvedSub.notes).annual_domain_fee, 0); assert.equal(sqlite.prepare('SELECT is_active FROM stores WHERE id=?').get(a.store.id).is_active, 1);
     const paidSession = await data(await call('auth/session', 'GET', undefined, c1)); assert.equal(paidSession.store.needs_upgrade, false); assert.equal(paidSession.store.is_paid_subscription, true); assert.equal(paidSession.subscription.plan_name, 'الباقة الأساسية'); assert.equal(paidSession.subscription.is_paid, true); assert.ok(paidSession.subscription.start_date); assert.ok(paidSession.subscription.end_date);
     const paidPublicStore = await data(await call('store?id=' + a.store.id)); assert.equal(paidPublicStore.store.needs_upgrade, false); assert.equal(paidPublicStore.store.is_paid_subscription, true); assert.equal(paidPublicStore.store.plan_name, 'الباقة الأساسية');
+    const tinyPng = 'data:image/png;base64,iVBORw0KGgo=';
+    assert.equal((await call('logo', 'PUT', { logo_data: tinyPng })).status, 401);
+    assert.equal((await call('logo', 'PUT', { logo_data: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=' }, c1)).status, 400);
+    const savedLogo = await data(await call('logo', 'PUT', { logo_data: tinyPng }, c1)); assert.equal(savedLogo.logo_data, tinyPng);
+    assert.equal((await data(await call('store?id=' + a.store.id))).store.logo_data, tinyPng);
+    await data(await call('store', 'PUT', { id: a.store.id, name: 'متجر merchant1', activity_type: 'ملابس', whatsapp_number: '201012345678', currency: 'ج.م', bio: 'نبذة' }, c1));
+    assert.equal((await data(await call('store?id=' + a.store.id))).store.logo_data, tinyPng);
+    assert.equal((await data(await call('logo', 'PUT', { logo_data: '' }, c1))).logo_data, '');
+    assert.equal((await data(await call('store?id=' + a.store.id))).store.logo_data, '');
     sqlite.prepare("INSERT INTO employee_store_renewal_requests(id,store_id,employee_id,employee_name,employee_email,months,proof_mime,proof_base64,source_payment_request_id,status) VALUES(?,?,?,?,?,?,?,?,?,'pending')").run('employee-renewal-test', a.store.id, 'employee-test', 'موظف تجريبي', 'employee@example.com', 1, 'image/png', 'iVBORw0KGgo=', paymentBody.request.id);
     const employeeRenewalQueue = await data(await call('admin/employee-renewal-requests', 'GET', undefined, ac)); assert.ok(employeeRenewalQueue.requests.some(r => r.id === 'employee-renewal-test' && r.store_name === 'متجر merchant1' && r.source_payment_status === 'approved'));
     const employeeRenewalProof = await call('admin/employee-renewal-requests/employee-renewal-test/proof', 'GET', undefined, ac); assert.equal(employeeRenewalProof.status, 200); assert.equal(employeeRenewalProof.headers.get('content-type'), 'image/png'); assert.equal((await employeeRenewalProof.arrayBuffer()).byteLength, 8);
