@@ -1,4 +1,4 @@
-import { Store, Product, TrafficStats, CustomerOrder, OrderStatus, StoreOrder, User, Subscription, MerchantDetail, SubscriptionFeatureKey, SubscriptionPaymentRequest, EmployeeStoreRenewalRequest } from '../types';
+import { Store, Product, TrafficStats, CustomerOrder, OrderStatus, StoreOrder, User, Subscription, MerchantDetail, SubscriptionFeatureKey, SubscriptionPaymentRequest, EmployeeStoreRenewalRequest, StoreThemeId } from '../types';
 
 
 
@@ -54,6 +54,7 @@ export function createStoreApi(API_BASE='/api/store') { return {
     email: string;
     username?: string;
     password: string;
+    theme_id?: StoreThemeId;
   }): Promise<{
     user: User;
     store: Store | null;
@@ -166,7 +167,7 @@ export function createStoreApi(API_BASE='/api/store') { return {
     return data.store;
   },
 
-  async createStore(storeData: { name: string; activity_type?: string; whatsapp_number: string }): Promise<void> {
+  async createStore(storeData: { name: string; activity_type?: string; whatsapp_number: string; theme_id?: StoreThemeId }): Promise<void> {
     const res = await fetch(`${API_BASE}/auth/create-store`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -176,6 +177,19 @@ export function createStoreApi(API_BASE='/api/store') { return {
     if (!res.ok || !data.success) {
       throw new Error(data.error || 'تعذر إنشاء المتجر. تحقق من الاتصال وحاول مرة أخرى.');
     }
+  },
+
+  async updateStoreTheme(themeId: StoreThemeId): Promise<StoreThemeId> {
+    const res = await fetch(`${API_BASE}/theme`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ theme_id: themeId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'تعذر حفظ ثيم المتجر. حاول مرة أخرى.');
+    }
+    return data.theme_id as StoreThemeId;
   },
 
   async activateFreeStore(): Promise<void> {
@@ -188,8 +202,8 @@ export function createStoreApi(API_BASE='/api/store') { return {
     if (!res.ok || !data.success) throw new Error(data.error || 'تعذر تفعيل الاشتراك المجاني. حاول مرة أخرى.');
   },
 
-  async createSubscriptionPaymentRequest(features: SubscriptionFeatureKey[], proof: string): Promise<{id:string;status:'pending';monthly_total:number;annual_total:number;due_now:number}> {
-    const res=await fetch(`${API_BASE}/subscription-requests`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({features,proof})});
+  async createSubscriptionPaymentRequest(features: SubscriptionFeatureKey[], proof: string, themeId?: StoreThemeId): Promise<{id:string;status:'pending';monthly_total:number;annual_total:number;due_now:number}> {
+    const res=await fetch(`${API_BASE}/subscription-requests`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({features,proof,theme_id:themeId})});
     const data=await res.json().catch(()=>({}));
     if(!res.ok||!data.success)throw new Error(data.error||'تعذر إرسال طلب الاشتراك');
     return data.request;

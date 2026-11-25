@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Store, User, Subscription } from '../types';
+import { Store, User, Subscription, StoreThemeId } from '../types';
 import { api } from '../services/api';
+import { DEFAULT_STORE_THEME } from '../../../shared/store-themes';
+import { StoreThemePicker } from './StoreThemePicker';
 import confetti from 'canvas-confetti';
 import {
   Lock,
@@ -58,6 +60,7 @@ export const MerchantLoginView: React.FC<MerchantLoginViewProps> = ({
   const [regEmail, setRegEmail] = useState('');
   const [regUsername, setRegUsername] = useState('');
   const [regPassword, setRegPassword] = useState('');
+  const [regTheme, setRegTheme] = useState<StoreThemeId>(DEFAULT_STORE_THEME);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -116,6 +119,7 @@ export const MerchantLoginView: React.FC<MerchantLoginViewProps> = ({
         email: cleanEmail,
         username: regUsername.trim() || cleanEmail.split('@')[0],
         password: regPassword,
+        theme_id: regTheme,
       });
 
       setSuccessMsg(isArabic ? '🎉 تم إنشاء متجرك بنجاح (وضع المعاينة)! جاري نقلك لمعاينة متجرك...' : '🎉 Store created! Redirecting to preview mode...');
@@ -220,7 +224,7 @@ export const MerchantLoginView: React.FC<MerchantLoginViewProps> = ({
 
       {/* 2. MAIN CARD */}
       <div className="relative z-10 flex-1 flex items-center justify-center p-4 sm:p-8">
-        <div className="max-w-lg w-full bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-2xl shadow-sky-500/10 p-6 sm:p-8 space-y-6">
+        <div className={`${authMode === 'register' ? 'max-w-3xl' : 'max-w-lg'} w-full bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-2xl shadow-sky-500/10 p-6 sm:p-8 space-y-6 transition-all`}>
           
           {/* Header Badge & Title */}
           <div className="text-center space-y-2">
@@ -501,6 +505,22 @@ export const MerchantLoginView: React.FC<MerchantLoginViewProps> = ({
                     <Lock className="w-3.5 h-3.5 text-slate-400 absolute top-3.5 start-3" />
                   </div>
                 </div>
+              </div>
+
+              {/* Theme Selector during registration */}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                <StoreThemePicker
+                  compact
+                  value={regTheme}
+                  onChange={setRegTheme}
+                  isArabic={isArabic}
+                  title={isArabic ? 'اختر تصميم (ثيم) متجرك' : 'Choose your store theme'}
+                  subtitle={
+                    isArabic
+                      ? 'اختَر الثيم المفضل لمتجرك وعاينه مباشرة؛ يمكنك تغييره لاحقًا في أي وقت من الإعدادات.'
+                      : 'Choose and preview your preferred storefront theme; you can change it anytime in Settings.'
+                  }
+                />
               </div>
 
               {/* Submit Registration Button */}

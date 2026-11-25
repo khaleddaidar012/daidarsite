@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),ts=require('typescript'),{DatabaseSync}=require('node:sqlite');
 function load(file,deps={}){const m={exports:{}};new Function('require','module','exports',ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(n=>deps[n]||(n.startsWith('.')&&fs.existsSync(require('node:path').resolve(require('node:path').dirname(file),n)+'.ts')?load(require('node:path').resolve(require('node:path').dirname(file),n)+'.ts'):require(n)),m,m.exports);return m.exports}
 const sqlite=new DatabaseSync(':memory:');sqlite.exec('PRAGMA foreign_keys=ON');
-for(const file of ['0001_initial_schema.sql','0002_auth_sessions.sql','0003_subscription_payment_requests.sql','0004_employee_store_renewal_requests.sql','0009_order_notes.sql'])sqlite.exec(fs.readFileSync('matjari/migrations/'+file,'utf8'));
+for(const file of ['0001_initial_schema.sql','0002_auth_sessions.sql','0003_subscription_payment_requests.sql','0004_employee_store_renewal_requests.sql','0009_order_notes.sql','0010_store_theme.sql'])sqlite.exec(fs.readFileSync('matjari/migrations/'+file,'utf8'));
 const DB={prepare(sql){let args=[];return{bind(...values){args=values;return this},async first(){return sqlite.prepare(sql).get(...args)||null},async all(){return{results:sqlite.prepare(sql).all(...args)}},async run(){return sqlite.prepare(sql).run(...args)}}},async batch(statements){sqlite.exec('BEGIN');try{const out=[];for(const s of statements)out.push(await s.run());sqlite.exec('COMMIT');return out}catch(e){sqlite.exec('ROLLBACK');throw e}}};
 const auth=load('matjari/lib/auth.ts'),{onRequest}=load('matjari/functions/api/[[route]].ts',{'../../lib/auth':auth});
 const {effectiveStoreStatus,displayStorePlan,isPaidStoreSubscription,hasActivePaidSubscription,needsStoreUpgrade}=load('matjari/lib/store-status.ts');
@@ -24,6 +24,12 @@ async function test(){
  assert.equal(wa.buildStoreWhatsAppUrl('+201555566666'),'https://wa.me/201555566666');
  assert.equal(wa.buildStoreWhatsAppUrl(''),null);
  assert.equal(wa.buildStoreWhatsAppUrl(null),null);
+ const themes=load('shared/store-themes.ts');
+ assert.equal(themes.STORE_THEMES.length,5);
+ for(const id of ['classic','minimal','boutique','tech','catalog'])assert.equal(themes.isValidStoreThemeId(id),true);
+ for(const badTheme of ['','unknown','<script>','../evil',null,undefined])assert.equal(themes.isValidStoreThemeId(badTheme),false);
+ assert.equal(themes.resolveStoreThemeId('unknown'),'classic');
+ assert.equal(themes.resolveStoreThemeId(null),'classic');
  global.window={location:{origin:'https://test.example',pathname:'/ar/hub/stores'},open:()=>({opener:null,location:{replace:v=>{openedTarget=v}}})};
  global.fetch=async()=>Response.json({slug:'m-random123',domain:null});
  try{const copied=await urls.preferredStorefrontUrl('store-test');await urls.openStorePreview('store-test');assert.equal(openedTarget,copied);assert.equal(new URL(openedTarget).pathname,'/s/m-random123');assert.equal(new URL(openedTarget).search,'');global.fetch=async()=>Response.json({slug:'m-random123',domain:'shop.example.com'});await urls.openStorePreview('store-test');assert.equal(openedTarget,'https://shop.example.com/')}finally{global.fetch=priorFetch;global.window=priorWindow}
@@ -62,8 +68,14 @@ async function test(){
     assert.equal((await call('auth/register', 'POST', {}, '', 'https://evil.example')).status, 403);
     const reg = (username) => ({ store_name: 'متجر ' + username, activity_type: 'عام', whatsapp_number: '01000000000', email: username + '@example.com', username, password: 'Unique password 123', role: 'super_admin' });
     assert.equal((await call('auth/register', 'POST', { ...reg('short'), password: '123' })).status, 400);
-    const r1 = await call('auth/register', 'POST', reg('merchant1')); const a = await data(r1), c1 = session(r1);
-    assert.equal(a.user.role, 'merchant'); assert.equal(a.user.password, undefined); assert.equal(a.store.is_active, 0); assert.equal(a.store.needs_upgrade, true); assert.equal(a.store.is_paid_subscription, false); assert.equal(a.subscription.plan_name, 'الباقة المجانية'); assert.equal(a.subscription.status, 'awaiting_activation'); assert.equal(a.subscription.start_date, null); assert.equal(a.subscription.end_date, null);
+    assert.equal((await call('auth/register', 'POST', { ...reg('bad-theme'), theme_id: 'evil' })).status, 400);
+    const r1 = await call('auth/register', 'POST', { ...reg('merchant1'), theme_id: 'boutique' }); const a = await data(r1), c1 = session(r1);
+    assert.equal(a.user.role, 'merchant'); assert.equal(a.user.password, undefined); assert.equal(a.store.is_active, 0); assert.equal(a.store.theme_id, 'boutique'); assert.equal(a.store.needs_upgrade, true); assert.equal(a.store.is_paid_subscription, false); assert.equal(a.subscription.plan_name, 'الباقة المجانية'); assert.equal(a.subscription.status, 'awaiting_activation'); assert.equal(a.subscription.start_date, null); assert.equal(a.subscription.end_date, null);
+    assert.equal((await call('theme', 'PUT', { theme_id: 'tech' })).status, 401);
+    assert.equal((await call('theme', 'PUT', { theme_id: 'tech' }, c1, 'https://evil.example')).status, 403);
+    assert.equal((await call('theme', 'PUT', { theme_id: 'not-a-theme' }, c1)).status, 400);
+    assert.equal((await data(await call('theme', 'PUT', { theme_id: 'tech' }, c1))).theme_id, 'tech');
+    assert.equal((await data(await call('auth/session', 'GET', undefined, c1))).store.theme_id, 'tech');
     assert.match(r1.headers.get('set-cookie'), /HttpOnly; Secure; SameSite=Lax/);
     const hash = sqlite.prepare('SELECT password FROM users WHERE id=?').get(a.user.id).password; assert.match(hash, /^pbkdf2\$/); assert.notEqual(hash, reg('x').password);
     assert.equal((await data(await call('auth/session', 'GET', undefined, c1))).user.id, a.user.id);
@@ -82,8 +94,12 @@ async function test(){
     assert.equal((await call('subscription-requests', 'POST', { features: ['main_store', 'custom_domain'], proof: 'bad' }, c1)).status, 400);
     assert.equal((await call('subscription-requests', 'POST', { features: ['main_store', 'made_up'], proof: receipt }, c1)).status, 400);
     assert.equal((await call('subscription-requests', 'POST', { features: ['main_store', 'custom_domain'], proof: receipt }, c1)).status, 400);
-    const paymentResult = await call('subscription-requests', 'POST', { features: ['main_store'], proof: receipt, monthly_total: 1, due_now: 1 }, c1); assert.equal(paymentResult.status, 201); const paymentBody = await paymentResult.json(); assert.equal(paymentBody.request.monthly_total, 350); assert.equal(paymentBody.request.annual_total, 0); assert.equal(paymentBody.request.due_now, 350); assert.equal(paymentBody.request.status, 'pending');
-    assert.equal((await call('subscription-requests', 'POST', { features: ['main_store'], proof: receipt }, c2)).status, 201);
+    const paymentResult = await call('subscription-requests', 'POST', { features: ['main_store'], proof: receipt, monthly_total: 1, due_now: 1, theme_id: 'minimal' }, c1); assert.equal(paymentResult.status, 201); const paymentBody = await paymentResult.json(); assert.equal(paymentBody.request.monthly_total, 350); assert.equal(paymentBody.request.annual_total, 0); assert.equal(paymentBody.request.due_now, 350); assert.equal(paymentBody.request.status, 'pending'); assert.equal(paymentBody.theme_id, 'minimal');
+    assert.equal((await data(await call('auth/session', 'GET', undefined, c1))).store.theme_id, 'minimal');
+    assert.equal((await call('subscription-requests', 'POST', { features: ['main_store'], proof: receipt, theme_id: 'bad-theme' }, c2)).status, 400);
+    assert.equal((await call('subscription-requests', 'POST', { features: ['main_store'], proof: receipt, theme_id: 'catalog' }, c2)).status, 201);
+    assert.equal((await data(await call('auth/session', 'GET', undefined, c2))).store.theme_id, 'catalog');
+    assert.equal((await data(await call('auth/session', 'GET', undefined, c1))).store.theme_id, 'minimal');
     const adminHash = await auth.passwordHash('Owner secure password'); sqlite.prepare("INSERT INTO users(id,username,password,role) VALUES('owner','owner',?,'super_admin')").run(adminHash);
     const ar = await call('auth/login', 'POST', { username: 'owner', password: 'Owner secure password' }); await data(ar); const ac = session(ar);
     const created = await data(await call('admin/merchants', 'POST', { store_name: 'New employee store', activity_type: 'عام', whatsapp_number: '01000000000', username: 'employee-inactive', password: 'eight123', price: 1200, duration_months: 12, is_active: 1 }, ac));
@@ -103,7 +119,7 @@ async function test(){
     await data(await call(`admin/merchants/${a.store.id}/toggle-status`, 'PUT', undefined, ac));
     const activated = await data(await call('auth/session', 'GET', undefined, c1));
     assert.equal(activated.store.effective_status, 'active'); assert.equal(activated.subscription.status, 'active'); assert.equal(activated.store.needs_upgrade, true); assert.equal(activated.store.is_paid_subscription, false); assert.equal(activated.subscription.plan_name, 'الباقة المجانية'); assert.equal(activated.subscription.start_date, null); assert.equal(activated.subscription.end_date, null);
-    const freePublicStore = await data(await call('store?id=' + a.store.id)); assert.equal(freePublicStore.store.needs_upgrade, true); assert.equal(freePublicStore.store.is_paid_subscription, false); assert.equal(freePublicStore.store.plan_name, 'الباقة المجانية');
+    const freePublicStore = await data(await call('store?id=' + a.store.id)); assert.equal(freePublicStore.store.needs_upgrade, true); assert.equal(freePublicStore.store.is_paid_subscription, false); assert.equal(freePublicStore.store.plan_name, 'الباقة المجانية'); assert.equal(freePublicStore.store.theme_id, 'minimal');
     assert.ok((await data(await call('stores'))).stores.some(store => store.id === a.store.id));
     assert.equal((await call('visit', 'POST', { store_id: a.store.id })).status, 200);
     const p = await data(await call('products', 'POST', { store_id: a.store.id, name: 'منتج', price: 50, image_data: 'https://example.com/p.png' }, c1));

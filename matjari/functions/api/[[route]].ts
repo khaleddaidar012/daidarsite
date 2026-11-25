@@ -5,6 +5,7 @@ import { displayStorePlan, effectiveStoreStatus, hasActivePaidSubscription, need
 import { domainRoutes, type DomainEnv } from '../../lib/domains';
 import {shortLinkRoutes} from '../../lib/short-links';
 import {storePlanName} from '../../lib/subscription-plans';
+import { DEFAULT_STORE_THEME, isValidStoreThemeId, resolveStoreThemeId, type StoreThemeId } from '../../../shared/store-themes';
 // Cloudflare Pages Function with Cloudflare D1 Binding
 export interface Env extends EcoEnv, DomainEnv {
   DB: EcoDB;
@@ -87,18 +88,32 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
     if(path==='domain-store'&&method==='GET')return new Response(JSON.stringify({store_id:null}),{headers});
     const domainResponse = await domainRoutes(request, env, actor, path, decodePaymentProof);
     if (domainResponse) return domainResponse;
+    if(path==='theme'&&method==='PUT'){
+      if(!actor)return fail('يرجى تسجيل الدخول',401);
+      if(actor.role!=='merchant'||!actor.store_id)return fail('تغيير ثيم المتجر متاح لصاحب المتجر فقط',403);
+      const b=await request.json() as any;
+      if(!isValidStoreThemeId(b?.theme_id))return fail('ثيم المتجر المختار غير صالح',400);
+      const store=await db.prepare('SELECT id FROM stores WHERE id=?').bind(actor.store_id).first();
+      if(!store)return fail('المتجر غير موجود',404);
+      await saveStoreThemeId(db,actor.store_id,b.theme_id);
+      return new Response(JSON.stringify({success:true,theme_id:b.theme_id}),{headers});
+    }
     if(path==='auth/create-store'&&method==='POST'){
       if(!actor)return fail('سجل الدخول أولاً',401);
       if(actor.store_id||actor.role!=='merchant')return fail('الحساب لديه متجر بالفعل',409);
       const b=await request.json() as any;
       if(typeof b.name!=='string'||!b.name.trim()||b.name.length>160||typeof b.whatsapp_number!=='string'||!/^\+?[0-9]{8,15}$/.test(b.whatsapp_number))return fail('أدخل اسم المتجر ورقم واتساب صحيح',400);
+      if(b.theme_id!==undefined&&!isValidStoreThemeId(b.theme_id))return fail('ثيم المتجر المختار غير صالح',400);
+      const themeId:StoreThemeId=b.theme_id?b.theme_id:DEFAULT_STORE_THEME;
       const id='store-'+crypto.randomUUID();
+      await ensureStoreThemeTable(db);
       await db.batch([
         db.prepare("INSERT INTO stores(id,name,activity_type,whatsapp_number,is_active) SELECT ?,?,?,?,0 WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND store_id IS NULL)").bind(id,b.name.trim(),String(b.activity_type||'عام').slice(0,100),b.whatsapp_number,actor.id),
         db.prepare('UPDATE users SET store_id=? WHERE id=? AND store_id IS NULL').bind(id,actor.id),
-        db.prepare("INSERT INTO subscriptions(id,store_id,plan_name,status,start_date,end_date,price) SELECT ?,?,'الباقة المجانية','awaiting_activation',date('now'),date('now'),0 WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND store_id=?)").bind(crypto.randomUUID(),id,actor.id,id)
+        db.prepare("INSERT INTO subscriptions(id,store_id,plan_name,status,start_date,end_date,price) SELECT ?,?,'الباقة المجانية','awaiting_activation',date('now'),date('now'),0 WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND store_id=?)").bind(crypto.randomUUID(),id,actor.id,id),
+        db.prepare("INSERT INTO store_themes(store_id,theme_id,updated_at) SELECT ?,?,datetime('now') WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND store_id=?)").bind(id,themeId,actor.id,id)
       ]);
-      return new Response(JSON.stringify({success:true}),{headers});
+      return new Response(JSON.stringify({success:true,theme_id:themeId}),{headers});
     }
     if(path==='auth/activate-free'&&method==='POST'){
       if(!actor)return fail('سجل الدخول أولاً',401);
@@ -114,6 +129,7 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       if(actor.role!=='merchant'||!actor.store_id)return fail('طلب الاشتراك متاح لصاحب المتجر فقط');
       const body=await request.json() as any;
       const features: unknown=body.features;
+      if(body.theme_id!==undefined&&!isValidStoreThemeId(body.theme_id))return fail('ثيم المتجر المختار غير صالح',400);
       if(Array.isArray(features)&&features.some(f=>!['main_store','protection_bundle'].includes(String(f))))return fail('اختيار غير متاح حاليًا؛ حدّث الصفحة وراجع الباقات',400);
       if(Array.isArray(features)&&features.includes('custom_domain'))return fail('طلب الدومين متاح الآن من قسم دومين المتجر بسعره الفعلي',400);
       if(!Array.isArray(features)||features.length>Object.keys(subscriptionFeatureCatalog).length||!features.includes('main_store')||features.some((feature:unknown)=>typeof feature!=='string'||!Object.prototype.hasOwnProperty.call(subscriptionFeatureCatalog,feature)))return fail('راجع اختيارات الاشتراك',400);
@@ -127,14 +143,16 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
       const id='pay-'+crypto.randomUUID();
       await db.prepare(`INSERT INTO subscription_payment_requests(id,store_id,user_id,features_json,monthly_total,annual_total,due_now,proof_mime,proof_base64)
         VALUES(?,?,?,?,?,?,?,?,?)`).bind(id,actor.store_id,actor.id,JSON.stringify(uniqueFeatures),monthlyTotal,annualTotal,monthlyTotal+annualTotal,proof.mime,proof.base64).run();
-      return new Response(JSON.stringify({success:true,request:{id,status:'pending',monthly_total:monthlyTotal,annual_total:annualTotal,due_now:monthlyTotal+annualTotal}}),{status:201,headers});
+      if(body.theme_id)await saveStoreThemeId(db,actor.store_id,body.theme_id);
+      return new Response(JSON.stringify({success:true,request:{id,status:'pending',monthly_total:monthlyTotal,annual_total:annualTotal,due_now:monthlyTotal+annualTotal},theme_id:body.theme_id?body.theme_id:undefined}),{status:201,headers});
     }
     if (path === 'auth/session' && method === 'GET') {
       if (!actor) return fail('يرجى تسجيل الدخول', 401);
       const store = actor.store_id ? await db.prepare('SELECT * FROM stores WHERE id=?').bind(actor.store_id).first() : null;
       const subscription = actor.store_id ? await db.prepare('SELECT * FROM subscriptions WHERE store_id=? ORDER BY created_at DESC LIMIT 1').bind(actor.store_id).first() : null;
       const userActive = actor.store_id ? await db.prepare('SELECT is_active FROM users WHERE id=?').bind(actor.id).first() : null;
-      return new Response(JSON.stringify({ success: true, user: publicUser(actor), store: store ? withStoreStatus(store, userActive?.is_active, subscription) : null, subscription: serializeStoreSubscription(subscription) }), { headers });
+      const themeId = store ? await getStoreThemeId(db, (store as any).id) : DEFAULT_STORE_THEME;
+      return new Response(JSON.stringify({ success: true, user: publicUser(actor), store: store ? withStoreStatus(store, userActive?.is_active, subscription, Date.now(), themeId) : null, subscription: serializeStoreSubscription(subscription) }), { headers });
     }
     if (path === 'auth/logout' && method === 'POST') {
       await db.prepare('DELETE FROM auth_sessions WHERE token_hash=?').bind(await digest(token(request))).run();
@@ -328,10 +346,11 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
           subscription = await db.prepare('SELECT * FROM subscriptions WHERE store_id = ? ORDER BY created_at DESC LIMIT 1').bind((user as any).store_id).first();
         }
 
+        const themeId = store ? await getStoreThemeId(db, store.id) : DEFAULT_STORE_THEME;
         return new Response(JSON.stringify({
           success: true,
           user: publicUser(user),
-          store: store ? withStoreStatus(store, user.is_active, subscription) : null,
+          store: store ? withStoreStatus(store, user.is_active, subscription, Date.now(), themeId) : null,
           subscription: serializeStoreSubscription(subscription),
         }), { headers: { ...headers, 'Set-Cookie': await newSession(db, user, env, request, body.link_identity===true) } });
       }
@@ -350,7 +369,11 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
           email = '',
           username,
           password,
+          theme_id,
         } = body;
+
+        if (theme_id !== undefined && !isValidStoreThemeId(theme_id)) return fail('ثيم المتجر المختار غير صالح', 400);
+        const resolvedTheme: StoreThemeId = theme_id ? theme_id : DEFAULT_STORE_THEME;
 
         const cleanEmail = (email || '').trim().toLowerCase();
         const cleanUsername = (username || cleanEmail.split('@')[0] || '').trim();
@@ -375,6 +398,7 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
         const userId = 'usr-' + crypto.randomUUID();
         const subId = 'sub-' + crypto.randomUUID();
 
+        await ensureStoreThemeTable(db);
         await db.batch([db.prepare(`
           INSERT INTO stores (id, name, activity_type, whatsapp_number, currency, bio, is_active)
           VALUES (?, ?, ?, ?, ?, '', 0)
@@ -388,7 +412,12 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
         db.prepare(`
           INSERT INTO subscriptions (id, store_id, plan_name, status, start_date, end_date, price)
           VALUES (?, ?, 'الباقة المجانية', 'awaiting_activation', date('now'), date('now'), 0)
-        `).bind(subId, storeId)]);
+        `).bind(subId, storeId),
+
+        db.prepare(`
+          INSERT INTO store_themes (store_id, theme_id, updated_at)
+          VALUES (?, ?, datetime('now'))
+        `).bind(storeId, resolvedTheme)]);
 
         const createdStore = await db.prepare('SELECT * FROM stores WHERE id = ?').bind(storeId).first();
         const createdUser = await db.prepare('SELECT id, username, email, role, store_id, is_active FROM users WHERE id = ?').bind(userId).first();
@@ -397,7 +426,7 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
         return new Response(JSON.stringify({
           success: true,
           user: createdUser,
-          store: createdStore ? withStoreStatus(createdStore, (createdUser as any)?.is_active, createdSub) : null,
+          store: createdStore ? withStoreStatus(createdStore, (createdUser as any)?.is_active, createdSub, Date.now(), resolvedTheme) : null,
           subscription: serializeStoreSubscription(createdSub),
         }), { headers: { ...headers, 'Set-Cookie': await newSession(db, { ...createdUser as any, password: hashedPassword }, env, request) } });
       }
@@ -591,13 +620,15 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
           if (fallback?.id) record = await getStoreAccess(db, fallback.id);
         }
         if (requestedId && record && !storeIsAvailable(record.status) && actor?.role !== 'super_admin' && actor?.store_id !== requestedId) return fail('المتجر غير متاح حاليًا',404);
-        return new Response(JSON.stringify({ success: true, store: record?.store ? withStoreStatus(record.store, record.user?.is_active ?? 1, record.subscription) : null }), { headers });
+        const themeId = record?.store ? await getStoreThemeId(db, record.store.id) : DEFAULT_STORE_THEME;
+        return new Response(JSON.stringify({ success: true, store: record?.store ? withStoreStatus(record.store, record.user?.is_active ?? 1, record.subscription, Date.now(), themeId) : null }), { headers });
       }
 
       if (method === 'POST' || method === 'PUT') {
         const body = await request.json() as any;
         const id = body.id || 'store-' + Date.now();
-        const { name, activity_type, whatsapp_number = '201061532875', currency = 'ج.م', bio = '', logo_data = '' } = body;
+        const { name, activity_type, whatsapp_number = '201061532875', currency = 'ج.م', bio = '', logo_data = '', theme_id } = body;
+        if (theme_id !== undefined && !isValidStoreThemeId(theme_id)) return fail('ثيم المتجر المختار غير صالح', 400);
 
         const existing = await db.prepare('SELECT id FROM stores WHERE id = ?').bind(id).first();
         if (existing) {
@@ -612,9 +643,11 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
             VALUES (?, ?, ?, ?, ?, ?, ?, 1)
           `).bind(id, name, activity_type, whatsapp_number, currency, bio, logo_data).run();
         }
+        if (theme_id) await saveStoreThemeId(db, id, theme_id);
 
         const saved = await db.prepare('SELECT * FROM stores WHERE id = ?').bind(id).first();
-        return new Response(JSON.stringify({ success: true, store: saved }), { headers });
+        const savedTheme = await getStoreThemeId(db, id);
+        return new Response(JSON.stringify({ success: true, store: saved ? { ...saved, theme_id: savedTheme } : null }), { headers });
       }
     }
 
@@ -739,7 +772,25 @@ export async function handleStoreRequest(request:Request, env:Env, delegatedActo
   }
 };
 
-function withStoreStatus(store: any, userActive: number | boolean | null | undefined, subscription: any, now = Date.now()) {
+async function ensureStoreThemeTable(db: any) {
+  await db.prepare("CREATE TABLE IF NOT EXISTS store_themes (store_id TEXT PRIMARY KEY, theme_id TEXT NOT NULL DEFAULT 'classic', updated_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY(store_id) REFERENCES stores(id) ON DELETE CASCADE)").run();
+}
+
+async function getStoreThemeId(db: any, storeId: string): Promise<StoreThemeId> {
+  try {
+    const row = await db.prepare('SELECT theme_id FROM store_themes WHERE store_id=?').bind(storeId).first() as { theme_id?: string } | null;
+    return resolveStoreThemeId(row?.theme_id);
+  } catch {
+    return DEFAULT_STORE_THEME;
+  }
+}
+
+async function saveStoreThemeId(db: any, storeId: string, themeId: StoreThemeId) {
+  await ensureStoreThemeTable(db);
+  await db.prepare("INSERT INTO store_themes(store_id,theme_id,updated_at) VALUES(?,?,datetime('now')) ON CONFLICT(store_id) DO UPDATE SET theme_id=excluded.theme_id,updated_at=datetime('now')").bind(storeId, themeId).run();
+}
+
+function withStoreStatus(store: any, userActive: number | boolean | null | undefined, subscription: any, now = Date.now(), themeId: StoreThemeId = DEFAULT_STORE_THEME) {
   const effective_status = effectiveStoreStatus(userActive, store.is_active, subscription, now);
   return {
     ...store,
@@ -747,6 +798,7 @@ function withStoreStatus(store: any, userActive: number | boolean | null | undef
     is_paid_subscription: hasActivePaidSubscription(userActive, store.is_active, subscription, now),
     needs_upgrade: needsStoreUpgrade(userActive, store.is_active, subscription, now),
     plan_name: displayStorePlan(subscription),
+    theme_id: resolveStoreThemeId(themeId),
   };
 }
 

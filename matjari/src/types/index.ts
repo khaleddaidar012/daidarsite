@@ -1,3 +1,6 @@
+import type { StoreThemeId } from '../../../shared/store-themes';
+export type { StoreThemeId };
+
 export type UserRole = 'super_admin' | 'merchant';
 
 export interface User {
@@ -76,6 +79,7 @@ export interface Store {
   is_paid_subscription?: boolean;
   needs_upgrade?: boolean;
   plan_name?: string;
+  theme_id?: StoreThemeId;
   created_at?: string;
   updated_at?: string;
 }

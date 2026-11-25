@@ -1,25 +1,39 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Save, Check, ShieldCheck, MessageCircle, AlertCircle, Sparkles } from 'lucide-react';
-import { Store } from '../types';
+import { Product, Store, StoreThemeId } from '../types';
 import { api } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
+import { resolveStoreThemeId } from '../../../shared/store-themes';
+import { StoreThemePicker } from './StoreThemePicker';
 
 interface SettingsViewProps {
   store: Store | null;
+  products?: Product[];
   onRefresh: () => Promise<void>;
 }
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ store, onRefresh }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ store, products = [], onRefresh }) => {
   const { t, isArabic } = useLanguage();
   const [name, setName] = useState(store?.name || '');
   const [activityType, setActivityType] = useState(store?.activity_type || '');
   const [whatsapp, setWhatsapp] = useState(store?.whatsapp_number || '');
   const [currency, setCurrency] = useState(store?.currency || (isArabic ? 'ج.م' : '$'));
   const [bio, setBio] = useState(store?.bio || '');
+  const [themeId, setThemeId] = useState<StoreThemeId>(() => resolveStoreThemeId(store?.theme_id));
   
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    setThemeId(resolveStoreThemeId(store?.theme_id));
+  }, [store?.theme_id]);
+
+  const handleSaveThemeOnly = async (nextTheme: StoreThemeId) => {
+    await api.updateStoreTheme(nextTheme);
+    setThemeId(nextTheme);
+    await onRefresh();
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,6 +58,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ store, onRefresh }) 
         whatsapp_number: whatsapp.trim(),
         currency,
         bio: bio.trim(),
+        theme_id: themeId,
       });
 
       await onRefresh();
@@ -202,6 +217,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ store, onRefresh }) 
           </button>
         </div>
       </form>
+
+      {/* Storefront Theme Picker */}
+      <StoreThemePicker
+        value={themeId}
+        savedValue={resolveStoreThemeId(store?.theme_id)}
+        onChange={setThemeId}
+        onSave={handleSaveThemeOnly}
+        isArabic={isArabic}
+        store={store}
+        products={products}
+        title={isArabic ? 'تصميم (ثيم) واجهة المتجر' : 'Storefront Theme'}
+        subtitle={
+          isArabic
+            ? 'اختر بين 5 ثيمات احترافية وعاين متجرك قبل الحفظ. التغيير ينعكس على واجهة متجرك فقط دون المساس بمنتجاتك أو طلباتك.'
+            : 'Choose from 5 professional themes and preview live before saving. Your products, orders, and settings remain intact.'
+        }
+      />
 
     </div>
   );
