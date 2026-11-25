@@ -4,6 +4,7 @@ import { Product, Store, StoreThemeId } from '../types';
 import { api } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { resolveStoreThemeId } from '../../../shared/store-themes';
+import { normalizeWhatsAppPhone } from '../../../shared/whatsapp';
 import { StoreThemePicker } from './StoreThemePicker';
 
 interface SettingsViewProps {
@@ -20,7 +21,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ store, products = []
   const [currency, setCurrency] = useState(store?.currency || (isArabic ? 'ج.م' : '$'));
   const [bio, setBio] = useState(store?.bio || '');
   const [themeId, setThemeId] = useState<StoreThemeId>(() => resolveStoreThemeId(store?.theme_id));
-  
+
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -43,6 +44,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ store, products = []
     }
     if (!whatsapp.trim()) {
       setErrorMessage(isArabic ? 'يرجى إدخال رقم الواتساب لضمان عمل مسار الطلبات' : 'Please enter WhatsApp number for checkout');
+      return;
+    }
+    const normalizedWhatsapp = normalizeWhatsAppPhone(whatsapp);
+    if (!normalizedWhatsapp) {
+      setErrorMessage(
+        isArabic
+          ? 'رقم الواتساب غير صالح — أدخل رقمًا مصريًا من 11 رقمًا مثل 010xxxxxxxx أو رقمًا دوليًا برمز الدولة مثل 2010xxxxxxxx حتى يظهر زر الواتساب في متجرك.'
+          : 'Invalid WhatsApp number — enter an 11-digit Egyptian number (e.g. 010xxxxxxxx) or international number with country code (e.g. 2010xxxxxxxx) so your store WhatsApp button works.'
+      );
       return;
     }
 
@@ -108,7 +118,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ store, products = []
 
       {/* Settings Form */}
       <form onSubmit={handleSave} className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 p-6 sm:p-10 shadow-xs space-y-6 transition-colors">
-        
+
         {/* Basic Store Info */}
         <div className="space-y-4">
           <h3 className="text-sm font-bold text-slate-800 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2">
@@ -161,7 +171,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ store, products = []
         <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
           <h3 className="text-sm font-bold text-slate-800 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center gap-2">
             <MessageCircle className="w-4 h-4 text-[#0084d6] dark:text-sky-400" />
-            <span>{isArabic ? 'إعدادات استلام الطلبات والواتساب (+20 10 61532875)' : 'WhatsApp Order Receiving (+20 10 61532875)'}</span>
+            <span>{isArabic ? 'إعدادات استلام الطلبات والواتساب' : 'WhatsApp Order Receiving Settings'}</span>
           </h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -173,13 +183,45 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ store, products = []
                 type="tel"
                 value={whatsapp}
                 onChange={(e) => setWhatsapp(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:border-[#0084d6] focus:ring-2 focus:ring-sky-100 text-sm font-mono dir-ltr text-right"
-                placeholder="201061532875"
+                dir="ltr"
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:border-[#0084d6] focus:ring-2 focus:ring-sky-100 text-sm font-mono text-left"
+                placeholder="010xxxxxxxx / 2010xxxxxxxx"
                 required
               />
-              <span className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 block">
-                {isArabic ? 'تأكد من كتابة رمز الدولة وبدون إشارة + أو مسافات.' : 'Country code included, without + or spaces.'}
-              </span>
+              {(() => {
+                const trimmed = whatsapp.trim();
+                const normalized = normalizeWhatsAppPhone(trimmed);
+                if (!trimmed) {
+                  return (
+                    <span className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 block">
+                      {isArabic
+                        ? 'اكتب رقمًا مصريًا من 11 رقمًا (010xxxxxxxx) أو برمز الدولة (2010xxxxxxxx).'
+                        : 'Enter an 11-digit Egyptian number (010xxxxxxxx) or full international number (2010xxxxxxxx).'}
+                    </span>
+                  );
+                }
+                if (normalized) {
+                  return (
+                    <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 mt-1.5 flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5 shrink-0" />
+                      <span>
+                        {isArabic ? 'رقم صالح — سيظهر زر واتساب في متجرك على:' : 'Valid — store WhatsApp button will link to:'}{' '}
+                        <strong dir="ltr" className="font-mono">+{normalized}</strong>
+                      </span>
+                    </span>
+                  );
+                }
+                return (
+                  <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400 mt-1.5 flex items-start gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    <span>
+                      {isArabic
+                        ? 'الرقم غير صالح لرابط واتساب (قد يوجد رقم ناقص أو زائد) — لن يظهر زر واتساب في متجرك حتى تصححه إلى 11 رقمًا مصريًا أو رقم دولي صحيح.'
+                        : 'Invalid WhatsApp format (check for missing or extra digits) — the store WhatsApp button stays hidden until fixed.'}
+                    </span>
+                  </span>
+                );
+              })()}
             </div>
 
             <div>

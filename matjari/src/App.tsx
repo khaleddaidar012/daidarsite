@@ -374,6 +374,7 @@ export const App: React.FC = () => {
           products={storefrontProducts}
           cart={cart}
           onAddToCart={handleAddToCart}
+          onUpdateQuantity={handleUpdateCartQuantity}
           onOpenCart={() => setIsCartOpen(true)}
           onUpgradeClick={handleStorefrontUpgrade}
           onBackToDashboard={() => {

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Store, User, Subscription, StoreThemeId } from '../types';
 import { api } from '../services/api';
 import { DEFAULT_STORE_THEME } from '../../../shared/store-themes';
+import { normalizeWhatsAppPhone } from '../../../shared/whatsapp';
 import { StoreThemePicker } from './StoreThemePicker';
 import confetti from 'canvas-confetti';
 import {
@@ -56,7 +57,7 @@ export const MerchantLoginView: React.FC<MerchantLoginViewProps> = ({
   // Register Form State
   const [storeName, setStoreName] = useState('');
   const [activityType, setActivityType] = useState('ملابس وأزياء');
-  const [whatsappNumber, setWhatsappNumber] = useState('01061532875');
+  const [whatsappNumber, setWhatsappNumber] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regUsername, setRegUsername] = useState('');
   const [regPassword, setRegPassword] = useState('');
@@ -103,6 +104,15 @@ export const MerchantLoginView: React.FC<MerchantLoginViewProps> = ({
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(cleanEmail)) {
       setError(isArabic ? 'يرجى إدخال بريد إلكتروني حقيقي وصالح من Google (مثال: name@gmail.com)' : 'Please enter a valid Google email address (e.g. name@gmail.com)');
+      return;
+    }
+
+    if (!normalizeWhatsAppPhone(whatsappNumber)) {
+      setError(
+        isArabic
+          ? 'رقم الواتساب غير صالح — أدخل رقمًا مصريًا من 11 رقمًا مثل 010xxxxxxxx أو رقمًا دوليًا برمز الدولة مثل 2010xxxxxxxx.'
+          : 'Invalid WhatsApp number — enter an 11-digit Egyptian number (010xxxxxxxx) or international number with country code.'
+      );
       return;
     }
 
@@ -462,7 +472,7 @@ export const MerchantLoginView: React.FC<MerchantLoginViewProps> = ({
                       type="tel"
                       value={whatsappNumber}
                       onChange={(e) => setWhatsappNumber(e.target.value)}
-                      placeholder="01061532875"
+                      placeholder="010xxxxxxxx"
                       className="w-full px-4 py-2.5 ps-9 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:border-[#0084d6] focus:ring-4 focus:ring-sky-100 dark:focus:ring-sky-900/30 transition-all font-mono placeholder:text-slate-400"
                       required
                     />
