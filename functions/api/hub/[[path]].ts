@@ -15,7 +15,11 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
   try {
     if (request.method !== 'GET' && !sameOrigin(request)) return json({ error: 'طلب غير مسموح' }, 403)
     if (path === 'google' && request.method === 'GET') {
-      if(env.ECOSYSTEM_DB)return Response.redirect(new URL('/api/ecosystem/google',request.url).toString(),303)
+      if(env.ECOSYSTEM_DB){
+        const nextUrl=new URL('/api/ecosystem/google',request.url);
+        nextUrl.search=new URL(request.url).search;
+        return Response.redirect(nextUrl.toString(),303);
+      }
       if (!env.HUB_GOOGLE_CLIENT_ID || !env.HUB_GOOGLE_CLIENT_SECRET) return json({ error: 'تسجيل Google غير مفعّل. أضف مفاتيح OAuth في Cloudflare.' }, 503)
       const state = crypto.randomUUID() + crypto.randomUUID()
       const callback = `${new URL(request.url).origin}/api/hub/google/callback`
@@ -28,10 +32,12 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
     }
     if (path === 'google/callback' && request.method === 'GET') {
       // Reuse the already registered production callback without changing Google credentials.
-      // A central OAuth state must always use the OIDC/PKCE verifier, never the legacy flow.
-      if(env.ECOSYSTEM_DB&&ecoRead(request,'__Host-eco_google')){
+      // When ecosystem auth is active (and not an explicit legacy cookie), always route through
+      // the central OIDC/PKCE handler with the same hubEnv configuration as /api/ecosystem/*.
+      if(env.ECOSYSTEM_DB&&(ecoRead(request,'__Host-eco_google')||!cookie(request,'daidar_hub_oauth'))){
         const target=new URL(request.url);target.pathname='/api/ecosystem/google/callback';
-        return ecosystem(new Request(target,request),env,hubAdapter(env));
+        const hubEnv={...env,ECOSYSTEM_CLIENT:'hub',ECOSYSTEM_STORE_ORIGIN:new URL(request.url).origin};
+        return ecosystem(new Request(target,request),hubEnv,hubAdapter(hubEnv));
       }
       const query = new URL(request.url).searchParams
       const state = query.get('state') || ''

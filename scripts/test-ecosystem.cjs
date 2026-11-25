@@ -106,6 +106,15 @@ async function test(){
   const proofResult=await ec('hub','google/callback?code=test&state='+proofUrl.searchParams.get('state'),cookie(proofGoogle)+'; '+freshCookie);assert.equal(proofResult.status,303);assert.equal(await eco.ecoLocalId(hubEnv,'hub',freshIdentity),oldGoogle);assert.equal((await data(await ec('hub','session',cookie(proofResult)))).user.id,freshIdentity);
   const bad=await ec('hub','google'),badUrl=new URL(bad.headers.get('location'));jwt=await new jose.SignJWT({nonce:'wrong',email:'owner@example.test',email_verified:true}).setProtectedHeader({alg:'RS256',kid:'test-key'}).setIssuer('https://accounts.google.com').setAudience('google-test').setSubject('attacker').setIssuedAt().setExpirationTime('5m').sign(privateKey);
   assert.equal((await ec('hub','google/callback?code=test&state='+badUrl.searchParams.get('state'),cookie(bad))).status,401);
+  // Browser cancellation, expired state, and unconfigured OAuth redirect cleanly back to Hub login instead of raw JSON.
+  const htmlCancelReq=new Request('https://hub.example/api/hub/google/callback?error=access_denied',{headers:{Accept:'text/html',Cookie:'__Host-eco_locale=en'}});
+  const htmlCancel=await hub.onRequest({request:htmlCancelReq,env:hubEnv});
+  assert.equal(htmlCancel.status,303);assert.equal(htmlCancel.headers.get('location'),'https://hub.example/en/hub/login?oauth=cancelled');
+  const htmlExpiredReq=new Request('https://hub.example/api/hub/google/callback?code=test&state=expired',{headers:{Accept:'text/html'}});
+  const htmlExpired=await hub.onRequest({request:htmlExpiredReq,env:hubEnv});
+  assert.equal(htmlExpired.status,303);assert.equal(htmlExpired.headers.get('location'),'https://hub.example/ar/hub/login?oauth=failed');
+  const htmlUnavail=await eco.ecosystem(new Request('https://hub.example/api/ecosystem/google?locale=ar',{headers:{Accept:'text/html'}}),{...hubEnv,HUB_GOOGLE_CLIENT_ID:'',HUB_GOOGLE_CLIENT_SECRET:''},hubAdapter);
+  assert.equal(htmlUnavail.status,303);assert.equal(htmlUnavail.headers.get('location'),'https://hub.example/ar/hub/login?oauth=unavailable');
  }finally{global.fetch=originalFetch}
  // A Google-only identity must explicitly prove its existing Store account.
  // Its SSO-only Hub link then follows the merge instead of stranding Hub at login.

@@ -149,39 +149,49 @@ export async function ecosystem(request:Request,e:EcoEnv,adapter:EcoAdapter):Pro
       const destination=client==='hub'?rawReturn:(client==='store'&&sameSite&&rawReturn&&/^\/(ar|en)\/hub\/stores/.test(rawReturn)?rawReturn:null);
       return redirect(allowed[client]+(destination||homepage(client,sameSite)),[await familyCookie(e,identity.id,identity.family),ecoCookie('__Host-eco_state','',0),ecoCookie('__Host-eco_pkce','',0),ecoCookie('__Host-eco_return','',0)]);
     }
+    const wantsHtml=request.headers.get('Accept')?.includes('text/html')||false;
+    const oauthLocale=()=>{const c=ecoRead(request,'__Host-eco_locale');const r=url.searchParams.get('return_to')||ecoRead(request,'__Host-eco_return');if(url.searchParams.get('locale')==='en'||c==='en'||r?.startsWith('/en/'))return 'en';return 'ar'};
+    const oauthFailRedirect=(reason:'failed'|'cancelled'|'unavailable'|'conflict')=>redirect(`${allowed.hub}/${oauthLocale()}/hub/login?oauth=${reason}`,[ecoCookie('__Host-eco_google','',0),ecoCookie('__Host-eco_locale','',0)]);
     if(path==='google'&&request.method==='GET'){
-      if(url.origin!==allowed.hub)return redirect(allowed.hub+'/api/ecosystem/google');
-      if(!e.HUB_GOOGLE_CLIENT_ID||!e.HUB_GOOGLE_CLIENT_SECRET)reject('إعداد Google غير متاح بعد',503);
+      if(url.origin!==allowed.hub)return redirect(allowed.hub+'/api/ecosystem/google'+url.search);
+      if(!e.HUB_GOOGLE_CLIENT_ID||!e.HUB_GOOGLE_CLIENT_SECRET){if(wantsHtml)return oauthFailRedirect('unavailable');reject('إعداد Google غير متاح بعد',503)}
       await ecoLimit(e,request,'google',20,900000);
       const state=ecoRandom(),nonce=ecoRandom(),verifier=ecoRandom();
       await db.prepare('INSERT INTO ec_oauth(state,nonce,verifier,user_id,expires_at) VALUES(?,?,?,?,?)').bind(await ecoHash(state),nonce,verifier,user?.id||null,Date.now()+600000).run();
       const target=new URL('https://accounts.google.com/o/oauth2/v2/auth');target.search=new URLSearchParams({client_id:e.HUB_GOOGLE_CLIENT_ID,redirect_uri:googleCallback(e),response_type:'code',scope:'openid email profile',state,nonce,code_challenge:await ecoChallenge(verifier),code_challenge_method:'S256',prompt:'select_account'}).toString();
       const destination=safeHubReturn(url.searchParams.get('return_to'));
-      return redirect(target.toString(),[ecoCookie('__Host-eco_google',state,600),...(destination?[ecoCookie('__Host-eco_return',destination,600)]:[])]);
+      const loc=oauthLocale();
+      return redirect(target.toString(),[ecoCookie('__Host-eco_google',state,600),ecoCookie('__Host-eco_locale',loc,600),...(destination?[ecoCookie('__Host-eco_return',destination,600)]:[])]);
     }
     if(path==='google/callback'&&request.method==='GET'){
+      const oauthError=url.searchParams.get('error');
       const state=url.searchParams.get('state')||'';
-      if(!state||state!==ecoRead(request,'__Host-eco_google')||!url.searchParams.get('code')||url.searchParams.get('error'))reject('تعذر إكمال دخول Google',401);
-      const pending=await db.prepare('DELETE FROM ec_oauth WHERE state=? AND expires_at>? RETURNING nonce,verifier,user_id').bind(await ecoHash(state),Date.now()).first();if(!pending)reject('انتهت محاولة الدخول',401);
+      if(oauthError){if(wantsHtml)return oauthFailRedirect(oauthError==='access_denied'?'cancelled':'failed');reject('تعذر إكمال دخول Google',401)}
+      if(!e.HUB_GOOGLE_CLIENT_ID||!e.HUB_GOOGLE_CLIENT_SECRET){if(wantsHtml)return oauthFailRedirect('unavailable');reject('إعداد Google غير متاح بعد',503)}
+      if(!state||state!==ecoRead(request,'__Host-eco_google')||!url.searchParams.get('code')){if(wantsHtml)return oauthFailRedirect('failed');reject('تعذر إكمال دخول Google',401)}
+      const pending=await db.prepare('DELETE FROM ec_oauth WHERE state=? AND expires_at>? RETURNING nonce,verifier,user_id').bind(await ecoHash(state),Date.now()).first();if(!pending){if(wantsHtml)return oauthFailRedirect('failed');reject('انتهت محاولة الدخول',401)}
       const tokens=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({client_id:e.HUB_GOOGLE_CLIENT_ID!,client_secret:e.HUB_GOOGLE_CLIENT_SECRET!,redirect_uri:googleCallback(e),code:url.searchParams.get('code')!,grant_type:'authorization_code',code_verifier:pending.verifier})});
-      if(!tokens.ok)reject('تعذر التحقق من Google',401);const data=await tokens.json() as any;
-      if(!adapter.verifyGoogle)reject('ارجع إلى بوابة الهوية لإكمال Google',503);
-      const payload=await adapter.verifyGoogle(data.id_token,e.HUB_GOOGLE_CLIENT_ID!);
-      if(payload.nonce!==pending.nonce||typeof payload.sub!=='string'||typeof payload.email!=='string'||payload.email_verified!==true)reject('تعذر إثبات هوية Google',401);
+      if(!tokens.ok){if(wantsHtml)return oauthFailRedirect('failed');reject('تعذر التحقق من Google',401)}const data=await tokens.json() as any;
+      if(!adapter.verifyGoogle){if(wantsHtml)return oauthFailRedirect('unavailable');reject('ارجع إلى بوابة الهوية لإكمال Google',503)}
+      let payload:Record<string,unknown>;
+      try{payload=await adapter.verifyGoogle(data.id_token,e.HUB_GOOGLE_CLIENT_ID!)}catch(err){if(wantsHtml)return oauthFailRedirect('failed');throw err}
+      if(payload.nonce!==pending.nonce||typeof payload.sub!=='string'||typeof payload.email!=='string'||payload.email_verified!==true){if(wantsHtml)return oauthFailRedirect('failed');reject('تعذر إثبات هوية Google',401)}
+      const normalizedEmail=payload.email.trim().toLowerCase();
       let linked=await db.prepare('SELECT user_id FROM ec_google WHERE subject=?').bind(payload.sub).first();
       // Never match identities on email. Linking Google to an existing account requires its current session.
-      if(pending.user_id&&(!user||user.id!==pending.user_id))reject('أعد تسجيل الدخول قبل ربط Google',401);
-      if(linked&&pending.user_id&&linked.user_id!==pending.user_id)reject('حساب Google مرتبط بهوية أخرى',409);
+      if(pending.user_id&&(!user||user.id!==pending.user_id)){if(wantsHtml)return oauthFailRedirect('failed');reject('أعد تسجيل الدخول قبل ربط Google',401)}
+      if(linked&&pending.user_id&&linked.user_id!==pending.user_id){if(wantsHtml)return oauthFailRedirect('conflict');reject('حساب Google مرتبط بهوية أخرى',409)}
       let id=linked?.user_id||pending.user_id;
       // A verified legacy Google subject is proof of that local account, not an email match.
       // The current central session and signed Google response prove both sides of this link.
       if(pending.user_id&&!linked){const legacy=await adapter.googleLocal?.(payload.sub);if(legacy)id=await ecoBind(e,client,legacy,pending.user_id,true)}
-      if(!id){const legacy=await adapter.googleLocal?.(payload.sub);if(legacy)id=await ecoBind(e,client,legacy);else{id=crypto.randomUUID();await db.prepare('INSERT INTO ec_users(id,email,name,created_at) VALUES(?,?,?,?)').bind(id,payload.email,String(payload.name||payload.email).slice(0,120),Date.now()).run()}}
+      if(!id){const legacy=await adapter.googleLocal?.(payload.sub);if(legacy)id=await ecoBind(e,client,legacy);else{id=crypto.randomUUID();await db.prepare('INSERT INTO ec_users(id,email,name,created_at) VALUES(?,?,?,?)').bind(id,normalizedEmail,String(payload.name||normalizedEmail).slice(0,120),Date.now()).run()}}
       if(!linked)await db.prepare('INSERT INTO ec_google(subject,user_id) VALUES(?,?)').bind(payload.sub,id).run();
-      const profile={id,email:payload.email,name:String(payload.name||payload.email),family:'',platform_admin:false};
-      try{await adapter.ensureLocal(profile)}catch(error:any){if(error.status!==409)throw error;return redirect(allowed.hub+'/ar/hub?ecosystem_link=1',[await familyCookie(e,id),ecoCookie('__Host-eco_google','',0)])}
+      const profile={id,email:normalizedEmail,name:String(payload.name||normalizedEmail),family:'',platform_admin:false};
+      const loc=oauthLocale();
+      try{await adapter.ensureLocal(profile)}catch(error:any){if(error.status!==409)throw error;return redirect(`${allowed.hub}/${loc}/hub?ecosystem_link=1`,[await familyCookie(e,id),ecoCookie('__Host-eco_google','',0),ecoCookie('__Host-eco_locale','',0)])}
       await ecoAudit(e,id,'google-login',id);
-      return redirect(allowed.hub+'/ar/hub?ecosystem_resume=1',[await familyCookie(e,id),ecoCookie('__Host-eco_google','',0)]);
+      return redirect(`${allowed.hub}/${loc}/hub?ecosystem_resume=1`,[await familyCookie(e,id),ecoCookie('__Host-eco_google','',0),ecoCookie('__Host-eco_locale','',0)]);
     }
     if(path==='admin'&&request.method==='GET'){
       if(!user?.platform_admin)reject('هذه الصلاحية لإدارة المنظومة فقط',403);
