@@ -430,8 +430,7 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                 </span>
               </span>
               <span className="hidden sm:inline text-slate-400">
-                {formatCount(products.length)} {isArabic ? 'منتج' : 'ITEMS'} · {formatCount(rawCategories.length || 1)}{' '}
-                {isArabic ? 'تصنيف' : 'CATS'}
+                {isArabic ? 'طلب مباشر 24/7' : 'DIRECT ORDER 24/7'}
               </span>
             </div>
           </div>
@@ -825,9 +824,6 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                   <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
                   <span>{store?.activity_type || t('shop_safe')}</span>
                 </span>
-                <span className="text-[11px] font-mono font-bold text-slate-400 bg-slate-900/90 border border-slate-800 px-2.5 py-1 rounded-lg">
-                  {formatCount(products.length)} {isArabic ? 'منتج متاح' : 'SKU READY'}
-                </span>
               </div>
 
               <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
@@ -865,17 +861,15 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                 )}
               </div>
 
-              {/* Tech Telemetry Metrics */}
+              {/* Tech Highlights */}
               <div className="grid grid-cols-3 gap-3 max-w-md pt-1">
                 <div className="rounded-xl bg-[#111827]/90 border border-slate-800 p-3">
-                  <span className="text-[10px] font-mono text-slate-400 block">{isArabic ? 'المنتجات' : 'PRODUCTS'}</span>
-                  <strong className="text-base font-black text-cyan-400 font-mono">{formatCount(products.length)}</strong>
+                  <span className="text-[10px] font-mono text-slate-400 block">{isArabic ? 'التصفح' : 'BROWSING'}</span>
+                  <strong className="text-xs font-black text-cyan-400">{isArabic ? 'سريع ومنظم' : 'FAST UI'}</strong>
                 </div>
                 <div className="rounded-xl bg-[#111827]/90 border border-slate-800 p-3">
-                  <span className="text-[10px] font-mono text-slate-400 block">{isArabic ? 'التصنيفات' : 'CATEGORIES'}</span>
-                  <strong className="text-base font-black text-white font-mono">
-                    {formatCount(rawCategories.length || 1)}
-                  </strong>
+                  <span className="text-[10px] font-mono text-slate-400 block">{isArabic ? 'التواصل' : 'SUPPORT'}</span>
+                  <strong className="text-xs font-black text-white">{isArabic ? 'مباشر' : 'DIRECT'}</strong>
                 </div>
                 <div className="rounded-xl bg-[#111827]/90 border border-slate-800 p-3">
                   <span className="text-[10px] font-mono text-slate-400 block">{isArabic ? 'الطلب' : 'CHECKOUT'}</span>
@@ -940,12 +934,6 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                 <h2 className="text-xl sm:text-2xl font-black text-slate-900 truncate">
                   {store?.name || t('platform_name')}
                 </h2>
-                <span className="rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-extrabold text-emerald-700">
-                  {formatCount(products.length)} {isArabic ? 'منتج متاح' : 'items'}
-                </span>
-                <span className="rounded-lg bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-[11px] font-bold text-slate-600">
-                  {formatCount(rawCategories.length || 1)} {isArabic ? 'تصنيف' : 'categories'}
-                </span>
               </div>
               <p className="text-xs text-slate-600 line-clamp-2 max-w-2xl">
                 {store?.bio ||
@@ -1042,20 +1030,20 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
               {/* Classic Trust Feature Pills */}
               <div className="grid grid-cols-3 gap-2.5 pt-2 max-w-lg">
                 <div className="rounded-2xl bg-white/90 border border-sky-100 p-3 shadow-sm">
-                  <strong className="block text-base font-black text-[#0084d6] font-mono">
-                    {formatCount(products.length)}
+                  <strong className="block text-xs sm:text-sm font-black text-[#0084d6]">
+                    {isArabic ? 'طلب سريع' : 'Fast Order'}
                   </strong>
-                  <span className="text-[11px] font-bold text-slate-500">{isArabic ? 'منتج متاح' : 'Products'}</span>
+                  <span className="text-[11px] font-bold text-slate-500">{isArabic ? 'بخطوة واحدة' : 'In one click'}</span>
                 </div>
                 <div className="rounded-2xl bg-white/90 border border-sky-100 p-3 shadow-sm">
-                  <strong className="block text-base font-black text-[#0e1f38] font-mono">
-                    {formatCount(rawCategories.length || 1)}
+                  <strong className="block text-xs sm:text-sm font-black text-[#0e1f38]">
+                    {isArabic ? 'متاح 24/7' : 'Open 24/7'}
                   </strong>
-                  <span className="text-[11px] font-bold text-slate-500">{isArabic ? 'تصنيفات' : 'Categories'}</span>
+                  <span className="text-[11px] font-bold text-slate-500">{isArabic ? 'تصفح بأي وقت' : 'Shop anytime'}</span>
                 </div>
                 <div className="rounded-2xl bg-white/90 border border-sky-100 p-3 shadow-sm">
-                  <strong className="block text-sm font-black text-emerald-600">{isArabic ? 'مباشر' : 'Direct'}</strong>
-                  <span className="text-[11px] font-bold text-slate-500">{isArabic ? 'عبر واتساب' : 'WhatsApp'}</span>
+                  <strong className="block text-xs sm:text-sm font-black text-emerald-600">{isArabic ? 'مباشر' : 'Direct'}</strong>
+                  <span className="text-[11px] font-bold text-slate-500">{isArabic ? 'عبر واتساب' : 'Via WhatsApp'}</span>
                 </div>
               </div>
             </div>
