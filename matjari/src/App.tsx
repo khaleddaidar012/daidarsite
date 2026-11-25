@@ -10,6 +10,8 @@ import { PublicStorefront } from './components/PublicStorefront';
 import { ExploreStoresView } from './components/ExploreStoresView';
 import { CartDrawer } from './components/CartDrawer';
 import { Footer } from './components/Footer';
+import FloatingWhatsAppButton from '../../shared/FloatingWhatsAppButton';
+import { buildDaidarSupportWhatsAppUrl } from '../../shared/whatsapp';
 import { useLanguage } from './context/LanguageContext';
 import { storefrontUrl,openStorePreview } from './services/storefront-url';
 
@@ -427,21 +429,35 @@ export const App: React.FC = () => {
   // 4. MERCHANT LOGIN VIEW (Dedicated External Portal for Store Owners)
   if (view === 'merchant_login') {
     return (
-      <MerchantLoginView
-        onLoginSuccess={handleLoginSuccess}
-        onBackToHome={() => navigateTo('landing')}
-      />
+      <>
+        <MerchantLoginView
+          onLoginSuccess={handleLoginSuccess}
+          onBackToHome={() => navigateTo('landing')}
+        />
+        <FloatingWhatsAppButton
+          scope="hub"
+          ar={isArabic}
+          href={buildDaidarSupportWhatsAppUrl(isArabic ? 'مرحبًا، أحتاج مساعدة في تسجيل الدخول إلى متجري' : 'Hello, I need help signing in to my store')}
+        />
+      </>
     );
   }
 
   // 5. SUPER ADMIN LOGIN VIEW
   if (view === 'login') {
     return (
-      <LoginView
-        onLoginSuccess={handleLoginSuccess}
-        onBackToHome={() => navigateTo('landing')}
-        onGoToMerchantLogin={openMerchantAccess}
-      />
+      <>
+        <LoginView
+          onLoginSuccess={handleLoginSuccess}
+          onBackToHome={() => navigateTo('landing')}
+          onGoToMerchantLogin={openMerchantAccess}
+        />
+        <FloatingWhatsAppButton
+          scope="hub"
+          ar={isArabic}
+          href={buildDaidarSupportWhatsAppUrl(isArabic ? 'مرحبًا، أحتاج مساعدة في دعيدر هب' : 'Hello, I need help with Daidar Hub')}
+        />
+      </>
     );
   }
 

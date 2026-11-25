@@ -118,6 +118,53 @@
   .free-activation-shine::after { animation: none; }
   .landing-card-enter { animation: none !important; }
   .landing-cta-shine::after { animation: none !important; }
+  .whatsapp-gleam-btn,
+  .whatsapp-gleam-btn::after { animation: none !important; }
+}
+
+@keyframes whatsappGleamSweep {
+  0%, 52% {
+    transform: translateX(-160%) skewX(-24deg);
+    opacity: 0;
+  }
+  62% {
+    opacity: 0.95;
+  }
+  82% {
+    opacity: 0.9;
+  }
+  92%, 100% {
+    transform: translateX(220%) skewX(-24deg);
+    opacity: 0;
+  }
+}
+
+@keyframes whatsappGleamGlow {
+  0%, 100% {
+    box-shadow: 0 10px 24px rgba(37, 211, 102, 0.35), 0 0 0 0 rgba(37, 211, 102, 0.42);
+  }
+  50% {
+    box-shadow: 0 12px 28px rgba(37, 211, 102, 0.5), 0 0 0 10px rgba(37, 211, 102, 0);
+  }
+}
+
+.whatsapp-gleam-btn {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  animation: whatsappGleamGlow 2.8s ease-in-out infinite;
+}
+
+.whatsapp-gleam-btn::after {
+  content: '';
+  position: absolute;
+  inset-block: -45%;
+  left: 0;
+  width: 48%;
+  background: linear-gradient(110deg, transparent 15%, rgba(255, 255, 255, 0.85) 50%, transparent 85%);
+  animation: whatsappGleamSweep 3.2s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 1;
 }
 
 @keyframes landingFadeUp {

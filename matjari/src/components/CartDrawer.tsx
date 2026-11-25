@@ -4,6 +4,7 @@ import { CartItem, Store } from '../types';
 import { api } from '../services/api';
 import confetti from 'canvas-confetti';
 import { useLanguage } from '../context/LanguageContext';
+import { buildStoreWhatsAppUrl, normalizeWhatsAppPhone } from '../../../shared/whatsapp';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -91,9 +92,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           (customerAddress.trim() ? `\nAddress: ${customerAddress.trim()}` : '') +
           (notes.trim() ? `\nNote: ${notes.trim()}` : '');
 
-      // 3. Clean store owner's WhatsApp number (+20 10 61532875)
-      let phone = store?.whatsapp_number || '201061532875';
-      phone = phone.replace(/[^0-9]/g, '');
+      // 3. Strictly normalize the store owner's own WhatsApp number (never fall back to platform support)
+      const nextWhatsappUrl = buildStoreWhatsAppUrl(store?.whatsapp_number, whatsappMessage) || '';
 
       // Trigger Confetti Celebration
       confetti({
@@ -105,8 +105,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       setIsOrderConfirmed(true);
 
       // 4. Keep the WhatsApp link for the customer's optional manual confirmation
-      const whatsappUrl = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(whatsappMessage)}`;
-      setWhatsappUrl(whatsappUrl);
+      setWhatsappUrl(nextWhatsappUrl);
 
     } catch (err: any) {
       setError(err.message || (isArabic ? 'حدث خطأ أثناء حفظ الطلب في D1' : 'Error saving order to D1'));
@@ -174,17 +173,21 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   <div className="font-black text-[#0084d6]">{t('order_summary_label')}</div>
                   <div>• {t('store_label')} {store?.name || (isArabic ? 'دعيدر للحلول البرمجية' : 'Daidar Solutions')}</div>
                   <div>• {t('total_label')} {totalPrice} {currency}</div>
-                  <div>• WhatsApp: +{store?.whatsapp_number || '201061532875'}</div>
+                  {normalizeWhatsAppPhone(store?.whatsapp_number) && (
+                    <div>• WhatsApp: +{normalizeWhatsAppPhone(store?.whatsapp_number)}</div>
+                  )}
                 </div>
 
                 <div className="pt-4 flex flex-col gap-2.5">
-                  <button
-                    onClick={() => { if (whatsappUrl) window.open(whatsappUrl, '_blank', 'noopener,noreferrer'); }}
-                    className="w-full py-3.5 rounded-2xl bg-[#0084d6] hover:bg-[#0074bd] text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-sky-600/25 transition-all"
-                  >
-                    <MessageSquare className="w-4 h-4" />
-                    <span>{t('whatsapp_btn_label')}</span>
-                  </button>
+                  {whatsappUrl && (
+                    <button
+                      onClick={() => { window.open(whatsappUrl, '_blank', 'noopener,noreferrer'); }}
+                      className="w-full py-3.5 rounded-2xl bg-[#0084d6] hover:bg-[#0074bd] text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-sky-600/25 transition-all"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      <span>{t('whatsapp_btn_label')}</span>
+                    </button>
+                  )}
 
                   <button
                     onClick={handleFinish}

@@ -1,15 +1,17 @@
-import React,{useCallback,useEffect,useRef,useState} from 'react';
-import {Store,Product,Subscription,User,OrderStatus,StoreOrder} from '../types';
-import {api} from '../services/api';
-import {OrderDetails} from './OrderDetails';
-import {ProductsView} from './ProductsView';
-import {SettingsView} from './SettingsView';
-import {SubscriptionCheckout} from './SubscriptionCheckout';
-import {DomainManager} from './DomainManager';
-import {UpgradeBanner} from './UpgradeBanner';
-import {useLanguage} from '../context/LanguageContext';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Store, Product, Subscription, User, OrderStatus, StoreOrder } from '../types';
+import { api } from '../services/api';
+import { OrderDetails } from './OrderDetails';
+import { ProductsView } from './ProductsView';
+import { SettingsView } from './SettingsView';
+import { SubscriptionCheckout } from './SubscriptionCheckout';
+import { DomainManager } from './DomainManager';
+import { UpgradeBanner } from './UpgradeBanner';
+import { useLanguage } from '../context/LanguageContext';
 import EcosystemPanel from '../../../shared/EcosystemPanel';
-import { storefrontUrl,preferredStorefrontUrl } from '../services/storefront-url';
+import FloatingWhatsAppButton from '../../../shared/FloatingWhatsAppButton';
+import { buildDaidarSupportWhatsAppUrl } from '../../../shared/whatsapp';
+import { storefrontUrl, preferredStorefrontUrl } from '../services/storefront-url';
 import { displayStorePlan, freeStorePlanName, isPaidStoreSubscription } from '../../lib/store-status';
 import {Package,ShoppingBag,Settings,ExternalLink,Copy,Check,LogOut,RefreshCw,MessageCircle,Home,CreditCard,Globe} from 'lucide-react';
 interface Props{user:User;initialStore:Store|null;subscription:Subscription|null;initialTab?:Tab;onLogout:()=>void;onPreviewStore:(id:string)=>void;onBackToHome?:()=>void}
@@ -44,7 +46,7 @@ export const StoreOwnerDashboard:React.FC<Props>=({user,initialStore,subscriptio
  useEffect(()=>{setPreferredUrl('');if(store)void preferredStorefrontUrl(store.id).then(setPreferredUrl)},[store?.id]);
  const hasDomain=!!preferredUrl&&new URL(preferredUrl).hostname!==window.location.hostname;
  const storeUrl=preferredUrl||(store?storefrontUrl(store.id):'');
- const support='https://wa.me/201061532875?text='+encodeURIComponent('مرحباً، أحتاج مساعدة بخصوص متجر '+(store?.name||user.username)+(store?' ('+store.id+')':''));
+ const support=buildDaidarSupportWhatsAppUrl('مرحباً، أحتاج مساعدة بخصوص متجر '+(store?.name||user.username)+(store?' ('+store.id+')':''));
  const tabs:{id:Tab;label:string;Icon:typeof Home;soon?:boolean}[]=[{id:'overview',label:text('متجري','Overview'),Icon:Home},{id:'products',label:text('المنتجات','Products'),Icon:Package},{id:'orders',label:text('الطلبات','Orders'),Icon:ShoppingBag},{id:'settings',label:text('بيانات المتجر','Store details'),Icon:Settings},{id:'subscription',label:text('الاشتراك والدعم','Subscription & support'),Icon:CreditCard},{id:'inventory',label:text('إدارة المخزون','Inventory management'),Icon:Package,soon:true},{id:'finance',label:text('إدارة الحسابات المالية','Financial accounts'),Icon:CreditCard,soon:true}];
  const normalizeSearch=(value:string)=>value.normalize('NFKC').toLocaleLowerCase().replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).trim();
  const query=normalizeSearch(orderSearch),phoneQuery=query.replace(/[\s()+-]/g,'');
@@ -91,5 +93,6 @@ export const StoreOwnerDashboard:React.FC<Props>=({user,initialStore,subscriptio
     {tab==='subscription'&&<section className="space-y-5"><div className="rounded-2xl border bg-white p-5"><h2 className="font-black">{text('حالة اشتراك المتجر','Store subscription status')}</h2><dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2"><div><dt className="text-slate-500">{text('الخطة الحالية','Current plan')}</dt><dd className="mt-1 font-bold">{currentPlanLabel}</dd></div><div><dt className="text-slate-500">{text('الحالة','Status')}</dt><dd className="mt-1 font-bold">{status}</dd></div><div><dt className="text-slate-500">{text('البداية','Starts')}</dt><dd dir="ltr" className="mt-1 font-bold">{paidSubscription&&subscription?.start_date?subscription.start_date:'—'}</dd></div><div><dt className="text-slate-500">{text('الانتهاء','Expires')}</dt><dd dir="ltr" className="mt-1 font-bold">{paidSubscription&&subscription?.end_date?subscription.end_date:'—'}</dd></div></dl></div><div className="rounded-2xl border bg-white p-5"><button type="button" onClick={()=>openTab('domains')} className="rounded-xl border border-sky-200 px-4 py-3 text-sm font-bold text-sky-700">{hasDomain?text('تغيير أو شراء دومين آخر','Change or buy another domain'):text('شراء دومين للمتجر','Buy a store domain')}</button></div>{store&&<div ref={upgradeSectionRef} id="subscription-upgrade-section" className="scroll-mt-6"><SubscriptionCheckout store={store} support={support} isArabic={ar}/></div>}</section>}
    </>}
   </main>
+  <FloatingWhatsAppButton scope="hub" ar={ar} href={support} tooltip={text('تواصل مع دعم دعيدر','Contact Daidar support')} label={text('تواصل مع دعم دعيدر على واتساب','Contact Daidar support on WhatsApp')}/>
  </div>;
 };

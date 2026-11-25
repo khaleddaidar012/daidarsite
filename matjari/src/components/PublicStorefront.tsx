@@ -3,6 +3,8 @@ import { ShoppingBag, Search, Phone, ArrowRight, Heart, Share2, Sparkles, Plus, 
 import { Store, Product, CartItem } from '../types';
 import { Footer } from './Footer';
 import { UpgradeBanner } from './UpgradeBanner';
+import FloatingWhatsAppButton from '../../../shared/FloatingWhatsAppButton';
+import { buildStoreWhatsAppUrl } from '../../../shared/whatsapp';
 import { api } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -45,6 +47,10 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
   const totalCartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const phone = store?.whatsapp_number?.trim() || '';
   const displayPhone = phone.startsWith('+') || phone.startsWith('0') ? phone : `+${phone}`;
+  const storeWhatsAppMessage = isArabic
+    ? (store?.name ? `مرحبًا، أرغب في الاستفسار عن منتجات متجر ${store.name}` : 'مرحبًا، أرغب في الاستفسار عن منتجات المتجر')
+    : (store?.name ? `Hello, I have a question about ${store.name}` : 'Hello, I have a question about your store');
+  const storeWhatsAppHref = buildStoreWhatsAppUrl(store?.whatsapp_number, storeWhatsAppMessage);
   const storeStatus = store?.effective_status || (store?.is_active === 1 ? 'active' : 'awaiting_activation');
   const canOrder = !!store && ['active', 'trial'].includes(storeStatus);
   const needsUpgrade = !!store && (typeof store.needs_upgrade === 'boolean' ? store.needs_upgrade : (store.is_paid_subscription === false || !canOrder));
@@ -82,10 +88,10 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
 
   return (
     <div className="min-h-screen bg-[#f7fafe] dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col justify-between font-cairo transition-colors selection:bg-sky-100 selection:text-sky-900">
-      
+
       {/* 1. TOP PREVIEW BANNER & NAVBAR */}
       <header className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 sticky top-0 z-30 transition-colors shadow-2xs">
-        
+
         {/* Free / Unsubscribed Upgrade Banner */}
         {store && needsUpgrade && (
           <UpgradeBanner
@@ -108,7 +114,7 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
 
         {/* Main Navbar */}
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-2 sm:gap-4">
-          
+
           {/* Vendor Profile Info */}
           <div className="flex items-center gap-3 min-w-0">
             <img
@@ -187,21 +193,20 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
 
       {/* 3. MAIN CATALOG SECTION */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1 space-y-6">
-        
+
         {/* Search & Filters Bar */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-          
+
           {/* Category Filter Pills (Matching Screenshot Style) */}
           <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-none">
             {categories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-5 py-2.5 rounded-full text-xs font-black whitespace-nowrap transition-all cursor-pointer ${
-                  selectedCategory === cat
-                    ? 'bg-[#0084d6] text-white shadow-md shadow-sky-600/25'
-                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 border border-slate-200 dark:border-slate-700'
-                }`}
+                className={`px-5 py-2.5 rounded-full text-xs font-black whitespace-nowrap transition-all cursor-pointer ${selectedCategory === cat
+                  ? 'bg-[#0084d6] text-white shadow-md shadow-sky-600/25'
+                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 border border-slate-200 dark:border-slate-700'
+                  }`}
               >
                 {cat}
               </button>
@@ -282,11 +287,10 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
                       <button
                         disabled={!canOrder}
                         onClick={() => handleAdd(p)}
-                        className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
-                          isAdded
-                            ? 'bg-[#0e1f38] text-white shadow-md'
-                            : 'bg-[#e6f4fe] dark:bg-sky-950/70 text-[#0084d6] dark:text-sky-300 hover:bg-[#0084d6] hover:text-white border border-sky-200 dark:border-sky-800'
-                        }`}
+                        className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${isAdded
+                          ? 'bg-[#0e1f38] text-white shadow-md'
+                          : 'bg-[#e6f4fe] dark:bg-sky-950/70 text-[#0084d6] dark:text-sky-300 hover:bg-[#0084d6] hover:text-white border border-sky-200 dark:border-sky-800'
+                          }`}
                       >
                         {isAdded ? (
                           <>
@@ -372,6 +376,26 @@ export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
             <span>{t('shopping_cart')} ({totalCartCount})</span>
           </button>
         </div>
+      )}
+
+      {/* Floating Store Owner WhatsApp Button (strictly the merchant's own number) */}
+      {storeWhatsAppHref && (
+        <FloatingWhatsAppButton
+          scope="storefront"
+          ar={isArabic}
+          href={storeWhatsAppHref}
+          offsetBottom={!isArabic && totalCartCount > 0}
+          tooltip={
+            isArabic
+              ? `تواصل مع ${store?.name || 'المتجر'} على واتساب`
+              : `Chat with ${store?.name || 'the store'} on WhatsApp`
+          }
+          label={
+            isArabic
+              ? `تواصل مع صاحب متجر ${store?.name || ''} على واتساب`.trim()
+              : `Contact ${store?.name || 'store'} owner on WhatsApp`
+          }
+        />
       )}
 
       {/* Bottom Footer */}

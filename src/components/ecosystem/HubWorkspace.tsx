@@ -1,12 +1,14 @@
 'use client'
-import {useCallback,useEffect,useState} from 'react';
-import {Store,Monitor,Users,Wrench,ArrowLeft,ArrowRight,Blocks,UserRound,Plus,LogOut,ExternalLink,PackageOpen,Globe} from 'lucide-react';
-import {type HubSection,safeHubReturn} from '../../../shared/hub-navigation';
+import { useCallback, useEffect, useState } from 'react';
+import { Store, Monitor, Users, Wrench, ArrowLeft, ArrowRight, Blocks, UserRound, Plus, LogOut, ExternalLink, PackageOpen, Globe } from 'lucide-react';
+import { type HubSection, safeHubReturn } from '../../../shared/hub-navigation';
 import ServiceSlider from './ServiceSlider';
 import HubPortal from '@/components/hub/HubPortal';
 import SystemManagementService from '@/components/hub/SystemManagementService';
 import UnifiedAdmin from './UnifiedAdmin';
 import EcosystemPanel from '../../../shared/EcosystemPanel';
+import FloatingWhatsAppButton from '../../../shared/FloatingWhatsAppButton';
+import { buildDaidarSupportWhatsAppUrl } from '../../../shared/whatsapp';
 import styles from './workspace.module.css';
 type User={id:string;name:string;email:string;platform_admin:boolean};
 type Service={id:string;system:string;title:string;activity?:string;plan:string;status:string;start:number|null;end:number|null;can_access:boolean;offline?:boolean;preview_url?:string|null};
@@ -59,5 +61,7 @@ export default function HubWorkspace({locale,section='home'}:{locale:'ar'|'en';s
  {section==='other-services'&&<section className={styles.detail}><div className={styles.notice}><h1>{text('إدارة أنظمتك والدعم الفني','System management & support')}</h1><p>{text('إدارة بيانات وأنظمة إلكترونية تساعد السيستم بتاعك يشتغل بتكلفة أقل.','Data and system management that helps your business run at a lower cost.')}</p><p>{text('إدارة العملاء وفريق العمل: قريبًا. الاشتراك غير متاح حاليًا.','Customer and team management: coming soon. Subscriptions are not yet available.')}</p></div>{account&&config&&<form className={styles.notice} onSubmit={async e=>{e.preventDefault();if(requestBusy)return;const form=e.currentTarget;setRequestBusy(true);setError('');const key=consultationKey||crypto.randomUUID();setConsultationKey(key);try{await saveRequest({operation_id:key,kind:'consultation',note:new FormData(form).get('note')});setConsultationKey('');form.reset()}catch(e){setError((e as Error).message)}finally{setRequestBusy(false)}}}><label className="block font-bold">{text('محتاج استشارة في إيه؟','What would you like advice on?')}<textarea name="note" required maxLength={2000} className="mt-3 block w-full rounded-xl border p-4"/></label><button className={styles.button} disabled={requestBusy}>{text('أرسل طلب الاستشارة','Send consultation request')}</button></form>}{requestNotice&&<p role="status" className={styles.notice}>{requestNotice}</p>}{account?<SystemManagementService ar={ar} onRequest={config?saveRequest:undefined} onBack={()=>location.assign(href('services'))}/>:<a className={styles.button} href={login('other-services')}>{text('اطلب استشارة أو خدمة إدارة السيستم','Request advice or system management')}</a>}</section>}
  </>}
  <footer className={styles.footer}>{text('دعيدر هب · حلول أبسط، لشغل أفضل.','Daidar Hub · Simple tools for better business.')}</footer>
- </main></div>;
+ </main>
+ {section!=='admin'&&<FloatingWhatsAppButton scope="hub" ar={ar} href={buildDaidarSupportWhatsAppUrl(text('مرحبًا، أحتاج مساعدة في دعيدر هب','Hello, I need help with Daidar Hub'))}/>}
+ </div>;
 }
