@@ -130,30 +130,6 @@ export function HeroSection({ locale }: HeroSectionProps) {
           <HeroServicesCarousel locale={locale} />
 
         </div>
-
-        {/* Clean Bottom Services Quick-Jump Ribbon (grounds the hero visually) */}
-        <div className="mt-14 pt-7 border-t border-[#dde7f2] dark:border-[#1a2c48] grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {t.hero.carousel.slides.map((slide, idx) => (
-            <Link
-              key={slide.id}
-              href={`/${locale}#services`}
-              className="group flex items-center justify-between gap-2 rounded-2xl border border-[#dde7f2] dark:border-[#1e3456] bg-white/90 dark:bg-[#102038]/90 px-4 py-3 hover:border-[#0284c7] dark:hover:border-[#38bdf8] hover:shadow-sm transition-all"
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="text-[11px] font-mono font-extrabold text-[#0284c7] dark:text-[#38bdf8] bg-[#e6f4fe] dark:bg-[#0f2744] px-2 py-0.5 rounded-md flex-shrink-0">
-                  0{idx + 1}
-                </span>
-                <span className="text-xs sm:text-sm font-extrabold text-[#0f2744] dark:text-[#e8f0fb] truncate">
-                  {slide.title}
-                </span>
-              </div>
-              <ArrowIcon
-                size={14}
-                className="text-[#8fa3bb] group-hover:text-[#0284c7] dark:group-hover:text-[#38bdf8] transition-colors flex-shrink-0"
-              />
-            </Link>
-          ))}
-        </div>
       </div>
     </section>
   )
