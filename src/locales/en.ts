@@ -56,20 +56,27 @@ const en = {
   },
   about: {
     sectionLabel: 'About Us',
-    title: 'We Build Solutions You Need',
-    titleHighlight: 'with Precision & Quality',
+    title: 'Daidar Solutions',
+    titleHighlight: 'Partners in Success',
+    companyName: 'Daidar Solutions',
+    companyAlt: 'Daidar Solutions company logo',
+    foundedLabel: 'Founded in 2026',
+    sloganLabel: 'Our Core Motto',
+    slogan: 'Partners in Success',
+    domainsLabel: 'Core Specializations',
+    domains: [
+      { id: 'websites', title: 'Websites', desc: 'Modern responsive web experiences built for clarity' },
+      { id: 'stores', title: 'Online Stores', desc: 'Structured storefronts and shopping flows open 24/7' },
+      { id: 'systems', title: 'Digital Systems', desc: 'Custom management, operations, and analytics systems' },
+    ],
     paragraph1:
-      'Daidar Solutions specializes in developing websites, digital stores, custom systems, and SaaS solutions. We believe every project has a unique nature, so we take time to deeply understand client needs before writing a single line of code.',
+      'A software company specialized in building websites, online stores, and digital systems of all kinds. Founded in 2026 with a bold ambition to craft practical digital solutions that help business owners organize their operations and strengthen their online presence.',
     paragraph2:
-      'We use the latest technologies like React, Next.js, and Node.js to build fast, secure, and scalable solutions. Our goal is not just to deliver a project, but to build a digital tool that serves your business long-term.',
-    founderTitle: 'Founder',
-    founderName: 'Khaled Hesham',
-    founderRole: 'JavaScript Developer specializing in web applications and custom systems',
-    techStack: 'Tech Stack',
+      'We start by understanding each project’s real needs, then turn them into a practical solution tailored to how the business works. We believe our success is tied to our clients’ success — guided by our core motto: "Partners in Success".',
     values: [
-      { title: 'Quality First', description: 'Clean code, precise design, high performance' },
-      { title: 'Full Transparency', description: 'Open communication at every project stage' },
-      { title: 'Practical Solutions', description: 'We focus on what truly serves your business' },
+      { title: 'Quality Craftsmanship', description: 'We build clean, fast, reliable software with attention to detail' },
+      { title: 'Full Transparency', description: 'Clear communication and visibility throughout every phase' },
+      { title: 'Practical Solutions', description: 'We focus on tools that truly serve your business without unnecessary complexity' },
     ],
   },
   services: {
