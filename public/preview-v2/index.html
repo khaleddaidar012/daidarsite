@@ -1,0 +1,2029 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>دعيدر للحلول البرمجية — معاينة التصميم العالمي المقترح</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f6f9fd;
+      --surface: #ffffff;
+      --surface-alt: #f0f6fc;
+      --ink: #0b1f3a;
+      --ink-2: #3d5470;
+      --muted: #657c97;
+      --border: #dce6f2;
+      --primary: #0284c7;
+      --primary-dark: #0369a1;
+      --accent: #38bdf8;
+      --navy: #0a1b33;
+      --navy-2: #11294b;
+      --success: #059669;
+      --danger: #dc2626;
+      --shadow-sm: 0 4px 16px rgba(11, 31, 58, 0.05);
+      --shadow-md: 0 14px 36px rgba(11, 31, 58, 0.08);
+      --shadow-lg: 0 24px 60px rgba(2, 132, 199, 0.14);
+      --radius: 20px;
+    }
+
+    html.dark {
+      --bg: #071120;
+      --surface: #0e1c33;
+      --surface-alt: #122440;
+      --ink: #eef5fe;
+      --ink-2: #b4cbe3;
+      --muted: #84a0bf;
+      --border: #1b3152;
+      --shadow-sm: 0 4px 18px rgba(0, 0, 0, 0.25);
+      --shadow-md: 0 16px 40px rgba(0, 0, 0, 0.35);
+      --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.45);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Cairo', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.7;
+      overflow-x: hidden;
+      transition: background 0.25s ease, color 0.25s ease;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; }
+    img { max-width: 100%; display: block; }
+
+    .container {
+      width: 100%;
+      max-width: 1220px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    /* Preview Notice Bar */
+    .preview-banner {
+      background: linear-gradient(90deg, #0a1b33, #0369a1, #0a1b33);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 9px 16px;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .preview-pill {
+      background: rgba(56, 189, 248, 0.2);
+      border: 1px solid rgba(125, 211, 252, 0.45);
+      color: #bae6fd;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+    }
+
+    /* Navbar */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(18px);
+      border-bottom: 1px solid var(--border);
+    }
+    html.dark .navbar {
+      background: rgba(7, 17, 32, 0.88);
+    }
+    .nav-accent {
+      height: 3px;
+      background: linear-gradient(90deg, #0a1b33, #0284c7, #38bdf8);
+    }
+    .nav-inner {
+      height: 74px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .brand-logo {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      padding: 6px;
+      display: grid;
+      place-items: center;
+    }
+    .brand-logo img.dark-logo { display: none; }
+    html.dark .brand-logo img.light-logo { display: none; }
+    html.dark .brand-logo img.dark-logo { display: block; }
+    .brand-title { font-size: 14px; font-weight: 900; line-height: 1.2; }
+    .brand-sub { font-size: 11px; font-weight: 700; color: var(--primary); }
+    html.dark .brand-sub { color: var(--accent); }
+
+    .nav-pills {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 5px;
+    }
+    .nav-pills a {
+      padding: 7px 14px;
+      border-radius: 999px;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--ink-2);
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .nav-pills a:hover, .nav-pills a.active {
+      background: var(--surface);
+      color: var(--primary);
+      box-shadow: var(--shadow-sm);
+    }
+    html.dark .nav-pills a:hover, html.dark .nav-pills a.active { color: var(--accent); }
+
+    .nav-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 13px;
+      font-weight: 800;
+      font-size: 13.5px;
+      padding: 11px 20px;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7, #0ea5e9);
+      color: #fff;
+      box-shadow: 0 8px 22px rgba(2, 132, 199, 0.28);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(2, 132, 199, 0.36); }
+    .btn-navy {
+      background: var(--navy);
+      color: #fff;
+      border-color: rgba(125, 211, 252, 0.2);
+    }
+    .btn-navy:hover { background: var(--navy-2); transform: translateY(-2px); }
+    .btn-outline {
+      background: var(--surface);
+      color: var(--ink);
+      border-color: var(--border);
+    }
+    .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+    .btn-sm { padding: 8px 14px; font-size: 12.5px; border-radius: 11px; }
+    .icon-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 11px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink);
+      display: grid;
+      place-items: center;
+      font-size: 16px;
+    }
+    .icon-btn:hover { border-color: var(--primary); }
+
+    /* Shared Section Typography */
+    section { padding: 86px 0; position: relative; }
+    .section-head { max-width: 720px; margin-bottom: 46px; }
+    .section-head.center { margin-inline: auto; text-align: center; }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--primary);
+      background: rgba(2, 132, 199, 0.1);
+      border: 1px solid rgba(2, 132, 199, 0.22);
+      margin-bottom: 14px;
+    }
+    html.dark .eyebrow { color: var(--accent); background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.25); }
+    .eyebrow-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    h2.sec-title {
+      font-size: clamp(27px, 3.6vw, 40px);
+      font-weight: 900;
+      line-height: 1.28;
+      margin-bottom: 12px;
+      letter-spacing: -0.01em;
+    }
+    p.sec-sub {
+      font-size: 16px;
+      color: var(--ink-2);
+      line-height: 1.8;
+    }
+    .gradient-text {
+      background: linear-gradient(120deg, #0284c7, #0ea5e9, #38bdf8);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    /* 1. HERO */
+    .hero {
+      padding: 72px 0 64px;
+      background:
+        radial-gradient(rgba(159, 182, 207, 0.32) 1px, transparent 1px),
+        var(--bg);
+      background-size: 28px 28px;
+      border-bottom: 1px solid var(--border);
+    }
+    html.dark .hero {
+      background:
+        radial-gradient(rgba(56, 189, 248, 0.14) 1px, transparent 1px),
+        var(--bg);
+      background-size: 28px 28px;
+    }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.08fr 0.92fr;
+      gap: 48px;
+      align-items: center;
+    }
+    .hero h1 {
+      font-size: clamp(32px, 4.4vw, 52px);
+      font-weight: 900;
+      line-height: 1.22;
+      margin-bottom: 18px;
+    }
+    .hero-desc {
+      font-size: 17px;
+      color: var(--ink-2);
+      max-width: 560px;
+      margin-bottom: 28px;
+      line-height: 1.85;
+    }
+    .hero-ctas {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 26px;
+    }
+    .hero-trust-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      max-width: 540px;
+    }
+    .trust-chip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 12.5px;
+      font-weight: 800;
+      box-shadow: var(--shadow-sm);
+    }
+    .trust-chip span.ico {
+      width: 30px;
+      height: 30px;
+      border-radius: 9px;
+      background: rgba(2, 132, 199, 0.1);
+      color: var(--primary);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+
+    /* Hero Interactive Showcase Card */
+    .hero-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 26px;
+      padding: 22px;
+      box-shadow: var(--shadow-lg);
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .slide-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 15px;
+      font-weight: 900;
+    }
+    .slide-counter {
+      font-family: monospace;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 8px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .hero-visual {
+      aspect-ratio: 16 / 10;
+      border-radius: 18px;
+      overflow: hidden;
+      background: #e9f3fc;
+      border: 1px solid var(--border);
+      margin-bottom: 16px;
+      position: relative;
+    }
+    .hero-visual img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.6s ease, opacity 0.35s ease;
+    }
+    .hero-card-desc {
+      font-size: 14.5px;
+      color: var(--ink-2);
+      min-height: 52px;
+      margin-bottom: 16px;
+      font-weight: 600;
+    }
+    .progress-bars {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .p-bar {
+      height: 5px;
+      border-radius: 999px;
+      background: var(--border);
+      overflow: hidden;
+      cursor: pointer;
+      border: none;
+      padding: 0;
+    }
+    .p-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #0284c7, #38bdf8);
+      border-radius: 999px;
+    }
+    .p-bar.done .p-bar-fill { width: 100%; }
+    .p-bar.active .p-bar-fill { animation: progressFill 5s linear forwards; }
+    @keyframes progressFill { from { width: 0%; } to { width: 100%; } }
+
+    /* 2. ENGINEERING GUARANTEES BAR */
+    .guarantees-bar {
+      padding: 26px 0;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .guarantees-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 14px;
+    }
+    .g-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--ink-2);
+    }
+    .g-ico {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      display: grid;
+      place-items: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    /* 3. PAIN VS SOLUTION */
+    .pain-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    .pain-card, .solution-card {
+      border-radius: 24px;
+      padding: 30px;
+      border: 1px solid var(--border);
+    }
+    .pain-card {
+      background: var(--surface);
+    }
+    .solution-card {
+      background: linear-gradient(160deg, #0b2242 0%, #10325d 60%, #0369a1 100%);
+      color: #fff;
+      border-color: rgba(56, 189, 248, 0.3);
+      box-shadow: var(--shadow-lg);
+    }
+    .ps-label {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 14px;
+    }
+    .pain-card .ps-label { background: rgba(220, 38, 38, 0.1); color: var(--danger); }
+    .solution-card .ps-label { background: rgba(56, 189, 248, 0.2); color: #bae6fd; }
+    .ps-list { list-style: none; display: grid; gap: 14px; margin-top: 18px; }
+    .ps-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 11px;
+      font-size: 14.5px;
+      line-height: 1.7;
+    }
+    .ps-mark {
+      width: 24px;
+      height: 24px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      font-size: 13px;
+      font-weight: 900;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .pain-card .ps-mark { background: rgba(220, 38, 38, 0.12); color: var(--danger); }
+    .solution-card .ps-mark { background: rgba(52, 211, 153, 0.2); color: #6ee7b7; }
+
+    /* 4. INTERACTIVE SOLUTION EXPLORER */
+    .explorer-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      overflow: hidden;
+      box-shadow: var(--shadow-md);
+    }
+    .explorer-tabs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-alt);
+    }
+    .exp-tab {
+      border: none;
+      background: transparent;
+      padding: 18px 14px;
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--ink-2);
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .exp-tab:hover { color: var(--primary); }
+    .exp-tab.active {
+      background: var(--surface);
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+    html.dark .exp-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .explorer-body {
+      padding: 36px;
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 34px;
+      align-items: center;
+    }
+    .deliv-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 11px;
+      margin: 20px 0 24px;
+    }
+    .deliv-item {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      padding: 11px 13px;
+      font-size: 13.5px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .deliv-check { color: var(--success); font-weight: 900; }
+    .exp-meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+    .exp-meta-pill {
+      font-size: 12.5px;
+      font-weight: 800;
+      padding: 6px 12px;
+      border-radius: 10px;
+      background: rgba(2, 132, 199, 0.08);
+      color: var(--primary);
+      border: 1px solid rgba(2, 132, 199, 0.2);
+    }
+    html.dark .exp-meta-pill { color: var(--accent); }
+    .exp-visual-box {
+      border-radius: 22px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+      box-shadow: var(--shadow-sm);
+    }
+    .exp-visual-box img { aspect-ratio: 16 / 10; width: 100%; object-fit: cover; }
+    .exp-visual-caption {
+      padding: 16px 18px;
+      font-size: 13.5px;
+      color: var(--ink-2);
+      border-top: 1px solid var(--border);
+    }
+
+    /* 5. DAIDAR HUB DARK BENTO SHOWCASE */
+    .bento-section {
+      background: linear-gradient(180deg, #071528 0%, #0b1e38 100%);
+      color: #eef5fe;
+      border-top: 1px solid #163052;
+      border-bottom: 1px solid #163052;
+    }
+    .bento-section .sec-sub { color: #9db8d6; }
+    .bento-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 18px;
+    }
+    .bento-card {
+      background: rgba(17, 37, 68, 0.72);
+      border: 1px solid rgba(125, 211, 252, 0.16);
+      border-radius: 24px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.25s ease, border-color 0.25s ease;
+    }
+    .bento-card:hover { transform: translateY(-4px); border-color: rgba(56, 189, 248, 0.45); }
+    .bento-7 { grid-column: span 7; }
+    .bento-5 { grid-column: span 5; }
+    .bento-6 { grid-column: span 6; }
+    .bento-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11.5px;
+      font-weight: 800;
+      padding: 4px 11px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.14);
+      color: #7dd3fc;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      width: fit-content;
+      margin-bottom: 14px;
+    }
+    .bento-card h3 { font-size: 22px; font-weight: 900; margin-bottom: 10px; color: #fff; }
+    .bento-card p { font-size: 14.5px; color: #b1c8e2; line-height: 1.8; margin-bottom: 18px; }
+    .price-highlight {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 6px;
+      background: rgba(16, 185, 129, 0.14);
+      border: 1px solid rgba(52, 211, 153, 0.35);
+      color: #6ee7b7;
+      padding: 8px 16px;
+      border-radius: 14px;
+      font-weight: 900;
+      font-size: 16px;
+      margin-bottom: 18px;
+      width: fit-content;
+    }
+    .bento-bullets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .bento-bullets span {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 5px 11px;
+      border-radius: 9px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #dceafc;
+    }
+
+    /* 6. INTERACTIVE SCOPE ESTIMATOR */
+    .calc-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      padding: 36px;
+      box-shadow: var(--shadow-md);
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 32px;
+      align-items: stretch;
+    }
+    .calc-group { margin-bottom: 22px; }
+    .calc-group label {
+      display: block;
+      font-size: 14px;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+    .opt-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    .opt-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+    .opt-btn {
+      border: 1.5px solid var(--border);
+      background: var(--surface-alt);
+      color: var(--ink);
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 13px;
+      font-weight: 800;
+      text-align: right;
+      transition: all 0.2s;
+    }
+    .opt-btn:hover { border-color: var(--primary); }
+    .opt-btn.selected {
+      background: rgba(2, 132, 199, 0.1);
+      border-color: var(--primary);
+      color: var(--primary);
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.14);
+    }
+    html.dark .opt-btn.selected { color: var(--accent); border-color: var(--accent); }
+    .calc-result {
+      background: linear-gradient(155deg, #0b2242 0%, #0f3460 100%);
+      color: #fff;
+      border-radius: 22px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
+    .calc-result h3 { font-size: 21px; font-weight: 900; margin: 10px 0 8px; }
+    .calc-result p { font-size: 14px; color: #bed6f0; line-height: 1.75; }
+    .calc-metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 18px 0;
+    }
+    .calc-metric {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 12px;
+    }
+    .calc-metric small { display: block; font-size: 11.5px; color: #8ec5f4; font-weight: 700; }
+    .calc-metric strong { font-size: 14.5px; font-weight: 900; }
+    .calc-list { list-style: none; display: grid; gap: 7px; margin-bottom: 20px; font-size: 13px; color: #dbeafe; }
+
+    /* 7. INDUSTRIES */
+    .industries-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+    .ind-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      transition: all 0.25s;
+      box-shadow: var(--shadow-sm);
+    }
+    .ind-card:hover { transform: translateY(-4px); border-color: var(--primary); box-shadow: var(--shadow-md); }
+    .ind-ico {
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      background: rgba(2, 132, 199, 0.1);
+      display: grid;
+      place-items: center;
+      font-size: 22px;
+      margin-bottom: 14px;
+    }
+    .ind-card h3 { font-size: 16.5px; font-weight: 900; margin-bottom: 7px; }
+    .ind-card p { font-size: 13.5px; color: var(--ink-2); line-height: 1.75; }
+
+    /* 8. 5-STEP PROCESS */
+    .process-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+    }
+    .step-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 22px 18px;
+      position: relative;
+      box-shadow: var(--shadow-sm);
+    }
+    .step-num {
+      font-family: monospace;
+      font-size: 12px;
+      font-weight: 900;
+      color: var(--primary);
+      background: rgba(2, 132, 199, 0.1);
+      padding: 4px 10px;
+      border-radius: 8px;
+      display: inline-block;
+      margin-bottom: 12px;
+    }
+    .step-card h3 { font-size: 15.5px; font-weight: 900; margin-bottom: 7px; }
+    .step-card p { font-size: 13px; color: var(--ink-2); line-height: 1.7; }
+
+    /* 9. COMPARISON TABLE */
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      overflow-x: auto;
+      box-shadow: var(--shadow-md);
+    }
+    table.cmp {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 680px;
+    }
+    table.cmp th, table.cmp td {
+      padding: 17px 18px;
+      text-align: right;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+    }
+    table.cmp thead th {
+      background: var(--surface-alt);
+      font-weight: 900;
+      font-size: 14.5px;
+    }
+    table.cmp th.daidar-col, table.cmp td.daidar-col {
+      background: rgba(2, 132, 199, 0.06);
+      font-weight: 800;
+    }
+    table.cmp thead th.daidar-col {
+      background: #0284c7;
+      color: #fff;
+    }
+    .badge-yes { color: var(--success); font-weight: 900; }
+    .badge-warn { color: #d97706; font-weight: 800; }
+    .badge-no { color: var(--danger); font-weight: 800; }
+
+    /* 10. CASE STUDIES / PORTFOLIO */
+    .cases-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 22px;
+    }
+    .case-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.25s;
+    }
+    .case-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-lg); border-color: var(--primary); }
+    .case-cover {
+      height: 175px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      color: #fff;
+      position: relative;
+    }
+    .case-body { padding: 22px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+    .case-body h3 { font-size: 17px; font-weight: 900; margin-bottom: 8px; }
+    .case-body p { font-size: 13.5px; color: var(--ink-2); line-height: 1.75; margin-bottom: 14px; }
+    .case-tags { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 12px; border-top: 1px solid var(--border); }
+    .case-tags span {
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 4px 9px;
+      border-radius: 8px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      color: var(--ink-2);
+    }
+
+    /* 11. FAQ — 15 ESSENTIAL QUESTIONS */
+    .faq-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 14px 18px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-sm);
+    }
+    .faq-cats { display: flex; flex-wrap: wrap; gap: 8px; }
+    .faq-cat-btn {
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+      color: var(--ink-2);
+      border-radius: 11px;
+      padding: 8px 14px;
+      font-size: 12.5px;
+      font-weight: 800;
+      transition: all 0.2s;
+    }
+    .faq-cat-btn.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+    .faq-search {
+      min-width: 250px;
+      flex: 0 1 300px;
+      padding: 9px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+      color: var(--ink);
+      font-family: inherit;
+      font-size: 13.5px;
+      outline: none;
+    }
+    .faq-search:focus { border-color: var(--primary); }
+    .faq-list { display: grid; gap: 12px; }
+    .faq-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      overflow: hidden;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .faq-item.open {
+      border-color: var(--primary);
+      box-shadow: var(--shadow-sm);
+    }
+    .faq-q {
+      width: 100%;
+      border: none;
+      background: transparent;
+      color: var(--ink);
+      padding: 18px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      text-align: right;
+      font-size: 15.5px;
+      font-weight: 800;
+    }
+    .faq-q-left { display: flex; align-items: center; gap: 12px; }
+    .faq-num {
+      width: 30px;
+      height: 30px;
+      border-radius: 9px;
+      background: rgba(2, 132, 199, 0.1);
+      color: var(--primary);
+      font-family: monospace;
+      font-size: 12.5px;
+      font-weight: 900;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    html.dark .faq-num { color: var(--accent); }
+    .faq-chevron {
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      background: var(--surface-alt);
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--primary);
+      transition: transform 0.25s;
+      flex-shrink: 0;
+    }
+    .faq-item.open .faq-chevron { transform: rotate(45deg); background: var(--primary); color: #fff; }
+    .faq-a {
+      display: none;
+      padding: 0 22px 20px 22px;
+      padding-right: 64px;
+      font-size: 14.5px;
+      color: var(--ink-2);
+      line-height: 1.85;
+    }
+    .faq-item.open .faq-a { display: block; }
+
+    /* 12. FINAL CTA */
+    .final-cta {
+      background: linear-gradient(135deg, #091d38 0%, #0e325c 55%, #0284c7 100%);
+      color: #fff;
+      border-radius: 30px;
+      padding: 54px 40px;
+      text-align: center;
+      box-shadow: var(--shadow-lg);
+      position: relative;
+      overflow: hidden;
+    }
+    .final-cta h2 { font-size: clamp(26px, 3.6vw, 40px); font-weight: 900; margin-bottom: 14px; }
+    .final-cta p { max-width: 640px; margin: 0 auto 28px; color: #cde6fd; font-size: 16px; }
+    .cta-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+    .btn-white { background: #fff; color: #0a1f3a; }
+    .btn-white:hover { background: #eef7ff; transform: translateY(-2px); }
+    .btn-wa { background: #22c55e; color: #fff; }
+    .btn-wa:hover { background: #16a34a; transform: translateY(-2px); }
+
+    /* FOOTER */
+    footer {
+      background: #081526;
+      color: #a4bed9;
+      padding: 60px 0 28px;
+      border-top: 1px solid #162e4d;
+    }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr 1fr 1.1fr;
+      gap: 32px;
+      margin-bottom: 40px;
+    }
+    footer h4 { color: #fff; font-size: 15px; font-weight: 900; margin-bottom: 14px; }
+    footer ul { list-style: none; display: grid; gap: 9px; font-size: 13.5px; }
+    footer ul a:hover { color: #38bdf8; }
+    .footer-bottom {
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 12.5px;
+      color: #6b87a8;
+    }
+
+    /* Floating WhatsApp */
+    .wa-float {
+      position: fixed;
+      bottom: 22px;
+      left: 22px;
+      z-index: 45;
+      background: #22c55e;
+      color: #fff;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font-weight: 800;
+      font-size: 13.5px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 10px 28px rgba(34, 197, 94, 0.38);
+      transition: transform 0.2s;
+    }
+    .wa-float:hover { transform: scale(1.04); }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .nav-pills { display: none; }
+      .hero-grid, .explorer-body, .calc-box, .pain-grid { grid-template-columns: 1fr; }
+      .guarantees-grid { grid-template-columns: repeat(2, 1fr); }
+      .process-grid { grid-template-columns: repeat(2, 1fr); }
+      .industries-grid, .cases-grid { grid-template-columns: repeat(2, 1fr); }
+      .bento-7, .bento-5, .bento-6 { grid-column: span 12; }
+      .footer-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 640px) {
+      section { padding: 60px 0; }
+      .hero-trust-row, .deliv-grid, .opt-grid, .opt-grid.cols-3, .industries-grid, .cases-grid, .process-grid, .footer-grid {
+        grid-template-columns: 1fr;
+      }
+      .explorer-tabs { grid-template-columns: repeat(2, 1fr); }
+      .explorer-body, .calc-box { padding: 22px; }
+      .faq-a { padding-right: 22px; }
+      .final-cta { padding: 36px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Local Preview Banner -->
+  <div class="preview-banner">
+    <span class="preview-pill">نسخة معاينة للتصميم الجديد</span>
+    <span>معاينة التصميم المقترح لموقع «دعيدر للحلول البرمجية» — شاركنا رأيك وملاحظاتك قبل الإطلاق الرسمي</span>
+  </div>
+
+  <!-- Navbar -->
+  <header class="navbar">
+    <div class="nav-accent"></div>
+    <div class="container nav-inner">
+      <a href="#top" class="brand">
+        <div class="brand-logo">
+          <img src="/logo.png" alt="دعيدر" class="light-logo" />
+          <img src="/logo-light.png" alt="دعيدر" class="dark-logo" />
+        </div>
+        <div>
+          <div class="brand-title">دعيدر للحلول البرمجية</div>
+          <div class="brand-sub">شركاء نجاح</div>
+        </div>
+      </a>
+
+      <nav class="nav-pills" aria-label="التنقل الرئيسي">
+        <a href="#top" class="active">الرئيسية</a>
+        <a href="#solutions">الحلول</a>
+        <a href="#hub">دعيدر هب</a>
+        <a href="#scope-finder">اكتشف الحل</a>
+        <a href="#portfolio">أعمالنا</a>
+        <a href="#faq">الأسئلة (15)</a>
+      </nav>
+
+      <div class="nav-actions">
+        <button id="themeToggle" class="icon-btn" title="تبديل المظهر الفاتح/الداكن" aria-label="تبديل المظهر">🌙</button>
+        <a href="#scope-finder" class="btn btn-primary btn-sm">احسب نطاق مشروعك ←</a>
+        <a href="#hub" class="btn btn-navy btn-sm">دعيدر هب</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- 1. HERO SECTION -->
+  <section id="top" class="hero">
+    <div class="container hero-grid">
+      <div>
+        <span class="eyebrow"><span class="eyebrow-dot"></span> شركة برمجيات ومنتجات رقمية متكاملة</span>
+        <h1>
+          حوّل نشاطك إلى <span class="gradient-text">نظام رقمي يبيع وينظّم شغلك</span> ٢٤ ساعة
+        </h1>
+        <p class="hero-desc">
+          في <strong>دعيدر للحلول البرمجية</strong> لا نبني صفحات شكلية فقط — نصمم ونطوّر <strong>مواقع احترافية، متاجر إلكترونية، أنظمة إدارة مخصصة، ومنصات SaaS</strong> جاهزة للتوسع، مع منظومة <strong>دعيدر هب</strong> لتشغيل ومتابعة مشروعك بوضوح كامل.
+        </p>
+
+        <div class="hero-ctas">
+          <a href="#scope-finder" class="btn btn-primary">اكتشف الحل الأنسب لنشاطك في ٣٠ ثانية ←</a>
+          <a href="#hub" class="btn btn-navy">استكشف دعيدر هب ومتجري</a>
+          <a href="#faq" class="btn btn-outline">الأسئلة الشائعة (15)</a>
+        </div>
+
+        <div class="hero-trust-row">
+          <div class="trust-chip"><span class="ico">⚡</span> أداء سحابي فائق</div>
+          <div class="trust-chip"><span class="ico">🛡️</span> أمان وملكية كاملة</div>
+          <div class="trust-chip"><span class="ico">🤝</span> دعم ومتابعة مستمرة</div>
+        </div>
+      </div>
+
+      <!-- Animated Hero Showcase -->
+      <div class="hero-card">
+        <div class="hero-card-top">
+          <div class="slide-badge">
+            <span id="heroSlideIcon">🛍️</span>
+            <span id="heroSlideTitle">متجر إلكتروني</span>
+          </div>
+          <span class="slide-counter" id="heroCounter">01 / 04</span>
+        </div>
+        <div class="hero-visual">
+          <img id="heroSlideImg" src="/images/hero-services/ecommerce.jpg" alt="متجر إلكتروني" />
+        </div>
+        <p class="hero-card-desc" id="heroSlideDesc">
+          زوّد فرص الوصول لعملاء محتملين، وخلّي منتجاتك متاحة ٢٤ ساعة بتجربة طلب سريعة ومنظمة.
+        </p>
+        <div class="progress-bars" id="heroBars">
+          <button class="p-bar active" data-slide="0" aria-label="متجر إلكتروني"><div class="p-bar-fill"></div></button>
+          <button class="p-bar" data-slide="1" aria-label="نظام إلكتروني"><div class="p-bar-fill"></div></button>
+          <button class="p-bar" data-slide="2" aria-label="موقع إلكتروني"><div class="p-bar-fill"></div></button>
+          <button class="p-bar" data-slide="3" aria-label="أنظمة SaaS"><div class="p-bar-fill"></div></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. ENGINEERING STANDARDS BAR -->
+  <div class="guarantees-bar">
+    <div class="container guarantees-grid">
+      <div class="g-item"><span class="g-ico">☁️</span> استضافة وأداء Cloudflare Edge</div>
+      <div class="g-item"><span class="g-ico">📱</span> تصميم متجاوب ١٠٠٪ مع الهاتف</div>
+      <div class="g-item"><span class="g-ico">🌐</span> دعم احترافي للعربية والإنجليزية</div>
+      <div class="g-item"><span class="g-ico">🔒</span> حماية وتشفير ضد الثغرات الشائعة</div>
+      <div class="g-item"><span class="g-ico">📍</span> تتبع شفاف لمراحل تنفيذ مشروعك</div>
+    </div>
+  </div>
+
+  <!-- 3. PAIN VS SOLUTION -->
+  <section>
+    <div class="container">
+      <div class="section-head center">
+        <span class="eyebrow"><span class="eyebrow-dot"></span> لماذا تخسر الأنشطة فرصًا يوميًا؟</span>
+        <h2 class="sec-title">الفرق بين العمل العشوائي وبين <span class="gradient-text">نظام رقمي مصمم لنموك</span></h2>
+        <p class="sec-sub">أغلب أصحاب الأعمال يبذلون مجهودًا مضاعفًا بسبب أدوات متفرقة ومواقع لا تقنع العميل — هنا يظهر الأثر الحقيقي للحل المنظم.</p>
+      </div>
+
+      <div class="pain-grid">
+        <div class="pain-card">
+          <span class="ps-label">الوضع التقليدي بدون نظام</span>
+          <h3 style="font-size:21px;font-weight:900;">تحديات تستنزف وقتك ومبيعاتك</h3>
+          <ul class="ps-list">
+            <li><span class="ps-mark">✕</span><span>طلبات ورسائل متفرقة بين واتساب والماسنجر تضيع فيها تفاصيل العملاء وتؤخر الرد.</span></li>
+            <li><span class="ps-mark">✕</span><span>ملفات Excel ودفاتر ورقية لا تعطيك رؤية واضحة للمخزون أو الأرباح أو أداء الفريق.</span></li>
+            <li><span class="ps-mark">✕</span><span>موقع قديم أو غياب كامل أونلاين يجعل العميل يتردد في الثقة بنشاطك مقارنة بالمنافسين.</span></li>
+            <li><span class="ps-mark">✕</span><span>تعامل مع مطورين بدون خطة أو متابعة، ينتهي بتأخير التسليم وغياب الدعم الفني لاحقًا.</span></li>
+          </ul>
+        </div>
+
+        <div class="solution-card">
+          <span class="ps-label">مع دعيدر للحلول البرمجية</span>
+          <h3 style="font-size:21px;font-weight:900;">بنية رقمية منظمة تعمل لصالحك</h3>
+          <ul class="ps-list">
+            <li><span class="ps-mark">✓</span><span>متجر أو موقع احترافي يعرض خدماتك ومنتجاتك بوضوح ويستقبل الطلبات على مدار ٢٤ ساعة.</span></li>
+            <li><span class="ps-mark">✓</span><span>لوحة تحكم مركزية تجمع الطلبات والعملاء والتقارير والإحصائيات الدقيقة في مكان واحد.</span></li>
+            <li><span class="ps-mark">✓</span><span>واجهة سريعة وهوية بصرية مقنعة ترفع ثقة العميل من أول ٥ ثوانٍ على الهاتف والكمبيوتر.</span></li>
+            <li><span class="ps-mark">✓</span><span>خطة تنفيذ مرحلية ورابط تتبع مباشر لمشروعك مع دعم فني حقيقي بعد الإطلاق.</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. INTERACTIVE SOLUTIONS EXPLORER -->
+  <section id="solutions" style="background: var(--surface-alt); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow"><span class="eyebrow-dot"></span> حلولنا الأساسية</span>
+        <h2 class="sec-title">اختر المسار المناسب لمرحلة عملك الحالية</h2>
+        <p class="sec-sub">اضغط على أي خدمة لاستعراض لمن تناسب، ماذا تستلم فعليًا، والمدة المتوقعة للتنفيذ.</p>
+      </div>
+
+      <div class="explorer-wrap">
+        <div class="explorer-tabs" role="tablist">
+          <button class="exp-tab active" data-tab="ecommerce">🛍️ المتاجر الإلكترونية</button>
+          <button class="exp-tab" data-tab="systems">⚙️ الأنظمة المخصصة</button>
+          <button class="exp-tab" data-tab="websites">🌐 المواقع الاحترافية</button>
+          <button class="exp-tab" data-tab="saas">☁️ منصات SaaS</button>
+        </div>
+
+        <div class="explorer-body" id="explorerBody">
+          <!-- Populated dynamically by JS -->
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. DAIDAR HUB & ECOSYSTEM BENTO -->
+  <section id="hub" class="bento-section">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow" style="background:rgba(56,189,248,0.14);color:#7dd3fc;border-color:rgba(56,189,248,0.3);"><span class="eyebrow-dot"></span> منظومة دعيدر هب (Daidar Hub)</span>
+        <h2 class="sec-title" style="color:#fff;">لا نبيع كلامًا عن البرمجيات — <span class="gradient-text">نحن نبني ونشغّل منظومتنا الخاصة</span></h2>
+        <p class="sec-sub">بوابة دعيدر هب تجمع لك حلولًا جاهزة ومختبرة يمكنك البدء بها فورًا، بجانب خدمات التطوير المخصص بالكامل.</p>
+      </div>
+
+      <div class="bento-grid">
+        <div class="bento-card bento-7">
+          <div>
+            <span class="bento-tag">🛍️ منتج جاهز للإطلاق السريع · متجري</span>
+            <h3>امتلك متجرك الإلكتروني الاحترافي في دقائق</h3>
+            <p>
+              بدل الانتظار أسابيع بتكاليف عالية، أطلق متجرك عبر <strong>منصة متجري</strong> داخل دعيدر هب بـ ٥ ثيمات احترافية قابلة للتبديل، ورابط مخصص أو ربط بدومين خاص، وإدارة منتجات وطلبات كاملة ولوحة تحكم سهلة من الهاتف.
+            </p>
+            <div class="price-highlight">ابتداءً من ٣٥٠ جنيه / شهريًا</div>
+            <div class="bento-bullets">
+              <span>٥ ثيمات احترافية</span>
+              <span>لوجو وهوية متجرك</span>
+              <span>رابط قصير أو دومين خاص</span>
+              <span>إدارة طلبات ومخزون</span>
+              <span>زر واتساب مباشر لمتجرك</span>
+            </div>
+          </div>
+          <div>
+            <a href="https://daidarsoluations.com/ar/hub/stores" target="_blank" class="btn btn-primary">استكشف منصة متجري ←</a>
+          </div>
+        </div>
+
+        <div class="bento-card bento-5">
+          <div>
+            <span class="bento-tag">🧩 بوابة العميل الموحدة</span>
+            <h3>حساب واحد لكل أنظمتك واشتراكاتك</h3>
+            <p>
+              عبر <strong>دعيدر هب</strong> تدخل بحسابك أو بحساب Google لإدارة متجرك، متابعة اشتراكاتك، وطلب الدعم أو الترقية من لوحة واحدة منظمة وآمنة.
+            </p>
+            <div class="bento-bullets">
+              <span>دخول سريع بـ Google</span>
+              <span>إدارة الاشتراكات</span>
+              <span>تحديثات مستمرة</span>
+            </div>
+          </div>
+          <div>
+            <a href="https://daidarsoluations.com/ar/hub" target="_blank" class="btn btn-white">افتح دعيدر هب ←</a>
+          </div>
+        </div>
+
+        <div class="bento-card bento-6">
+          <div>
+            <span class="bento-tag">📍 شفافية التنفيذ</span>
+            <h3>تتبع مشروعك خطوة بخطوة أونلاين</h3>
+            <p>
+              مع كل مشروع مخصص، تحصل على رابط متابعة خاص يعرض لك الجدول الزمني، المراحل المنجزة، وما يجري تنفيذه حاليًا دون الحاجة للاستفسار المتكرر.
+            </p>
+          </div>
+          <div class="bento-bullets" style="margin-bottom:0;">
+            <span>مراحل واضحة</span>
+            <span>تحديثات مباشرة</span>
+            <span>شفافية كاملة</span>
+          </div>
+        </div>
+
+        <div class="bento-card bento-6">
+          <div>
+            <span class="bento-tag">🛠️ تشغيل ومتابعة يومية</span>
+            <h3>خدمة إدارة السيستم والدعم التشغيلي</h3>
+            <p>
+              تحتاج فريقًا يساعدك يوميًا في إدخال البيانات ومتابعة تشغيل نظامك؟ نوفر باقات إدارة وتشغيل يومية مرنة (١ إلى ٣ ساعات يوميًا) لتتفرغ أنت لتطوير تجارتك.
+            </p>
+          </div>
+          <div class="bento-bullets" style="margin-bottom:0;">
+            <span>باقات تبدأ من ٨٠٠ جنيه/شهر</span>
+            <span>التزام بالمواعيد</span>
+            <span>تقارير واضحة</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. INTERACTIVE 30-SECOND SCOPE FINDER -->
+  <section id="scope-finder">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow"><span class="eyebrow-dot"></span> أداة تفاعلية ذكية</span>
+        <h2 class="sec-title">اكتشف الحل الأنسب لمشروعك في <span class="gradient-text">٣٠ ثانية</span></h2>
+        <p class="sec-sub">أجب عن ٣ اختيارات سريعة لتحصل فورًا على توصية تقنية عملية بالمسار الأنسب والمدة التقديرية وما تحتاجه للانطلاق.</p>
+      </div>
+
+      <div class="calc-box">
+        <div>
+          <div class="calc-group">
+            <label>١. ما نوع المشروع الذي تفكر فيه؟</label>
+            <div class="opt-grid" id="calcType">
+              <button type="button" class="opt-btn selected" data-val="store">🛍️ متجر إلكتروني لبيع منتجات</button>
+              <button type="button" class="opt-btn" data-val="website">🌐 موقع تعريفي لشركة / خدمة</button>
+              <button type="button" class="opt-btn" data-val="system">⚙️ نظام إدارة داخلي (ERP / CRM)</button>
+              <button type="button" class="opt-btn" data-val="saas">☁️ منصة SaaS / منتج رقمي</button>
+            </div>
+          </div>
+
+          <div class="calc-group">
+            <label>٢. ما حجم نشاطك حاليًا؟</label>
+            <div class="opt-grid cols-3" id="calcScale">
+              <button type="button" class="opt-btn selected" data-val="starter">بداية جديدة</button>
+              <button type="button" class="opt-btn" data-val="growing">نشاط قائم يتوسع</button>
+              <button type="button" class="opt-btn" data-val="enterprise">شركة متعددة الأقسام</button>
+            </div>
+          </div>
+
+          <div class="calc-group" style="margin-bottom:0;">
+            <label>٣. ما أولويتك القصوى الآن؟</label>
+            <div class="opt-grid cols-3" id="calcPriority">
+              <button type="button" class="opt-btn selected" data-val="fast">إطلاق سريع بأقل تكلفة</button>
+              <button type="button" class="opt-btn" data-val="brand">تصميم مخصص وهوية قوية</button>
+              <button type="button" class="opt-btn" data-val="automation">أتمتة وتقارير شاملة</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="calc-result" id="calcResult">
+          <!-- Updated dynamically -->
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. INDUSTRIES WE SERVE -->
+  <section style="background: var(--surface-alt); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+    <div class="container">
+      <div class="section-head center">
+        <span class="eyebrow"><span class="eyebrow-dot"></span> خبرة عملية متعددة القطاعات</span>
+        <h2 class="sec-title">حلول مصممة لطبيعة كل مجال</h2>
+        <p class="sec-sub">لكل نشاط طريقة عمل مختلفة — نصمم النظام ليتكيف مع شغلك الفعلي، لا العكس.</p>
+      </div>
+
+      <div class="industries-grid">
+        <div class="ind-card">
+          <div class="ind-ico">🛒</div>
+          <h3>التجارة والتجزئة</h3>
+          <p>متاجر إلكترونية سريعة، تنظيم الأصناف والمقاسات، سلة شراء سلسة، وإدارة طلبات ومخزون لحظية.</p>
+        </div>
+        <div class="ind-card">
+          <div class="ind-ico">🕋</div>
+          <h3>السياحة والحج والعمرة</h3>
+          <p>عرض البرامج والرحلات، استقبال الحجوزات والمستندات، متابعة الدفعات والموردين وتقارير الرحلات.</p>
+        </div>
+        <div class="ind-card">
+          <div class="ind-ico">🚢</div>
+          <h3>الشحن واللوجستيات</h3>
+          <p>مواقع متعددة اللغات، نماذج طلب عروض أسعار دقيقة، وبوابات تتبع شحنات وفواتير وصلاحيات فرق العمل.</p>
+        </div>
+        <div class="ind-card">
+          <div class="ind-ico">📖</div>
+          <h3>التعليم والأكاديميات</h3>
+          <p>مواقع تعريفية مقنعة، تسجيل الطلاب، جداول الحلقات والدورات، وتجربة قراءة وتصفح مريحة على الهاتف.</p>
+        </div>
+        <div class="ind-card">
+          <div class="ind-ico">🏢</div>
+          <h3>الشركات الخدمية والعيادات</h3>
+          <p>إدارة عملاء CRM، حجز مواعيد، متابعة العقود والمستحقات، وتقارير تشغيلية واضحة للإدارة.</p>
+        </div>
+        <div class="ind-card">
+          <div class="ind-ico">🚀</div>
+          <h3>الشركات الناشئة و SaaS</h3>
+          <p>تحويل فكرتك إلى منتج أولي MVP قابل للإطلاق ثم التوسع بنظام اشتراكات وصلاحيات وبنية سحابية قوية.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8. 5-STEP PROCESS -->
+  <section>
+    <div class="container">
+      <div class="section-head center">
+        <span class="eyebrow"><span class="eyebrow-dot"></span> منهجية عمل واضحة</span>
+        <h2 class="sec-title">كيف نحوّل فكرتك إلى نظام يعمل بنجاح؟</h2>
+        <p class="sec-sub">٥ خطوات منظمة بدون تعقيد أو مفاجآت، مع وضوح كامل في كل مرحلة.</p>
+      </div>
+
+      <div class="process-grid">
+        <div class="step-card">
+          <span class="step-num">01</span>
+          <h3>فهم النشاط والأهداف</h3>
+          <p>نستمع لطبيعة عملك ومشاكلك اليومية، ونحدد المتطلبات الأساسية ونطاق التنفيذ والجدول الزمني بدقة.</p>
+        </div>
+        <div class="step-card">
+          <span class="step-num">02</span>
+          <h3>التصميم وتجربة المستخدم</h3>
+          <p>نصمم واجهات واضحة تلائم هويتك التجارية وتسهّل على عميلك الشراء أو التواصل في أقل عدد من الخطوات.</p>
+        </div>
+        <div class="step-card">
+          <span class="step-num">03</span>
+          <h3>التطوير والبنية التقنية</h3>
+          <p>نبني النظام بأحدث تقنيات الويب وقواعد البيانات السحابية مع كود منظم وسريع وقابل للتطوير المستقبلي.</p>
+        </div>
+        <div class="step-card">
+          <span class="step-num">04</span>
+          <h3>الاختبار والأمان</h3>
+          <p>نختبر السرعة وتجربة الهاتف وحماية البيانات والصلاحيات قبل التسليم لضمان إطلاق مستقر وآمن.</p>
+        </div>
+        <div class="step-card">
+          <span class="step-num">05</span>
+          <h3>الإطلاق والدعم المستمر</h3>
+          <p>نطلق مشروعك على الدومين الخاص بك، ندرّبك على إدارته، ونبقى معك كشريك تقني للدعم والتوسع.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. COMPARISON TABLE -->
+  <section style="background: var(--surface-alt); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+    <div class="container">
+      <div class="section-head center">
+        <span class="eyebrow"><span class="eyebrow-dot"></span> مقارنة شفافة</span>
+        <h2 class="sec-title">لماذا يختار أصحاب الأعمال <span class="gradient-text">دعيدر للحلول البرمجية</span>؟</h2>
+        <p class="sec-sub">قبل أن تستثمر وقتك وميزانيتك، قارن بوضوح بين الخيارات المتاحة في السوق.</p>
+      </div>
+
+      <div class="table-wrap">
+        <table class="cmp">
+          <thead>
+            <tr>
+              <th>معيار المقارنة</th>
+              <th class="daidar-col">دعيدر للحلول البرمجية</th>
+              <th>العمل الحر العشوائي</th>
+              <th>القوالب الجاهزة المحدودة</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>تخصيص حسب طريقة شغلك</strong></td>
+              <td class="daidar-col"><span class="badge-yes">✓ تصميم وتطوير حسب احتياجك</span></td>
+              <td><span class="badge-warn">△ يتفاوت حسب الفرد</span></td>
+              <td><span class="badge-no">✕ مقيد بخصائص القالب</span></td>
+            </tr>
+            <tr>
+              <td><strong>الأداء وسرعة التصفح</strong></td>
+              <td class="daidar-col"><span class="badge-yes">✓ بنية حديثة وسرعة عالية (Cloudflare)</span></td>
+              <td><span class="badge-warn">△ غالبًا بلا تحسين للأداء</span></td>
+              <td><span class="badge-no">✕ بطء بسبب الإضافات الكثيرة</span></td>
+            </tr>
+            <tr>
+              <td><strong>شفافية المتابعة أثناء التنفيذ</strong></td>
+              <td class="daidar-col"><span class="badge-yes">✓ مراحل واضحة ورابط تتبع مباشر</span></td>
+              <td><span class="badge-no">✕ تواصل متقطع وغير منظم</span></td>
+              <td><span class="badge-warn">△ تعديلات سطحية فقط</span></td>
+            </tr>
+            <tr>
+              <td><strong>الأمان وحماية البيانات</strong></td>
+              <td class="daidar-col"><span class="badge-yes">✓ تحقق خادم وصلاحيات محكمة وتشفير</span></td>
+              <td><span class="badge-no">✕ مخاطر ثغرات شائعة</span></td>
+              <td><span class="badge-warn">△ عرضة لثغرات الإضافات</span></td>
+            </tr>
+            <tr>
+              <td><strong>الدعم الفني بعد الإطلاق</strong></td>
+              <td class="daidar-col"><span class="badge-yes">✓ شركة قائمة ودعم مستمر</span></td>
+              <td><span class="badge-no">✕ قد يختفي بعد التسليم</span></td>
+              <td><span class="badge-warn">△ دعم آلي عام فقط</span></td>
+            </tr>
+            <tr>
+              <td><strong>القابلية للتوسع وإضافة مزايا</strong></td>
+              <td class="daidar-col"><span class="badge-yes">✓ كود نظيف يكبر مع نشاطك</span></td>
+              <td><span class="badge-no">✕ صعوبة الصيانة والتطوير</span></td>
+              <td><span class="badge-no">✕ سقف تقني محدود جدًا</span></td>
+            </tr>
+            <tr>
+              <td><strong>تنوع الخيارات حسب الميزانية</strong></td>
+              <td class="daidar-col"><span class="badge-yes">✓ من «متجري» ٣٥٠ ج/شهر حتى الأنظمة المخصصة</span></td>
+              <td><span class="badge-warn">△ تكاليف خفية عند الأخطاء</span></td>
+              <td><span class="badge-warn">△ اشتراكات متراكمة للإضافات</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10. PORTFOLIO / CASE STUDIES -->
+  <section id="portfolio">
+    <div class="container">
+      <div class="section-head" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px;max-width:none;">
+        <div style="max-width:650px;">
+          <span class="eyebrow"><span class="eyebrow-dot"></span> نماذج حقيقية من أعمالنا</span>
+          <h2 class="sec-title">مشاريع نفخر بتطويرها لعملائنا</h2>
+          <p class="sec-sub">كل مشروع يبدأ بفهم التحدي، ثم بناء حل عملي يخدم العملاء وفريق التشغيل معًا.</p>
+        </div>
+        <a href="https://daidarsoluations.com/ar/portfolio" target="_blank" class="btn btn-outline">عرض جميع الأعمال ←</a>
+      </div>
+
+      <div class="cases-grid">
+        <article class="case-card">
+          <div class="case-cover" style="background:linear-gradient(135deg,#09223f,#0369a1);">
+            <span class="bento-tag" style="background:rgba(255,255,255,0.16);color:#fff;border-color:rgba(255,255,255,0.25);">🚢 شحن ولوجستيات</span>
+            <strong style="font-size:20px;">Nile Link Logistics</strong>
+          </div>
+          <div class="case-body">
+            <div>
+              <h3>موقع ونظام طلبات لشركة شحن ولوجستيات</h3>
+              <p>موقع متعدد اللغات بواجهة حديثة لعرض خدمات الشحن وطلب عروض الأسعار بسلاسة وتنظيم عمليات التشغيل والحسابات.</p>
+            </div>
+            <div class="case-tags">
+              <span>Next.js</span><span>TypeScript</span><span>متعدد اللغات</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="case-card">
+          <div class="case-cover" style="background:linear-gradient(135deg,#064e3b,#047857);">
+            <span class="bento-tag" style="background:rgba(255,255,255,0.16);color:#fff;border-color:rgba(255,255,255,0.25);">🕋 سياحة وحج وعمرة</span>
+            <strong style="font-size:20px;">شركة الساحة للحج والعمرة</strong>
+          </div>
+          <div class="case-body">
+            <div>
+              <h3>موقع وسيستم إدارة متكامل للرحلات</h3>
+              <p>عرض برامج الحج والعمرة باحترافية مع نظام داخلي للحجوزات والمستندات والدفعات وكشوف حسابات الموردين.</p>
+            </div>
+            <div class="case-tags">
+              <span>موقع + سيستم</span><span>إدارة حجوزات</span><span>تقارير PDF</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="case-card">
+          <div class="case-cover" style="background:linear-gradient(135deg,#1e1b4b,#4338ca);">
+            <span class="bento-tag" style="background:rgba(255,255,255,0.16);color:#fff;border-color:rgba(255,255,255,0.25);">📖 تعليم وأكاديميات</span>
+            <strong style="font-size:20px;">أكاديمية إتقان لتحفيظ القرآن</strong>
+          </div>
+          <div class="case-body">
+            <div>
+              <h3>موقع إلكتروني لأكاديمية إتقان</h3>
+              <p>واجهة عربية هادئة وواضحة تعرّف ببرامج التحفيظ والتعليم وتسهّل تسجيل الطلاب والتواصل المباشر مع الإدارة.</p>
+            </div>
+            <div class="case-tags">
+              <span>تصميم عربي متقن</span><span>تجاوب كامل</span><span>سرعة تحميل</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11. 15 ESSENTIAL FAQS (CATEGORIZED + SEARCHABLE) -->
+  <section id="faq" style="background: var(--surface-alt); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+    <div class="container">
+      <div class="section-head center">
+        <span class="eyebrow"><span class="eyebrow-dot"></span> إجابات واضحة وشفافة</span>
+        <h2 class="sec-title">أهم <span class="gradient-text">١٥ سؤالًا شائعًا</span> قبل أن تبدأ مشروعك</h2>
+        <p class="sec-sub">جمعنا لك أكثر الأسئلة التي يطرحها أصحاب الأعمال والتجار حول التكلفة والمدة والملكية والأمان والدعم الفني.</p>
+      </div>
+
+      <div class="faq-controls">
+        <div class="faq-cats" id="faqCats">
+          <button class="faq-cat-btn active" data-cat="all">الكل (15)</button>
+          <button class="faq-cat-btn" data-cat="start">البدء والتكلفة (4)</button>
+          <button class="faq-cat-btn" data-cat="hub">المتاجر ودعيدر هب (4)</button>
+          <button class="faq-cat-btn" data-cat="process">التنفيذ والملكية (4)</button>
+          <button class="faq-cat-btn" data-cat="security">الأمان والدعم (3)</button>
+        </div>
+        <input type="search" id="faqSearch" class="faq-search" placeholder="ابحث في الأسئلة… (مثال: تكلفة، ملكية، دومين)" />
+      </div>
+
+      <div class="faq-list" id="faqList">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- 12. FINAL CONVERSION CTA -->
+  <section>
+    <div class="container">
+      <div class="final-cta">
+        <span class="eyebrow" style="background:rgba(255,255,255,0.14);color:#e0f2fe;border-color:rgba(255,255,255,0.25);">شركاء نجاح · منذ ٢٠٢٦</span>
+        <h2>جاهز تنقل شغلك للمستوى الاحترافي؟</h2>
+        <p>
+          سواء كنت تريد إطلاق متجرك اليوم عبر <strong>متجري</strong>، أو بناء موقع أو نظام مخصص تمامًا لشركتك — تواصل معنا الآن وسنساعدك في اختيار الطريق الأذكى والأوضح.
+        </p>
+        <div class="cta-actions">
+          <a href="https://daidarsoluations.com/ar/request" target="_blank" class="btn btn-white">اطلب استشارة وعرض سعر لمشروعك ←</a>
+          <a href="https://wa.me/201061532875" target="_blank" class="btn btn-wa">💬 تحدث معنا مباشرة على واتساب</a>
+          <a href="https://daidarsoluations.com/ar/hub/stores" target="_blank" class="btn btn-navy">ابدأ متجرك من ٣٥٠ جنيه/شهر</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="brand" style="margin-bottom:14px;">
+            <div class="brand-logo" style="background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.12);">
+              <img src="/logo-light.png" alt="دعيدر" style="display:block;" />
+            </div>
+            <div>
+              <div class="brand-title" style="color:#fff;">دعيدر للحلول البرمجية</div>
+              <div class="brand-sub" style="color:#38bdf8;">شركاء نجاح</div>
+            </div>
+          </div>
+          <p style="font-size:13.5px;line-height:1.85;max-width:300px;">
+            شركة برمجيات متخصصة في تطوير المواقع الإلكترونية، المتاجر الإلكترونية، الأنظمة المخصصة، وحلول SaaS — تأسست عام ٢٠٢٦ لتكون شريكك التقني الدائم.
+          </p>
+        </div>
+
+        <div>
+          <h4>الحلول والمنتجات</h4>
+          <ul>
+            <li><a href="#solutions">المتاجر الإلكترونية</a></li>
+            <li><a href="#solutions">الأنظمة المخصصة (ERP / CRM)</a></li>
+            <li><a href="#solutions">المواقع الاحترافية</a></li>
+            <li><a href="#hub">منصة متجري ودعيدر هب</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4>روابط سريعة</h4>
+          <ul>
+            <li><a href="#scope-finder">حاسبة نطاق المشروع</a></li>
+            <li><a href="#portfolio">معرض الأعمال</a></li>
+            <li><a href="https://daidarsoluations.com/ar/articles" target="_blank">المقالات التقنية</a></li>
+            <li><a href="#faq">الأسئلة الشائعة (15)</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4>تواصل معنا</h4>
+          <ul>
+            <li><a href="https://wa.me/201061532875" target="_blank">واتساب: 2875 153 106 20+</a></li>
+            <li><a href="mailto:khaledhesham012@gmail.com">khaledhesham012@gmail.com</a></li>
+            <li><a href="https://www.facebook.com/daidarsoluations/" target="_blank">Facebook / daidarsoluations</a></li>
+            <li><a href="https://www.instagram.com/daidarsolutions" target="_blank">Instagram / @daidarsolutions</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <span>© ٢٠٢٦ دعيدر للحلول البرمجية. جميع الحقوق محفوظة.</span>
+        <span>نسخة معاينة تجريبية للتصميم الجديد</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Floating WhatsApp -->
+  <a href="https://wa.me/201061532875" target="_blank" class="wa-float" aria-label="تواصل على واتساب">
+    <span>💬</span>
+    <span>تواصل واتساب</span>
+  </a>
+
+  <script>
+    // Theme toggle
+    const themeToggle = document.getElementById('themeToggle');
+    themeToggle.addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      themeToggle.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
+    });
+
+    // 1. Hero Carousel
+    const heroSlides = [
+      {
+        icon: '🛍️',
+        title: 'متجر إلكتروني',
+        desc: 'زوّد فرص الوصول لعملاء محتملين، وخلّي منتجاتك متاحة ٢٤ ساعة بتجربة طلب سريعة ومنظمة.',
+        img: '/images/hero-services/ecommerce.jpg'
+      },
+      {
+        icon: '📊',
+        title: 'نظام إلكتروني لنشاطك',
+        desc: 'نظّم شغلك واعرف كل تفصيلة رايحة فين، بإحصائيات دقيقة تساعدك تطوّر نشاطك وتتخذ قرارات أفضل.',
+        img: '/images/hero-services/business-system.jpg'
+      },
+      {
+        icon: '🌐',
+        title: 'موقع إلكتروني احترافي',
+        desc: 'واكب التطور واظهر أونلاين بهوية رقمية سريعة ومقنعة تحوّل الزوار إلى عملاء حقيقيين.',
+        img: '/images/hero-services/website.jpg'
+      },
+      {
+        icon: '☁️',
+        title: 'أنظمة SaaS ومنتجات رقمية',
+        desc: 'ابدأ مشروعك الإلكتروني من الفكرة إلى الإطلاق ببنية سحابية قابلة للتوسع وإدارة اشتراكات متكاملة.',
+        img: '/images/hero-services/saas.svg'
+      }
+    ];
+    let currentSlide = 0;
+    const bars = Array.from(document.querySelectorAll('#heroBars .p-bar'));
+
+    function renderHeroSlide(index) {
+      currentSlide = index;
+      const s = heroSlides[index];
+      document.getElementById('heroSlideIcon').textContent = s.icon;
+      document.getElementById('heroSlideTitle').textContent = s.title;
+      document.getElementById('heroSlideDesc').textContent = s.desc;
+      document.getElementById('heroSlideImg').src = s.img;
+      document.getElementById('heroSlideImg').alt = s.title;
+      document.getElementById('heroCounter').textContent = `0${index + 1} / 04`;
+      bars.forEach((b, i) => {
+        b.classList.remove('active', 'done');
+        void b.offsetWidth;
+        if (i < index) b.classList.add('done');
+        if (i === index) b.classList.add('active');
+      });
+    }
+    bars.forEach(b => b.addEventListener('click', () => {
+      renderHeroSlide(Number(b.dataset.slide));
+      resetHeroTimer();
+    }));
+    let heroTimer = setInterval(() => renderHeroSlide((currentSlide + 1) % heroSlides.length), 5000);
+    function resetHeroTimer() {
+      clearInterval(heroTimer);
+      heroTimer = setInterval(() => renderHeroSlide((currentSlide + 1) % heroSlides.length), 5000);
+    }
+
+    // 2. Interactive Solutions Explorer
+    const solutionsData = {
+      ecommerce: {
+        tag: '🛍️ مناسب للتجار وأصحاب البراندات والمحلات',
+        title: 'متاجر إلكترونية تبيع لعملائك ٢٤ ساعة',
+        desc: 'سواء اخترت الإطلاق السريع عبر منصة «متجري» في دعيدر هب ابتداءً من ٣٥٠ جنيه شهريًا، أو بناء متجر مخصص بالكامل لهويتك — نوفر لك تجربة شراء سهلة تحوّل الزائر لطلب فعلي.',
+        meta: ['⏱️ الإطلاق: من يوم واحد (متجري) إلى ٢-٤ أسابيع (مخصص)', '📱 تجربة شراء متقنة على الهاتف'],
+        deliverables: [
+          'كتالوج منتجات وتصنيفات مرنة',
+          'سلة شراء وسجل طلبات منظم',
+          'ربط الدومين الخاص ولوجو المتجر',
+          'لوحة تحكم سهلة لإدارة الأسعار والمخزون',
+          'زر تواصل واتساب مباشر لمتجرك',
+          'سرعة تحميل عالية وتوافق مع SEO'
+        ],
+        img: '/images/hero-services/ecommerce.jpg',
+        caption: 'تخفف عنك الرد المتكرر على الأسعار والمقاسات وتجمع كل الطلبات في لوحة واحدة واضحة.'
+      },
+      systems: {
+        tag: '⚙️ مناسب للشركات، المصانع، السياحة، الشحن، والعيادات',
+        title: 'أنظمة إلكترونية مخصصة (ERP / CRM / تشغيل)',
+        desc: 'بدل تطويع شغلك لبرنامج جاهز لا يناسبك، نبني لك نظامًا يعمل بنفس طريقة إدارتك الفعلية — يربط المبيعات والموظفين والعملاء والحسابات والمخزون في مكان واحد.',
+        meta: ['⏱️ التنفيذ: ٣ إلى ٨ أسابيع حسب الحجم', '🔐 صلاحيات دقيقة لكل موظف وقسم'],
+        deliverables: [
+          'لوحات تحكم وتقارير مالية وتشغيلية',
+          'إدارة صلاحيات الموظفين والأقسام',
+          'سجل عملاء وفواتير ودفعات ومتبقيات',
+          'إشعارات ومتابعة لحظية لحالة العمل',
+          'تصدير تقارير PDF وملفات منظمة',
+          'قابلية التوسع وإضافة وحدات مستقبلية'
+        ],
+        img: '/images/hero-services/business-system.jpg',
+        caption: 'يمنحك رؤية فورية لحركة شغلك ويقلل الأخطاء اليدوية وتضييع الوقت بين الملفات.'
+      },
+      websites: {
+        tag: '🌐 مناسب للشركات، المكاتب، الأكاديميات، ومقدمي الخدمات',
+        title: 'مواقع إلكترونية احترافية تبني الثقة وتجلب العملاء',
+        desc: 'موقعك هو واجهتك الأولى أمام العميل. نصممه بهوية بصرية قوية، نصوص تسويقية مقنعة، وسرعة استجابة فائقة ليحول الزوار إلى استفسارات وطلبات فعلية.',
+        meta: ['⏱️ التنفيذ: ١ إلى ٣ أسابيع', '🌍 دعم كامل للعربية والإنجليزية (RTL / LTR)'],
+        deliverables: [
+          'تصميم مخصص يعكس هوية علامتك التجارية',
+          'نماذج طلب خدمة وتواصل مرتبطة بواتساب والبريد',
+          'معرض أعمال وقسم مقالات لرفع الظهور في جوجل',
+          'تحسين كامل للسرعة وتجربة الموبايل',
+          'لوحة إدارة لتحديث مشاريعك ومقالاتك بسهولة',
+          'شهادة أمان SSL واستضافة سحابية مستقرة'
+        ],
+        img: '/images/hero-services/website.jpg',
+        caption: 'يعكس احترافية شركتك من الثانية الأولى ويمنحك مصداقية حقيقية أمام عملائك.'
+      },
+      saas: {
+        tag: '☁️ مناسب لرواد الأعمال وأصحاب الأفكار الرقمية',
+        title: 'بناء منصات SaaS والمنتجات الرقمية القابلة للتوسع',
+        desc: 'نحول فكرتك إلى منتج برمجي سحابي متكامل يبدأ بـ MVP عملي لإطلاقه في السوق بسرعة، ثم يتوسع بثبات مع نمو عدد المستخدمين والاشتراكات.',
+        meta: ['⏱️ إطلاق MVP: ٤ إلى ٨ أسابيع', '🧱 معمارية سحابية معزولة وآمنة'],
+        deliverables: [
+          'تحليل فكرة المنتج وبناء خارطة MVP عملية',
+          'نظام حسابات ومستخدمين وصلاحيات متعدد العملاء',
+          'إدارة الباقات والاشتراكات والترقيات',
+          'واجهات API نظيفة وقابلة للتكامل',
+          'لوحة إدارة مركزية لمالك المنصة',
+          'اختبارات أمان وأداء قبل الإطلاق'
+        ],
+        img: '/images/hero-services/saas.svg',
+        caption: 'بنية تقنية قوية تساعدك تبدأ بدخل متكرر وتطوّر منتجك بثقة دون إعادة البناء من الصفر.'
+      }
+    };
+
+    const explorerBody = document.getElementById('explorerBody');
+    const expTabs = Array.from(document.querySelectorAll('.exp-tab'));
+    function renderExplorer(key) {
+      const d = solutionsData[key];
+      explorerBody.innerHTML = `
+        <div>
+          <span class="eyebrow" style="margin-bottom:10px;">${d.tag}</span>
+          <h3 style="font-size:25px;font-weight:900;margin-bottom:10px;line-height:1.3;">${d.title}</h3>
+          <p style="font-size:15px;color:var(--ink-2);line-height:1.85;margin-bottom:16px;">${d.desc}</p>
+          <div class="exp-meta-row">
+            ${d.meta.map(m => `<span class="exp-meta-pill">${m}</span>`).join('')}
+          </div>
+          <div style="font-size:13.5px;font-weight:900;margin-bottom:6px;">ماذا تستلم فعليًا؟</div>
+          <div class="deliv-grid">
+            ${d.deliverables.map(item => `<div class="deliv-item"><span class="deliv-check">✓</span><span>${item}</span></div>`).join('')}
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;">
+            <a href="https://daidarsoluations.com/ar/request" target="_blank" class="btn btn-primary">اطلب هذه الخدمة ←</a>
+            <a href="#scope-finder" class="btn btn-outline">قدّر نطاق مشروعك</a>
+          </div>
+        </div>
+        <div class="exp-visual-box">
+          <img src="${d.img}" alt="${d.title}" />
+          <div class="exp-visual-caption"><strong>الأثر المباشر على نشاطك:</strong> ${d.caption}</div>
+        </div>
+      `;
+    }
+    expTabs.forEach(tab => tab.addEventListener('click', () => {
+      expTabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      renderExplorer(tab.dataset.tab);
+    }));
+    renderExplorer('ecommerce');
+
+    // 3. Interactive 30-Second Scope Finder
+    const calcState = { type: 'store', scale: 'starter', priority: 'fast' };
+    function bindGroup(id, key) {
+      const btns = Array.from(document.querySelectorAll(`#${id} .opt-btn`));
+      btns.forEach(b => b.addEventListener('click', () => {
+        btns.forEach(x => x.classList.remove('selected'));
+        b.classList.add('selected');
+        calcState[key] = b.dataset.val;
+        renderCalc();
+      }));
+    }
+    bindGroup('calcType', 'type');
+    bindGroup('calcScale', 'scale');
+    bindGroup('calcPriority', 'priority');
+
+    function renderCalc() {
+      let pathTitle = '', desc = '', timeline = '', model = '', bullets = [];
+      if (calcState.type === 'store' && calcState.priority === 'fast' && calcState.scale !== 'enterprise') {
+        pathTitle = 'منصة «متجري» داخل دعيدر هب';
+        desc = 'أسرع وأذكى بداية لبيع منتجاتك أونلاين بدون تكاليف تأسيس ضخمة؛ متجرك يعمل خلال ساعات بـ ٥ ثيمات احترافية ورابط أو دومين خاص.';
+        timeline = 'جاهز خلال ٢٤ ساعة';
+        model = 'يبدأ من ٣٥٠ جنيه/شهر';
+        bullets = ['✓ ٥ ثيمات احترافية ولوجو خاص بك', '✓ إدارة منتجات وطلبات من الهاتف', '✓ ترقية سهلة لباقات الحماية والواتساب أو الدومين'];
+      } else if (calcState.type === 'store') {
+        pathTitle = 'متجر إلكتروني مخصص بالكامل';
+        desc = 'مصمم خصيصًا لهوية علامتك التجارية وتدفق الشراء والمخزون المناسب لنشاطك مع تكامل كامل وأداء عالٍ.';
+        timeline = '٢ إلى ٤ أسابيع';
+        model = 'عرض سعر حسب المواصفات';
+        bullets = ['✓ تصميم UI/UX مخصص لهويتك', '✓ لوحة إدارة شاملة للطلبات والعملاء والتقارير', '✓ قابلية ربط بشركات الشحن وبوابات الدفع'];
+      } else if (calcState.type === 'website') {
+        pathTitle = calcState.scale === 'enterprise' ? 'موقع مؤسسي متكامل + بوابة محتوى' : 'موقع إلكتروني تعريفي احترافي';
+        desc = 'موقع سريع ومقنع تسويقيًا يعرض خدماتك ومشاريعك ومقالاتك باحترافية ويحوّل الزوار إلى عملاء يتواصلون معك.';
+        timeline = calcState.scale === 'starter' ? '١ إلى ٢ أسبوع' : '٢ إلى ٣ أسابيع';
+        model = 'تطوير مخصص بتكلفة واضحة';
+        bullets = ['✓ تصميم متجاوب ١٠٠٪ بالعربية والإنجليزية', '✓ لوحة تحكم للمشاريع والمقالات والطلبات', '✓ تحسين كامل للسرعة ومحركات البحث SEO'];
+      } else if (calcState.type === 'system') {
+        pathTitle = 'نظام إدارة مخصص لنشاطك (ERP / CRM)';
+        desc = 'نبني نظامًا مفصّلًا على دورة عملك الفعلية لإدارة العملاء والموظفين والفواتير والمخزون بصلاحيات دقيقة وتقارير فورية.';
+        timeline = calcState.scale === 'enterprise' ? '٥ إلى ٨ أسابيع' : '٣ إلى ٥ أسابيع';
+        model = 'تنفيذ مرحلي بدفعات واضحة';
+        bullets = ['✓ تحليل كامل لدورة العمل قبل كتابة سطر كود', '✓ صلاحيات مخصصة لكل دور وظيفي', '✓ رابط تتبع شفاف للمشروع وتدريب لفريقك'];
+      } else {
+        pathTitle = 'تطوير منصة SaaS (بدءًا بنسخة MVP)';
+        desc = 'نحدد أهم المزايا التي تطلق منتجك في السوق بأسرع وقت وببنية سحابية آمنة قابلة لاستيعاب مئات وآلاف المشتركين.';
+        timeline = '٤ إلى ٨ أسابيع للنسخة الأولى';
+        model = 'شراكة تطوير مرحلية';
+        bullets = ['✓ معمارية متعددة العملاء وعزل بيانات', '✓ نظام باقات واشتراكات ولوحة إدارة', '✓ خطة توسع واضحة بعد الإطلاق'];
+      }
+
+      const waMsg = encodeURIComponent(`مرحبًا فريق دعيدر، استخدمت أداة تحديد النطاق في الموقع ومهتم بـ: ${pathTitle} (${timeline}).`);
+      document.getElementById('calcResult').innerHTML = `
+        <div>
+          <span class="bento-tag" style="margin-bottom:6px;">✨ التوصية المقترحة لنشاطك</span>
+          <h3>${pathTitle}</h3>
+          <p>${desc}</p>
+          <div class="calc-metrics">
+            <div class="calc-metric"><small>المدة التقديرية</small><strong>${timeline}</strong></div>
+            <div class="calc-metric"><small>نموذج التكلفة</small><strong>${model}</strong></div>
+          </div>
+          <ul class="calc-list">
+            ${bullets.map(b => `<li>${b}</li>`).join('')}
+          </ul>
+        </div>
+        <div style="display:grid;gap:10px;">
+          <a href="https://wa.me/201061532875?text=${waMsg}" target="_blank" class="btn btn-wa" style="width:100%;">💬 ناقش هذه التوصية على واتساب</a>
+          <a href="https://daidarsoluations.com/ar/request" target="_blank" class="btn btn-white" style="width:100%;">أرسل تفاصيل مشروعك لعرض سعر</a>
+        </div>
+      `;
+    }
+    renderCalc();
+
+    // 4. 15 ESSENTIAL FAQS
+    const faqs = [
+      {
+        cat: 'start',
+        q: 'كيف أبدأ مشروعي مع دعيدر للحلول البرمجية؟',
+        a: 'البداية بسيطة جدًا: أرسل لنا فكرة مشروعك عبر صفحة «اطلب خدمة» أو تواصل معنا مباشرة على واتساب. نرتّب معك جلسة سريعة لفهم طبيعة نشاطك وأهدافك، ثم نقدم لك خطة واضحة تشمل المزايا المطلوبة، المدة الزمنية، والتكلفة التفصيلية قبل البدء.'
+      },
+      {
+        cat: 'start',
+        q: 'كم تبلغ تكلفة تصميم موقع إلكتروني أو متجر أو نظام مخصص؟',
+        a: 'تختلف التكلفة حسب نوع المشروع وحجم المزايا المطلوبة. إذا كنت تريد متجرًا إلكترونيًا جاهزًا يمكنك البدء فورًا عبر منصة «متجري» في دعيدر هب ابتداءً من ٣٥٠ جنيه شهريًا، أما المواقع والأنظمة المخصصة فيتم تسعيرها بشفافية كاملة بعد فهم المتطلبات بدون أي مصاريف مخفية.'
+      },
+      {
+        cat: 'start',
+        q: 'كم يستغرق تنفيذ المشروع من البداية حتى الإطلاق؟',
+        a: 'متجر «متجري» الجاهز يُفعّل خلال ساعات قليلة. أما المواقع التعريفية الاحترافية فتستغرق عادةً من أسبوع إلى ٣ أسابيع، والمتاجر والأنظمة المخصصة من ٣ إلى ٨ أسابيع حسب حجم الشاشات والتقارير والربط المطلوب، مع التزامنا بجدول زمني متفق عليه مسبقًا.'
+      },
+      {
+        cat: 'start',
+        q: 'ما هي طرق الدفع المتاحة وهل يمكن تقسيم التكلفة على دفعات؟',
+        a: 'نعم، في المشاريع المخصصة يتم تقسيم التكلفة بشكل عادل على مراحل التنفيذ (دفعة بداية، ودفعات مرتبطة بإنجاز المراحل وتسليم المشروع)، مع إتاحة التحويل عبر InstaPay و Vodafone Cash والتحويل البنكي بوضوح كامل.'
+      },
+      {
+        cat: 'hub',
+        q: 'ما الفرق بين منصة «متجري» في دعيدر هب وبين بناء متجر مخصص بالكامل؟',
+        a: '«متجري» حل سحابي جاهز وسريع يبدأ من ٣٥٠ جنيه شهريًا، يناسب التجار الذين يريدون الانطلاق فورًا بتكلفة شهرية بسيطة مع ٥ ثيمات احترافية ورابط قصير أو دومين خاص. أما المتجر المخصص بالكامل فيناسب العلامات التجارية التي تحتاج تصميمًا فريدًا وتدفقات شحن أو محاسبة أو ربطًا خاصًا جدًا.'
+      },
+      {
+        cat: 'hub',
+        q: 'هل يمكن ربط متجري أو موقعي بدومين خاص باسم نشاطي؟',
+        a: 'نعم بالتأكيد! يمكنك ربط دومينك الخاص (مثل yourbrand.com) سواء في المشاريع المخصصة أو داخل منصة «متجري» في دعيدر هب، ونساعدك في إعداد DNS وشهادة الأمان HTTPS بالكامل ليظهر موقعك باسم علامتك التجارية فقط.'
+      },
+      {
+        cat: 'hub',
+        q: 'هل أحتاج لخبرة تقنية أو برمجية لإدارة موقعي أو متجري بعد التسليم؟',
+        a: 'أبدًا! نُصمم لوحات التحكم بلغة عربية واضحة وخطوات بسيطة يمكنك استخدامها من الهاتف أو الكمبيوتر لإضافة المنتجات أو المقالات أو متابعة الطلبات، كما نوفر لك شرحًا عمليًا عند التسليم، ويمكنك أيضًا الاشتراك في «خدمة إدارة السيستم» لو أردت فريقنا يتولى التشغيل اليومي عنك.'
+      },
+      {
+        cat: 'hub',
+        q: 'هل يمكن ربط الموقع أو النظام بواتساب أو خدمات البريد والتنبيهات؟',
+        a: 'نعم، ندعم الربط المباشر مع واتساب لاستقبال استفسارات وطلبات العملاء برسائل منظمة، وكذلك إشعارات البريد الإلكتروني، وروابط المتابعة، وتكاملات الـ API حسب احتياج مشروعك.'
+      },
+      {
+        cat: 'process',
+        q: 'كيف أتابع تقدم العمل في مشروعي أثناء التنفيذ؟',
+        a: 'نوفر لك شفافية كاملة عبر نظام تتبع المشاريع الخاص بدعيدر، حيث تحصل على رابط متابعة يعرض حالة كل مرحلة وموعدها، بالإضافة إلى تواصل مباشر ومستمر ومعاينة فعلية للواجهات أولًا بأول.'
+      },
+      {
+        cat: 'process',
+        q: 'كيف أضمن أن التصميم سيناسب طبيعة نشاطي قبل البدء في البرمجة؟',
+        a: 'نبدأ دائمًا بفهم هويتك وألوانك والجمهور المستهدف، ونعرض عليك تصورًا واضحًا للواجهات وتجربة المستخدم لأخذ موافقتك قبل الانتقال للتطوير النهائي، مما يضمن خروج الموقع بالشكل الذي يليق بشغلك.'
+      },
+      {
+        cat: 'process',
+        q: 'هل أمتلك الدومين والبيانات وحقوق مشروعي بالكامل؟',
+        a: 'نعم، في المشاريع المخصصة تمتلك حقوق مشروعك وبياناتك ودومينك بالكامل دون احتكار. وفي منصة «متجري» السحابية، بيانات منتجاتك وعملائك وطلباتك مملوكة لك وحدك مع احترام كامل للخصوصية.'
+      },
+      {
+        cat: 'process',
+        q: 'ماذا يحدث إذا أردت إضافة مميزات جديدة لاحقًا بعد الإطلاق؟',
+        a: 'نبني كل مشروع بكود نظيف ومعمارية منظمة تسمح بالتطوير والتوسع في أي وقت دون الحاجة لإعادة البناء من الصفر. كلما نما شغلك يمكننا إضافة وحدات أو تقارير أو خدمات جديدة بسلاسة.'
+      },
+      {
+        cat: 'security',
+        q: 'كيف تضمنون سرعة الموقع وأمان بيانات العملاء والطلبات؟',
+        a: 'نعتمد على بنية Cloudflare العالمية للسرعة والحماية، مع تشفير كامل للاتصالات (HTTPS)، وحماية الخادم ضد الثغرات الشائعة (مثل XSS و CSRF)، وفصل دقيق للصلاحيات، وفحص آلي قبل النشر.'
+      },
+      {
+        cat: 'security',
+        q: 'هل تتوافق المواقع والمتاجر مع الهواتف المحمولة ومحركات البحث (SEO)؟',
+        a: 'نعم ١٠٠٪. نصمم بأسلوب Mobile-First لأن أغلب العملاء يتصفحون من الهاتف، مع هيكلة سليمة للعناوين والروابط والوصف والسرعة، بالإضافة لقسم المقالات الذي يساعدك في الظهور بنتائج بحث جوجل.'
+      },
+      {
+        cat: 'security',
+        q: 'هل تقدمون دعمًا فنيًا وصيانة بعد تسليم المشروع؟',
+        a: 'بالتأكيد! شعارنا في دعيدر هو «شركاء نجاح»، لذلك لا تنتهي علاقتنا بتسليم المشروع. نوفر متابعة فنية لضمان استقرار التشغيل ومعالجة أي ملاحظات، مع خيارات دعم وصيانة وتطوير مستمر حسب احتياجك.'
+      }
+    ];
+
+    let activeFaqCat = 'all';
+    const faqList = document.getElementById('faqList');
+    const faqSearch = document.getElementById('faqSearch');
+    const faqCatBtns = Array.from(document.querySelectorAll('.faq-cat-btn'));
+
+    function renderFaqs() {
+      const q = faqSearch.value.trim().toLowerCase();
+      const filtered = faqs
+        .map((item, idx) => ({ ...item, num: idx + 1 }))
+        .filter(item => {
+          if (activeFaqCat !== 'all' && item.cat !== activeFaqCat) return false;
+          if (!q) return true;
+          return item.q.toLowerCase().includes(q) || item.a.toLowerCase().includes(q);
+        });
+
+      if (!filtered.length) {
+        faqList.innerHTML = `<div style="text-align:center;padding:34px;background:var(--surface);border:1px dashed var(--border);border-radius:18px;color:var(--muted);font-weight:700;">لا توجد أسئلة مطابقة لبحثك. جرّب كلمة أخرى أو تواصل معنا مباشرة على واتساب.</div>`;
+        return;
+      }
+
+      faqList.innerHTML = filtered.map((item, idx) => `
+        <div class="faq-item ${idx === 0 && !q ? 'open' : ''}">
+          <button type="button" class="faq-q" aria-expanded="${idx === 0 && !q ? 'true' : 'false'}">
+            <span class="faq-q-left">
+              <span class="faq-num">${String(item.num).padStart(2, '0')}</span>
+              <span>${item.q}</span>
+            </span>
+            <span class="faq-chevron">+</span>
+          </button>
+          <div class="faq-a">${item.a}</div>
+        </div>
+      `).join('');
+
+      faqList.querySelectorAll('.faq-q').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const card = btn.closest('.faq-item');
+          const wasOpen = card.classList.contains('open');
+          faqList.querySelectorAll('.faq-item').forEach(el => {
+            el.classList.remove('open');
+            el.querySelector('.faq-q').setAttribute('aria-expanded', 'false');
+          });
+          if (!wasOpen) {
+            card.classList.add('open');
+            btn.setAttribute('aria-expanded', 'true');
+          }
+        });
+      });
+    }
+
+    faqCatBtns.forEach(btn => btn.addEventListener('click', () => {
+      faqCatBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeFaqCat = btn.dataset.cat;
+      renderFaqs();
+    }));
+    faqSearch.addEventListener('input', renderFaqs);
+    renderFaqs();
+  </script>
+</body>
+</html>
