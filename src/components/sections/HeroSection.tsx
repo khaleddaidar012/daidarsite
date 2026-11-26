@@ -29,21 +29,18 @@ export function HeroSection({ locale }: HeroSectionProps) {
   return (
     <section
       id="hero"
-      className="relative min-h-[88vh] flex items-center overflow-hidden bg-gradient-to-b from-[#eaf3fb] via-[#f4f8fc] to-[#f8fafc] dark:from-[#081224] dark:via-[#0b1628] dark:to-[#0d192d] border-b border-[#dde7f2] dark:border-[#1a2c48]"
+      className="relative min-h-[86vh] flex items-center overflow-hidden bg-[#f7fafd] dark:bg-[#0b1628] border-b border-[#e2ebf4] dark:border-[#1a2c48]"
       aria-label={locale === 'ar' ? 'القسم الافتتاحي' : 'Hero section'}
     >
-      {/* Subtle architectural grid + ambient radial depth */}
+      {/* Clean uniform subtle architectural dot grid — no blotchy color spills */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
         <div
-          className="absolute inset-0 opacity-[0.45] dark:opacity-[0.16]"
+          className="absolute inset-0 opacity-[0.35] dark:opacity-[0.14]"
           style={{
-            backgroundImage:
-              'radial-gradient(#94b4d4 1px, transparent 1px)',
+            backgroundImage: 'radial-gradient(#9fb6cf 1px, transparent 1px)',
             backgroundSize: '28px 28px',
           }}
         />
-        <div className="absolute -top-28 start-[12%] h-80 w-80 rounded-full bg-[#38bdf8]/20 dark:bg-[#0284c7]/20 blur-3xl" />
-        <div className="absolute -bottom-24 end-[10%] h-96 w-96 rounded-full bg-[#0284c7]/15 dark:bg-[#38bdf8]/10 blur-3xl" />
       </div>
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-20 lg:py-28 relative z-10">
@@ -132,6 +129,30 @@ export function HeroSection({ locale }: HeroSectionProps) {
           {/* ── Rotating Services Showcase ────────── */}
           <HeroServicesCarousel locale={locale} />
 
+        </div>
+
+        {/* Clean Bottom Services Quick-Jump Ribbon (grounds the hero visually) */}
+        <div className="mt-14 pt-7 border-t border-[#dde7f2] dark:border-[#1a2c48] grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {t.hero.carousel.slides.map((slide, idx) => (
+            <Link
+              key={slide.id}
+              href={`/${locale}#services`}
+              className="group flex items-center justify-between gap-2 rounded-2xl border border-[#dde7f2] dark:border-[#1e3456] bg-white/90 dark:bg-[#102038]/90 px-4 py-3 hover:border-[#0284c7] dark:hover:border-[#38bdf8] hover:shadow-sm transition-all"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-[11px] font-mono font-extrabold text-[#0284c7] dark:text-[#38bdf8] bg-[#e6f4fe] dark:bg-[#0f2744] px-2 py-0.5 rounded-md flex-shrink-0">
+                  0{idx + 1}
+                </span>
+                <span className="text-xs sm:text-sm font-extrabold text-[#0f2744] dark:text-[#e8f0fb] truncate">
+                  {slide.title}
+                </span>
+              </div>
+              <ArrowIcon
+                size={14}
+                className="text-[#8fa3bb] group-hover:text-[#0284c7] dark:group-hover:text-[#38bdf8] transition-colors flex-shrink-0"
+              />
+            </Link>
+          ))}
         </div>
       </div>
     </section>
