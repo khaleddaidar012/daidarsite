@@ -134,19 +134,31 @@ function ProjectCard({
           </p>
         </div>
 
-        {/* Tech tags */}
-        <div className="mt-5 pt-4 border-t border-[#eef3f8] dark:border-[#1a2d48] flex flex-wrap gap-1.5">
-          {(locale === 'ar' ? project.technologiesAr : project.technologiesEn)
-            .slice(0, 3)
-            .map((tech) => (
-              <span
-                key={tech}
-                className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#f4f8fc] dark:bg-[#1a2d48] text-[#425874] dark:text-[#9cb8d6] border border-[#e2ebf4] dark:border-[#243b5e]"
-              >
-                {tech}
-              </span>
-            ))}
-        </div>
+        {/* Tech tags & View Link */}
+        {(() => {
+          const techs = (locale === 'ar' ? project.technologiesAr : project.technologiesEn).slice(0, 3)
+          return (
+            <div className="mt-5 pt-4 border-t border-[#eef3f8] dark:border-[#1a2d48] flex items-center justify-between gap-2 flex-wrap">
+              {techs.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {techs.map((tech) => (
+                    <span
+                      key={tech}
+                      className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#f4f8fc] dark:bg-[#1a2d48] text-[#425874] dark:text-[#9cb8d6] border border-[#e2ebf4] dark:border-[#243b5e]"
+                    >
+                      {tech}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0284c7] dark:text-[#38bdf8] group-hover:gap-2 transition-all">
+                  {t.portfolio.viewProject}
+                  <ArrowIcon size={14} />
+                </span>
+              )}
+            </div>
+          )
+        })()}
       </div>
     </Link>
   )
@@ -156,7 +168,7 @@ export function PortfolioPreview({ locale }: PortfolioPreviewProps) {
   const t = getTranslations(locale)
   const isRTL = locale === 'ar'
   const ArrowIcon = isRTL ? ArrowLeft : ArrowRight
-  const projects = useProjects(getPublishedProjects()).slice(0, 3)
+  const projects = useProjects(getPublishedProjects())
 
   return (
     <section
@@ -190,13 +202,20 @@ export function PortfolioPreview({ locale }: PortfolioPreviewProps) {
           </Link>
         </div>
 
-        {/* Projects Grid */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Responsive Multi-Row Projects Grid */}
+        <div
+          className={clsx(
+            'grid gap-6',
+            projects.length === 4
+              ? 'sm:grid-cols-2 lg:grid-cols-4'
+              : 'sm:grid-cols-2 lg:grid-cols-3'
+          )}
+        >
           {projects.map((project, i) => (
             <div
               key={project.id}
               className="animate-fade-in-up"
-              style={{ animationDelay: `${i * 0.1}s` }}
+              style={{ animationDelay: `${Math.min(i, 5) * 0.08}s` }}
             >
               <ProjectCard project={project} locale={locale} t={t} />
             </div>
