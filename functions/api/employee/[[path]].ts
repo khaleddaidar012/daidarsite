@@ -4,6 +4,7 @@ import { workProjects } from '../../lib/work-projects'
 import { hash, json, sameOrigin, verifyPassword, type Env } from '../../lib/store'
 import { withHourlyRates, adjustedPayrollDue, type PayrollAdjustment, cairoDay, cairoTime, calculatePayroll, checkInSchedule, employeeSession, monthlyAttendance, parseWorkWindows, safeEmployee, validCalendarDay, type Employee, type Attendance } from '../../lib/employees'
 import { manageProjects } from '../../lib/projects'
+import { manageArticles } from '../../lib/articles'
 import { adminHub } from '../../lib/hub-admin'
 import { d1UsageResponse } from '../../lib/d1-usage'
 import { recordAdminNotification } from '../../lib/notifications'
@@ -184,6 +185,18 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
         await recordAdminNotification(env, { actor: employee.name, eventType: body.id ? 'project_updated' : 'project_added', title: 'نشاط في معرض الأعمال', detail: `${employee.name} ${action}: «${title}»`, target: 'projects' })
       }
       return response
+    }
+    if (path === 'articles' || path === 'articles/image') {
+      if (employee.manage_articles !== 1) return json({ error: 'حسابك لا يملك صلاحية إضافة أو إدارة المقالات.' }, 403)
+      return await manageArticles(
+        request,
+        env,
+        { role: 'employee', employeeId: employee.id, employeeName: employee.name },
+        path === 'articles/image' ? 'image' : ''
+      )
+    }
+    if (path === 'article-categories') {
+      return json({ error: 'إدارة التصنيفات متاحة للإدارة فقط.' }, 403)
     }
     if (['hub-catalog', 'hub-customers', 'hub-manual-subscriptions'].includes(path)) {
       if (!employee.manage_hub_subscriptions) return json({ error: 'حسابك لا يملك صلاحية تسجيل اشتراكات دعيدر هب.' }, 403)

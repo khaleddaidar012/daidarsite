@@ -9,6 +9,7 @@ import { adminHub } from '../../lib/hub-admin'
 import { d1UsageResponse } from '../../lib/d1-usage'
 import { adminNotifications } from '../../lib/notifications'
 import { createDatabaseBackup } from '../../lib/database-backup'
+import { manageArticles, manageArticleCategories } from '../../lib/articles'
 
 export async function onRequest({ request, env }: { request: Request; env: Env }) {
   try {
@@ -81,6 +82,9 @@ export async function onRequest({ request, env }: { request: Request; env: Env }
       return json({ messages: rows.results, limited: rows.results.length === 500 })
     }
     if (path === 'projects') return await manageProjects(request, env)
+    if (path === 'articles') return await manageArticles(request, env, { role: 'admin' })
+    if (path === 'articles/image') return await manageArticles(request, env, { role: 'admin' }, 'image')
+    if (path === 'article-categories') return await manageArticleCategories(request, env)
     return json({ error: 'غير موجود' }, 404)
   } catch (error) {
     console.error('Admin request failed', error)

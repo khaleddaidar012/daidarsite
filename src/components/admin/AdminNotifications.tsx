@@ -1,10 +1,10 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Bell, BellRing, Blocks, CheckCheck, FolderKanban, LayoutDashboard, Mail, Users, X } from 'lucide-react'
+import { Bell, BellRing, Blocks, CheckCheck, FolderKanban, LayoutDashboard, Mail, Newspaper, Users, X } from 'lucide-react'
 
-type Target = 'overview' | 'projects' | 'employees' | 'messages' | 'hub'
+type Target = 'overview' | 'projects' | 'articles' | 'employees' | 'messages' | 'hub'
 type Item = { id: string; actor: string; event_type: string; title: string; detail: string; target: Target; created_at: number; read_at: number | null }
-const icons = { overview: LayoutDashboard, projects: FolderKanban, employees: Users, messages: Mail, hub: Blocks }
+const icons = { overview: LayoutDashboard, projects: FolderKanban, articles: Newspaper, employees: Users, messages: Mail, hub: Blocks }
 
 export default function AdminNotifications({ onNavigate }: { onNavigate: (section: Target) => void }) {
   const [items, setItems] = useState<Item[]>([])

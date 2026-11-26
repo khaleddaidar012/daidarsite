@@ -46,12 +46,14 @@ export function Navbar({ locale }: NavbarProps) {
     { href: `/${locale}#about`, label: t.about.sectionLabel },
     { href: `/${locale}#services`, label: t.nav.services },
     { href: `/${locale}/portfolio`, label: t.nav.portfolio },
+    { href: `/${locale}/articles`, label: t.nav.articles },
     { href: `/${locale}/hub`, label: locale === 'ar' ? 'دعيدر هب' : 'Daidar Hub' },
   ]
 
   const isActive = (href: string) => {
     if (href.includes('#')) return false
-    return pathname === href
+    if (href === `/${locale}`) return pathname === href
+    return pathname === href || pathname.startsWith(`${href}/`)
   }
 
   return (

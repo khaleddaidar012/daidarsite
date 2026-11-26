@@ -37,8 +37,10 @@ const trackingApi = load('functions/api/tracking.ts', { '../lib/store': store, '
 const serviceConfig = load('src/lib/system-management.ts')
 const serviceSubsLib = load('functions/lib/service-subscriptions.ts', {'./store':store,'./employees':employeeLib,'../../src/lib/system-management':serviceConfig})
 const chatLib=load('functions/lib/staff-chat.ts',{'./store':store})
-const admin = load('functions/api/admin/[[path]].ts', { '../../lib/staff-chat':chatLib, '../../lib/service-subscriptions':serviceSubsLib, '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
-const employeeApi = load('functions/api/employee/[[path]].ts', { '../../lib/staff-chat':chatLib, '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications, '../../lib/vapid': vapid, '../../../matjari/functions/api/[[route]]': { handleStoreRequest: async (request) => { delegatedStoreCalls.push({ url: request.url, method: request.method, body: request.method === 'GET' ? null : await request.clone().json() }); return Response.json({ success: true, merchants: request.method === 'GET' ? [{ store: { id: 'store-test' }, user: { username: 'store-test' } }] : [] }) } } }).onRequest
+const articleContent=load('src/lib/article-content.ts')
+const articlesLib=load('functions/lib/articles.ts',{'./store':store,'./notifications':notifications,'../../src/lib/article-content':articleContent})
+const admin = load('functions/api/admin/[[path]].ts', { '../../lib/articles':articlesLib, '../../lib/staff-chat':chatLib, '../../lib/service-subscriptions':serviceSubsLib, '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications }).onRequest
+const employeeApi = load('functions/api/employee/[[path]].ts', { '../../lib/articles':articlesLib, '../../lib/staff-chat':chatLib, '../../lib/work-projects': workProjectLib, '../../lib/store': store, '../../lib/employees': employeeLib, '../../lib/projects': projectLib, '../../lib/hub-admin': hubAdmin, '../../lib/d1-usage': d1Usage, '../../lib/notifications': notifications, '../../lib/vapid': vapid, '../../../matjari/functions/api/[[route]]': { handleStoreRequest: async (request) => { delegatedStoreCalls.push({ url: request.url, method: request.method, body: request.method === 'GET' ? null : await request.clone().json() }); return Response.json({ success: true, merchants: request.method === 'GET' ? [{ store: { id: 'store-test' }, user: { username: 'store-test' } }] : [] }) } } }).onRequest
 const visit = load('functions/api/visit.ts', { '../lib/store': store }).onRequestPost
 const publicProjects = load('functions/api/projects.ts', { '../lib/store': store }).onRequestGet
 const contact = load('functions/api/contact.ts', { '../lib/store': store, '../lib/notifications': notifications }).onRequestPost
@@ -163,6 +165,7 @@ async function test() {
   sqlite.exec(fs.readFileSync('migrations/0021_employee_shift_change_requests.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0022_relative_payroll_adjustments.sql', 'utf8'))
   sqlite.exec(fs.readFileSync('migrations/0023_hourly_payroll_rates.sql', 'utf8'))
+  sqlite.exec(fs.readFileSync('migrations/0024_articles_and_permissions.sql', 'utf8'))
   for (const path of ['employees', 'attendance', 'employee-requests']) assert.equal((await call(path)).status, 401)
   const employeePassword = 'employee-test-password'
   const schedule = []

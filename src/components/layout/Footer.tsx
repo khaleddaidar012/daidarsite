@@ -17,6 +17,7 @@ export function Footer({ locale }: FooterProps) {
     { href: `/${locale}`, label: t.nav.home },
     { href: `/${locale}#services`, label: t.nav.services },
     { href: `/${locale}/portfolio`, label: t.nav.portfolio },
+    { href: `/${locale}/articles`, label: t.nav.articles },
     { href: `/${locale}/request`, label: t.nav.requestService },
   ]
 

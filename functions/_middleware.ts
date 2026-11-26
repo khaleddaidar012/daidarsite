@@ -3,6 +3,12 @@
 export async function onRequest(context:any) {
  const {env,request}=context;
  const shortUrl=new URL(request.url);
+ const isPrimaryHost=['daidarsoluations.com','www.daidarsoluations.com','daidarsite2.pages.dev'].includes(shortUrl.hostname)||shortUrl.hostname.endsWith('.daidarsite2.pages.dev')||shortUrl.hostname==='localhost'||shortUrl.hostname==='127.0.0.1';
+ const articleMatch=isPrimaryHost?shortUrl.pathname.match(/^\/(ar|en)\/articles\/([a-z0-9-]+)\/?$/):null;
+ if(articleMatch&&articleMatch[2]!=='read'){
+  shortUrl.pathname=`/${articleMatch[1]}/articles/read`;shortUrl.search=`?slug=${encodeURIComponent(articleMatch[2])}`;
+  return context.next(new Request(shortUrl,request));
+ }
  if((['daidarsoluations.com','www.daidarsoluations.com','daidarsite2.pages.dev'].includes(shortUrl.hostname)||shortUrl.hostname.endsWith('.daidarsite2.pages.dev'))&&/^\/s\/[a-z0-9-]+\/?$/.test(shortUrl.pathname)){
   const slug=shortUrl.pathname.split('/')[2],db=env.ECOSYSTEM_STORE_DB;
   if(/^shop-\d+$/.test(slug))return new Response('Store not found',{status:404});

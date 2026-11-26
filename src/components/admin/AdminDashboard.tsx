@@ -6,13 +6,14 @@ import ChatUnreadBadge from '@/components/shared/ChatUnreadBadge'
 import EmployeesManager from './EmployeesManager'
 import ProjectTracker from '@/components/shared/ProjectTracker'
 import AdminClock from './AdminClock'
-import { LayoutDashboard, FolderKanban, Users, Mail, ArrowUpLeft, LogOut, ExternalLink, ShieldCheck, Sparkles, Blocks, Database, MessageCircle } from 'lucide-react'
+import { LayoutDashboard, FolderKanban, Users, Mail, ArrowUpLeft, LogOut, ExternalLink, ShieldCheck, Sparkles, Blocks, Database, MessageCircle, Newspaper } from 'lucide-react'
 import './admin.css'
 import HubAdminManager from './HubAdminManager'
 import D1UsageDashboard from './D1UsageDashboard'
 import PasswordVault from './PasswordVault'
 import { KeyRound } from 'lucide-react'
 import AdminNotifications from './AdminNotifications'
+import ArticleEditorManager from '@/components/shared/ArticleEditorManager'
 
 const sections = [
   { id: 'passwords', label: 'كلمات مرور', icon: KeyRound, detail: 'حسابات المشاريع وكلمات المرور' },
@@ -20,6 +21,7 @@ const sections = [
   { id: 'tracking', label: 'تتبع المشاريع', icon: FolderKanban, detail: 'الجدول الشهري ومتابعة العملاء' },
   { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard, detail: 'متابعة أداء الموقع' },
   { id: 'projects', label: 'المشاريع', icon: FolderKanban, detail: 'إدارة معرض أعمالك' },
+  { id: 'articles', label: 'المقالات', icon: Newspaper, detail: 'إدارة مقالات الموقع والتصنيفات' },
   { id: 'employees', label: 'فريق العمل', icon: Users, detail: 'الحضور والإجازات' },
   { id: 'messages', label: 'رسائل العملاء', icon: Mail, detail: 'كل الطلبات في مكان واحد' },
   { id: 'hub', label: 'دعيدر هب', icon: Blocks, detail: 'الطلبات والاشتراكات والإصدارات' },
@@ -139,6 +141,7 @@ export default function AdminDashboard() {
         <div hidden={activeSection !== 'hub'}><HubAdminManager /></div>
         {activeSection === 'chat' && <StaffChat/>}
         {activeSection === 'passwords' && <PasswordVault />}
+        {activeSection === 'articles' && <ArticleEditorManager scope="admin" onUnauthorized={() => setSession(null)} />}
         <div hidden={activeSection !== 'tracking'}><ProjectTracker /></div><div hidden={activeSection !== 'databases'}><D1UsageDashboard /></div>
         <footer className="admin-footer"><span>دعيدر للحلول البرمجية</span><span>لوحة الإدارة · كل التفاصيل في مكان واحد</span></footer>
       </>}

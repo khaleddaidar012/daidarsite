@@ -4,6 +4,7 @@ import { HeroSection } from '@/components/sections/HeroSection'
 import { AboutSection } from '@/components/sections/AboutSection'
 import { ServicesSection } from '@/components/sections/ServicesSection'
 import { PortfolioPreview } from '@/components/sections/PortfolioPreview'
+import { ArticlesPreview } from '@/components/sections/ArticlesPreview'
 import { CtaSection } from '@/components/sections/CtaSection'
 
 type Props = {
@@ -35,6 +36,7 @@ export default async function HomePage({ params }: Props) {
       <AboutSection locale={locale} />
       <ServicesSection locale={locale} />
       <PortfolioPreview locale={locale} />
+      <ArticlesPreview locale={locale} />
       <CtaSection locale={locale} />
     </>
   )
