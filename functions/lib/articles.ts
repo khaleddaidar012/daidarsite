@@ -28,6 +28,7 @@ interface ArticleDbRow {
   category_name_en?: string
   cover_mime: string
   cover_base64?: string
+  static_cover_url?: string
   cover_alt: string
   status: 'published' | 'draft'
   author_type: 'admin' | 'employee'
@@ -133,6 +134,16 @@ function toCategorySlug(input: string): string {
   return ascii || `cat-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`
 }
 
+function resolveCoverUrl(row: ArticleDbRow, scope?: 'admin' | 'employee') {
+  const staticPath = row.static_cover_url || (row.cover_mime === 'static' ? row.cover_base64 : '')
+  if (row.cover_mime === 'static' && typeof staticPath === 'string' && /^\/images\/articles\/[a-z0-9-]+\.(?:jpg|jpeg|png|webp)$/i.test(staticPath)) {
+    return staticPath
+  }
+  return scope
+    ? `/api/${scope}/articles/image?id=${encodeURIComponent(row.id)}&v=${row.updated_at}`
+    : `/api/articles/image?id=${encodeURIComponent(row.id)}&v=${row.updated_at}`
+}
+
 function publicArticleDto(row: ArticleDbRow, includeContent: boolean) {
   return {
     id: row.id,
@@ -144,7 +155,7 @@ function publicArticleDto(row: ArticleDbRow, includeContent: boolean) {
     category_slug: row.category_slug || '',
     category_name_ar: row.category_name_ar || '',
     category_name_en: row.category_name_en || '',
-    cover_url: `/api/articles/image?id=${encodeURIComponent(row.id)}&v=${row.updated_at}`,
+    cover_url: resolveCoverUrl(row),
     cover_alt: row.cover_alt || row.title,
     published_at: row.published_at || row.created_at,
     updated_at: row.updated_at,
@@ -162,7 +173,7 @@ function managedArticleDto(row: ArticleDbRow, scope: 'admin' | 'employee') {
     category_slug: row.category_slug || '',
     category_name_ar: row.category_name_ar || '',
     category_name_en: row.category_name_en || '',
-    cover_url: `/api/${scope}/articles/image?id=${encodeURIComponent(row.id)}&v=${row.updated_at}`,
+    cover_url: resolveCoverUrl(row, scope),
     cover_alt: row.cover_alt || row.title,
     status: row.status,
     ...(scope === 'admin'
@@ -230,6 +241,7 @@ export async function publicArticles(request: Request, env: Env, subPath = '') {
       }
       const row = await env.DB.prepare(
         `SELECT a.id, a.slug, a.title, a.excerpt, a.content, a.category_id, a.cover_mime, a.cover_alt,
+                CASE WHEN a.cover_mime = 'static' THEN a.cover_base64 ELSE '' END AS static_cover_url,
                 a.status, a.published_at, a.created_at, a.updated_at,
                 c.slug AS category_slug, c.name_ar AS category_name_ar, c.name_en AS category_name_en
          FROM articles a
@@ -260,6 +272,7 @@ export async function publicArticles(request: Request, env: Env, subPath = '') {
     const articlesQuery = categorySlug
       ? env.DB.prepare(
           `SELECT a.id, a.slug, a.title, a.excerpt, a.category_id, a.cover_mime, a.cover_alt,
+                  CASE WHEN a.cover_mime = 'static' THEN a.cover_base64 ELSE '' END AS static_cover_url,
                   a.status, a.published_at, a.created_at, a.updated_at,
                   c.slug AS category_slug, c.name_ar AS category_name_ar, c.name_en AS category_name_en
            FROM articles a
@@ -272,6 +285,7 @@ export async function publicArticles(request: Request, env: Env, subPath = '') {
           .all<ArticleDbRow>()
       : env.DB.prepare(
           `SELECT a.id, a.slug, a.title, a.excerpt, a.category_id, a.cover_mime, a.cover_alt,
+                  CASE WHEN a.cover_mime = 'static' THEN a.cover_base64 ELSE '' END AS static_cover_url,
                   a.status, a.published_at, a.created_at, a.updated_at,
                   c.slug AS category_slug, c.name_ar AS category_name_ar, c.name_en AS category_name_en
            FROM articles a
@@ -334,6 +348,7 @@ export async function manageArticles(request: Request, env: Env, actor: ArticleA
         actor.role === 'admin'
           ? env.DB.prepare(
               `SELECT a.id, a.slug, a.title, a.excerpt, a.content, a.category_id, a.cover_mime, a.cover_alt,
+                      CASE WHEN a.cover_mime = 'static' THEN a.cover_base64 ELSE '' END AS static_cover_url,
                       a.status, a.author_type, a.author_employee_id, a.published_at, a.created_at, a.updated_at,
                       c.slug AS category_slug, c.name_ar AS category_name_ar, c.name_en AS category_name_en,
                       e.name AS author_employee_name
@@ -344,6 +359,7 @@ export async function manageArticles(request: Request, env: Env, actor: ArticleA
             ).all<ArticleDbRow>()
           : env.DB.prepare(
               `SELECT a.id, a.slug, a.title, a.excerpt, a.content, a.category_id, a.cover_mime, a.cover_alt,
+                      CASE WHEN a.cover_mime = 'static' THEN a.cover_base64 ELSE '' END AS static_cover_url,
                       a.status, a.author_type, a.author_employee_id, a.published_at, a.created_at, a.updated_at,
                       c.slug AS category_slug, c.name_ar AS category_name_ar, c.name_en AS category_name_en
                FROM articles a
